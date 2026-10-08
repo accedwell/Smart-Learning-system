@@ -8,7 +8,7 @@ export default function Landing({ onLogin, onSignup }){
       <div className="landing-topbar">
         <div className="landing-logo">
           <BrandMark size={30}/>
-          <b>{t('app_title').replace(/\s*[–-]\s*Prototype$/i, '')}</b>
+          <b>{t('app_title')}</b>
         </div>
         <div className="landing-topbar-actions">
           <button className="btn landing-btn-outline" onClick={onLogin}>{t('landing_login_btn')}</button>

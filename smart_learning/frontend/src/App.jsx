@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from './store/AppStore.jsx'
-import { useI18n } from './i18n/I18nContext.jsx'
-import { ADMIN_CREATED_ROLES, findAccount } from './services/accounts.js'
+import { findAccount } from './services/accounts.js'
 import Landing from './auth/Landing.jsx'
 import Login from './auth/Login.jsx'
 import Signup from './auth/Signup.jsx'
@@ -13,7 +12,6 @@ import ChatWidget from './layout/ChatWidget.jsx'
 
 export default function App(){
   const { state, update } = useStore();
-  const { t } = useI18n();
   // the password-reset email links to /?reset=<token>
   const [resetToken] = useState(()=>new URLSearchParams(window.location.search).get('reset'));
   const [screen, setScreen] = useState(resetToken ? 'reset' : 'landing'); // 'landing' | 'login' | 'signup' | 'forgot' | 'reset' | 'first-login'
@@ -42,26 +40,16 @@ export default function App(){
     });
   }
 
-  function handleLogin({ email, role, grade, password, extra }){
+  // email + password only: the account decides the role (and a learner's grade)
+  function handleLogin({ email, password }){
     const account = findAccount(state.admin.users, email);
-    if(account){
-      if(account.password!==password) return { key:'login_error_password' };
-      if(account.role!==role) return { key:'login_error_role', vars:{ role:t('tab_'+account.role) } };
-      if(account.mustChangePassword){
-        setPendingLogin({ accountId:account.id, extra });
-        setScreen('first-login');
-        return null;
-      }
-      enterWithAccount(account, extra);
+    if(!account || account.password!==password) return { key:'login_error_password' };
+    if(account.mustChangePassword){
+      setPendingLogin({ accountId:account.id, extra:{} });
+      setScreen('first-login');
       return null;
     }
-    // teachers, parents, HODs and principals only exist once the administrator adds them
-    if(ADMIN_CREATED_ROLES.includes(role)) return { key:'login_error_no_account', vars:{ role:t('tab_'+role) } };
-    // prototype demo: learners and administrators without an account can still look around
-    update(s=>{
-      s.auth = { loggedIn:true, name:email || t('login_email_placeholder'), role, grade, ...extra };
-      s.role = role;
-    });
+    enterWithAccount(account, {});
     return null;
   }
 
@@ -106,7 +94,7 @@ export default function App(){
   const toLogin = ()=>{ leaveReset(); setPendingLogin(null); setScreen('login'); };
   const pendingAccount = pendingLogin && state.admin.users.find(u=>u.id===pendingLogin.accountId);
   if(screen==='first-login' && pendingAccount) return <FirstLoginPassword account={pendingAccount} onSave={finishFirstLogin} onCancel={toLogin}/>;
-  if(screen==='login') return <Login onSubmit={handleLogin} onSignup={()=>setScreen('signup')} onForgot={()=>setScreen('forgot')} onHome={home}/>;
+  if(screen==='login') return <Login onSubmit={handleLogin} onSignup={()=>setScreen('signup')} onForgot={()=>setScreen('forgot')}/>;
   if(screen==='signup') return <Signup onSubmit={handleSignup} onLogin={toLogin} onHome={home}/>;
   if(screen==='reset' && resetToken) return <ResetPassword token={resetToken} onLogin={toLogin} onForgot={()=>{ leaveReset(); setScreen('forgot'); }}/>;
   if(screen==='forgot') return <ForgotPassword onLogin={toLogin} onHome={home}/>;

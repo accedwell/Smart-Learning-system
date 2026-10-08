@@ -24,7 +24,6 @@ export default function InviteEmailCard({ invite, onClose }){
       <div className="meta">To: {invite.email}</div>
       <div className="meta" style={{ marginBottom:8 }}>Subject: {subject}</div>
       <pre style={{ margin:0, whiteSpace:'pre-wrap', fontFamily:'inherit', fontSize:12.5, lineHeight:1.5 }}>{body}</pre>
-      <p className="ai-note">{t('admin_invite_note')}</p>
       <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
         <a className="btn btn-primary" href={mailto}>{t('admin_invite_open_btn')}</a>
         <button className="btn" onClick={copy}>{copied ? t('admin_invite_copied') : t('admin_invite_copy_btn')}</button>

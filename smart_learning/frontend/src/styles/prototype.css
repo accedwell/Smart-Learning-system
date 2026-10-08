@@ -429,6 +429,15 @@ img{max-width:100%}
     width:100%; font-family:inherit; font-size:13px; padding:8px 10px; border-radius:9px;
     border:1px solid var(--border); background:var(--bg); color:var(--ink);
   }
+  /* password box with a show/hide eye button inside its right edge */
+  .pw-input{ position:relative; }
+  .pw-input input{ padding-right:38px; }
+  .pw-toggle{ position:absolute; top:50%; right:4px; transform:translateY(-50%); display:flex; align-items:center;
+    justify-content:center; width:30px; height:30px; padding:0; border:none; border-radius:7px; background:none;
+    color:var(--ink-soft); cursor:pointer; }
+  .pw-toggle:hover{ color:var(--ink); background:var(--border); }
+  .pw-toggle:focus-visible{ outline:2px solid var(--brand); outline-offset:1px; }
+  .pw-toggle .icon-inline svg{ width:17px; height:17px; }
   .stars{ display:flex; gap:4px; }
   .stars button{ background:none; border:none; font-size:20px; cursor:pointer; color:var(--border); padding:2px; }
   .stars button.on{ color:var(--principal); }

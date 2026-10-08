@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useI18n } from '../i18n/I18nContext.jsx'
 import { HeroIllustration, GradeSelect } from '../components/ui.jsx'
 import { SELF_SIGNUP_ROLES } from '../services/accounts.js'
-import { AuthLangBar, RoleSelect, LinkButton } from './authParts.jsx'
+import { AuthLangBar, RoleSelect, LinkButton, PasswordInput } from './authParts.jsx'
 
 // SIGN UP: new-account screen for learners and school administrators only;
 // every other role is created by the administrator from the admin dashboard.
@@ -63,11 +63,11 @@ export default function Signup({ onSubmit, onLogin, onHome }){
           )}
           <div className="field">
             <label htmlFor="signupPassword">{t('signup_password_label')}</label>
-            <input type="password" id="signupPassword" value={password} onChange={(e)=>setPassword(e.target.value)} placeholder={t('signup_password_placeholder')} autoComplete="new-password" required/>
+            <PasswordInput id="signupPassword" value={password} onChange={setPassword} placeholder={t('signup_password_placeholder')} autoComplete="new-password" required/>
           </div>
           <div className="field">
             <label htmlFor="signupConfirmPassword">{t('signup_confirm_label')}</label>
-            <input type="password" id="signupConfirmPassword" value={confirm} onChange={(e)=>setConfirm(e.target.value)} placeholder={t('signup_confirm_placeholder')} autoComplete="new-password" required/>
+            <PasswordInput id="signupConfirmPassword" value={confirm} onChange={setConfirm} placeholder={t('signup_confirm_placeholder')} autoComplete="new-password" required/>
           </div>
           {error && <p className="field-error">{t(error.key, error.vars)}</p>}
           <button type="submit" className="btn btn-primary" style={{ padding:10, fontSize:13 }}>{t('signup_button')}</button>

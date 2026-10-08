@@ -3,7 +3,7 @@ import { useI18n } from '../i18n/I18nContext.jsx'
 import { HeroIllustration, Icon } from '../components/ui.jsx'
 import { MIN_PASSWORD_LENGTH } from '../services/accounts.js'
 import { apiPost } from '../services/api.js'
-import { LinkButton } from './authParts.jsx'
+import { LinkButton, PasswordInput } from './authParts.jsx'
 
 // opened from the link in the password-reset email (?reset=<token>)
 export default function ResetPassword({ token, onLogin, onForgot }){
@@ -47,11 +47,11 @@ export default function ResetPassword({ token, onLogin, onForgot }){
           <form className="login-body" onSubmit={submit}>
             <div className="field">
               <label htmlFor="resetNew">{t('pw_new_label')}</label>
-              <input type="password" id="resetNew" value={next} onChange={(e)=>setNext(e.target.value)} autoComplete="new-password" required/>
+              <PasswordInput id="resetNew" value={next} onChange={setNext} autoComplete="new-password" required/>
             </div>
             <div className="field">
               <label htmlFor="resetConfirm">{t('pw_confirm_label')}</label>
-              <input type="password" id="resetConfirm" value={confirm} onChange={(e)=>setConfirm(e.target.value)} autoComplete="new-password" required/>
+              <PasswordInput id="resetConfirm" value={confirm} onChange={setConfirm} autoComplete="new-password" required/>
             </div>
             {error && <p className="field-error">{t(error.code, error.vars)}</p>}
             {error && error.code==='reset_link_invalid' && <p className="forgot-pw-line"><LinkButton onClick={onForgot}>{t('reset_request_new_link')}</LinkButton></p>}

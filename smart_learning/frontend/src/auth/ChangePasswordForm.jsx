@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useI18n } from '../i18n/I18nContext.jsx'
+import { PasswordInput } from './authParts.jsx'
 import { MIN_PASSWORD_LENGTH } from '../services/accounts.js'
 
 // new password + confirmation. Asks for the current password too unless the
@@ -26,16 +27,16 @@ export default function ChangePasswordForm({ account, requireCurrent, onSave, on
       {requireCurrent && (
         <div className="field">
           <label htmlFor="pwCurrent">{t('pw_current_label')}</label>
-          <input type="password" id="pwCurrent" value={current} onChange={(e)=>setCurrent(e.target.value)} autoComplete="current-password" required/>
+          <PasswordInput id="pwCurrent" value={current} onChange={setCurrent} autoComplete="current-password" required/>
         </div>
       )}
       <div className="field">
         <label htmlFor="pwNew">{t('pw_new_label')}</label>
-        <input type="password" id="pwNew" value={next} onChange={(e)=>setNext(e.target.value)} autoComplete="new-password" required/>
+        <PasswordInput id="pwNew" value={next} onChange={setNext} autoComplete="new-password" required/>
       </div>
       <div className="field">
         <label htmlFor="pwConfirm">{t('pw_confirm_label')}</label>
-        <input type="password" id="pwConfirm" value={confirm} onChange={(e)=>setConfirm(e.target.value)} autoComplete="new-password" required/>
+        <PasswordInput id="pwConfirm" value={confirm} onChange={setConfirm} autoComplete="new-password" required/>
       </div>
       {error && <p className="field-error">{error}</p>}
       <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
