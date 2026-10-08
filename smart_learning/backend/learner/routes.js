@@ -1,0 +1,235 @@
+// /api/learner: lessons, the check-in quiz, teachers' quizzes for the learner's grade,
+// question papers, and rating teachers.
+const express = require('express');
+const db = require('../lib/db');
+const auth = require('../lib/auth');
+const ai = require('../lib/ai');
+const { aiLimiter } = require('../lib/rateLimit');
+const { catalog, t, langNote } = require('../lib/catalog');
+const { lessonsFor, refreshProgress, statusFor, latestCheckin } = require('../lib/learners');
+const { parentIdsOf, notify } = require('../lib/users');
+const { learnerView, mark } = require('../lib/quizzes');
+const http = require('../lib/http');
+
+const router = express.Router();
+router.use(auth.requireAuth(), auth.requireRole('learner'));
+
+// answers sent this long after a timed quiz's deadline are not accepted
+const DEADLINE_GRACE_MS = 30 * 1000;
+
+// AI extras are best-effort: the main action still succeeds when AI is unavailable or the
+// learner has used up their AI budget for the minute
+async function optionalAi(req, fn) {
+  if (!aiLimiter.allows(req)) return null;
+  try {
+    return await fn();
+  } catch (err) {
+    if (err instanceof http.HttpError) return null;
+    throw err;
+  }
+}
+
+// ---- lessons ----
+
+router.get('/lessons', async (req, res) => {
+  res.json({ grade: req.user.grade, lessons: await lessonsFor(req.user) });
+});
+
+// marks the lesson done and asks AI for the next best activity (`recommendation` is null without AI)
+router.post('/lessons/:id/complete', async (req, res) => {
+  const lessonId = http.id(req.params.id);
+  const lesson = await db.one('SELECT * FROM lessons WHERE id = ?', [lessonId]);
+  if (!lesson) throw http.notFound('lesson_not_found', 'No such lesson');
+  await lessonsFor(req.user); // makes sure the learner has their lesson rows
+  await db.tx(async (conn) => {
+    await db.query('UPDATE learner_lessons SET progress = 100, done = 1 WHERE learner_id = ? AND lesson_id = ?', [req.user.id, lessonId], conn);
+    await refreshProgress(req.user.id, conn);
+    await notify(await parentIdsOf(req.user.id, conn), { message: `${req.user.name} completed the lesson "${t(lesson.lesson_key)}".` }, conn);
+  });
+  const recommendation = await optionalAi(req, () => ai.askOneLiner(
+    `A learner just completed the lesson "${t(lesson.lesson_key)}" on an education platform called Smart Learning. ` +
+    'In ONE short sentence (max 25 words), recommend the next best personalised learning activity for them, warmly and ' +
+    `specifically.${langNote(http.body(req).lang)}`,
+  ));
+  res.json({ lessons: await lessonsFor(req.user), recommendation });
+});
+
+router.post('/lessons/:id/assessment-viewed', async (req, res) => {
+  await lessonsFor(req.user);
+  await db.query('UPDATE learner_lessons SET assessment_viewed = 1 WHERE learner_id = ? AND lesson_id = ?', [req.user.id, http.id(req.params.id)]);
+  res.json({ lessons: await lessonsFor(req.user) });
+});
+
+// ---- check-in quiz (the built-in multiple-choice quiz from the catalog) ----
+
+router.get('/checkin', async (req, res) => {
+  res.json({ latest: await latestCheckin(req.user.id) });
+});
+
+// answers: the chosen option index for each question, in order
+router.post('/checkin', async (req, res) => {
+  const b = http.body(req);
+  const bank = catalog.QUIZ_BANK;
+  if (!Array.isArray(b.answers) || b.answers.length !== bank.length) {
+    throw http.badRequest('invalid_field', `answers must list one choice for each of the ${bank.length} questions`, { field: 'answers' });
+  }
+  const answers = b.answers.map((a) => (Number.isInteger(a) ? a : null));
+  const missed = bank.filter((item, i) => answers[i] !== item.correct);
+  const score = bank.length - missed.length;
+  const feedback = missed.length === 0 ? null : await optionalAi(req, () => ai.askOneLiner(
+    `A ${t('grade_' + req.user.grade)} learner just took a short check-in quiz on a platform called Smart Learning and got ` +
+    `${score} out of ${bank.length} correct. They struggled with questions about: ${missed.map((m) => t(m.qKey)).join('; ')}. ` +
+    `In ONE short, encouraging sentence (max 25 words), tell them what to focus on next.${langNote(b.lang)}`,
+  ));
+  await db.query('INSERT INTO checkin_attempts (learner_id, answers, score, total, feedback) VALUES (?, ?, ?, ?, ?)',
+    [req.user.id, JSON.stringify(answers), score, bank.length, feedback ? feedback.slice(0, 500) : null]);
+  res.status(201).json({
+    score, total: bank.length, status: statusFor(score / bank.length),
+    missed: missed.map((m) => ({ qKey: m.qKey, correctKey: m.optKeys[m.correct] })),
+    feedback,
+  });
+});
+
+// ---- teachers' quizzes ----
+
+function attemptView(a) {
+  if (!a) return null;
+  return {
+    startedAt: a.started_at, deadline: a.deadline, submitted: a.submitted_at != null, submittedAt: a.submitted_at,
+    score: a.score, total: a.total, timedOut: Boolean(a.timed_out),
+  };
+}
+
+async function quizForLearner(req) {
+  const quiz = await db.one(
+    `SELECT z.*, u.name AS teacher_name FROM quizzes z LEFT JOIN users u ON u.id = z.teacher_id WHERE z.id = ? AND z.grade = ?`,
+    [http.id(req.params.id), req.user.grade],
+  );
+  if (!quiz) throw http.notFound('quiz_not_found', 'No such quiz for your grade');
+  return quiz;
+}
+
+// quizzes for the learner's grade (?subjectKey= narrows to one subject), each with their attempt
+router.get('/quizzes', async (req, res) => {
+  const params = [req.user.id, req.user.grade];
+  let filter = '';
+  if (req.query.subjectKey && req.query.subjectKey !== 'all') {
+    filter = 'AND z.subject_key = ?';
+    params.push(http.oneOf(req.query.subjectKey, catalog.SUBJECT_OPTIONS, 'subjectKey'));
+  }
+  const rows = await db.query(
+    `SELECT z.*, u.name AS teacher_name, a.started_at, a.deadline, a.submitted_at, a.score, a.total, a.timed_out,
+            a.id AS attempt_id
+       FROM quizzes z
+       LEFT JOIN users u ON u.id = z.teacher_id
+       LEFT JOIN quiz_attempts a ON a.quiz_id = z.id AND a.learner_id = ?
+      WHERE z.grade = ? ${filter}
+      ORDER BY z.subject_key, z.created_at`,
+    params,
+  );
+  res.json({ quizzes: rows.map((q) => ({ ...learnerView(q), attempt: q.attempt_id ? attemptView(q) : null })) });
+});
+
+// starts the quiz (or resumes the attempt in progress); { retake: true } starts over after a submission
+router.post('/quizzes/:id/start', async (req, res) => {
+  const quiz = await quizForLearner(req);
+  const existing = await db.one('SELECT * FROM quiz_attempts WHERE quiz_id = ? AND learner_id = ?', [quiz.id, req.user.id]);
+  const retake = http.body(req).retake === true;
+  if (existing && !(existing.submitted_at && retake)) {
+    return res.json({ quiz: learnerView(quiz), attempt: attemptView(existing) });
+  }
+  const now = new Date();
+  const deadline = quiz.time_limit_min ? new Date(now.getTime() + quiz.time_limit_min * 60000) : null;
+  await db.query(
+    `INSERT INTO quiz_attempts (quiz_id, learner_id, total, started_at, deadline) VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE answers = NULL, score = NULL, timed_out = 0, total = VALUES(total),
+       started_at = VALUES(started_at), deadline = VALUES(deadline), submitted_at = NULL`,
+    [quiz.id, req.user.id, quiz.questions.length, now, deadline],
+  );
+  const attempt = await db.one('SELECT * FROM quiz_attempts WHERE quiz_id = ? AND learner_id = ?', [quiz.id, req.user.id]);
+  res.status(201).json({ quiz: learnerView(quiz), attempt: attemptView(attempt) });
+});
+
+// answers: the typed answer for each question, in order
+router.post('/quizzes/:id/submit', async (req, res) => {
+  const quiz = await quizForLearner(req);
+  const attempt = await db.one('SELECT * FROM quiz_attempts WHERE quiz_id = ? AND learner_id = ?', [quiz.id, req.user.id]);
+  if (!attempt) throw http.conflict('quiz_not_started', 'Start the quiz before submitting it');
+  if (attempt.submitted_at) throw http.conflict('quiz_already_submitted', 'This quiz has already been submitted; start a retake first');
+
+  const b = http.body(req);
+  const answers = (Array.isArray(b.answers) ? b.answers : []).slice(0, quiz.questions.length)
+    .map((a) => (typeof a === 'string' ? a.slice(0, 200) : ''));
+  const now = Date.now();
+  const deadline = attempt.deadline ? new Date(attempt.deadline).getTime() : null;
+  const timedOut = deadline != null && now >= deadline;
+  // answers that arrive well after the deadline are discarded (the UI submits at the deadline itself)
+  const late = deadline != null && now > deadline + DEADLINE_GRACE_MS;
+  const score = late ? 0 : mark(quiz, answers);
+
+  await db.tx(async (conn) => {
+    await db.query(
+      'UPDATE quiz_attempts SET answers = ?, score = ?, total = ?, timed_out = ?, submitted_at = ? WHERE id = ?',
+      [JSON.stringify(late ? [] : answers), score, quiz.questions.length, timedOut, new Date(now), attempt.id], conn,
+    );
+    // only the learner's linked parents hear about the mark
+    await notify(await parentIdsOf(req.user.id, conn), {
+      message: `${req.user.name} scored ${score}/${quiz.questions.length} on "${quiz.title}" (${t(quiz.subject_key)}).`,
+    }, conn);
+  });
+  const saved = await db.one('SELECT * FROM quiz_attempts WHERE id = ?', [attempt.id]);
+  res.json({
+    attempt: attemptView(saved),
+    // the marked questions, now that the attempt is over
+    review: quiz.questions.map((q, i) => ({
+      text: q.text, answer: q.answer, given: answers[i] || '',
+      correct: !late && Boolean(answers[i]) && answers[i].trim().toLowerCase() === q.answer.trim().toLowerCase(),
+    })),
+  });
+});
+
+// ---- question papers ----
+
+router.get('/papers', async (req, res) => {
+  const rows = await db.query(
+    `SELECT p.*, u.name AS teacher_name FROM papers p LEFT JOIN users u ON u.id = p.teacher_id
+      WHERE p.grade = ? ORDER BY p.created_at DESC`,
+    [req.user.grade],
+  );
+  res.json({
+    papers: rows.map((p) => ({
+      id: p.id, title: p.title, grade: p.grade, subjectKey: p.subject_key, fileName: p.file_name, mimeType: p.mime_type,
+      teacherName: p.teacher_name, fileUrl: `/api/papers/${p.id}/file`, createdAt: p.created_at,
+    })),
+  });
+});
+
+// ---- rating teachers ----
+
+router.get('/teachers', async (req, res) => {
+  const rows = await db.query(
+    `SELECT u.id, u.name, u.subject_key, u.teach_grade, r.rating AS my_rating
+       FROM users u LEFT JOIN teacher_ratings r ON r.teacher_id = u.id AND r.learner_id = ?
+      WHERE u.role = 'teacher' ORDER BY (u.teach_grade = ?) DESC, u.name`,
+    [req.user.id, req.user.grade],
+  );
+  res.json({
+    teachers: rows.map((r) => ({
+      id: r.id, name: r.name, subjectKey: r.subject_key, gradeKey: r.teach_grade ? 'grade_' + r.teach_grade : null, myRating: r.my_rating,
+    })),
+  });
+});
+
+// one rating per learner per teacher; rating again replaces it
+router.put('/teachers/:id/rating', async (req, res) => {
+  const teacher = await db.one("SELECT id FROM users WHERE id = ? AND role = 'teacher'", [http.id(req.params.id)]);
+  if (!teacher) throw http.notFound('teacher_not_found', 'No such teacher');
+  const rating = http.int(http.body(req).rating, 'rating', { min: 1, max: 5 });
+  await db.query(
+    'INSERT INTO teacher_ratings (teacher_id, learner_id, rating) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE rating = VALUES(rating)',
+    [teacher.id, req.user.id, rating],
+  );
+  res.json({ teacherId: teacher.id, rating });
+});
+
+module.exports = router;

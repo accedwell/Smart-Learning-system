@@ -1,0 +1,2983 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Smart Learning Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    /* navy + gold + blue palette, matching the TUT-style reference: a warm gold as
+       the dominant/CTA color, dark navy as the anchor for gradients, and a bright
+       blue (the sidebar's active-highlight color) as the secondary accent */
+    --bg:#f6f5ee; --surface:color-mix(in srgb, #f6f5ee 93%, transparent); --ink:#182219; --ink-soft:#5c6b5c; --border:#e4ddc7;
+    --brand:#b8791f; --brand-ink:#0f1a38; --accent:#f2a63c;
+    --font-display:'Outfit','Inter',system-ui,-apple-system,sans-serif;
+    --font-body:'Inter',system-ui,-apple-system,sans-serif;
+    --learner:#2563eb; --learner-tint:#eaf1fd;
+    --teacher:#7c3aed; --teacher-tint:#f2edfc;
+    --parent:#0f766e; --parent-tint:#e7faf7;
+    --principal:#c8871a; --principal-tint:#fbf1de;
+    --hod:#b23a63; --hod-tint:#fbe9f0;
+    --admin:#155c3a; --admin-tint:#e9f3ec;
+    --good:#2f9159; --warn:#c8871a; --bad:#c0392b;
+    --chip-bg:#f2efdf;
+    --shadow: 0 10px 30px rgba(28,42,32,.10);
+    /* dark navy sidebar + rounded active-pill treatment */
+    --sidebar-bg:#0f1a38; --sidebar-bg2:#16234a; --sidebar-ink:#c3cbe6; --sidebar-active:var(--brand);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0f1712; --surface:color-mix(in srgb, #16211a 93%, transparent); --ink:#eaf3ec; --ink-soft:#9db3a4; --border:#28362c;
+      --brand:#d9a13c; --brand-ink:#0f1a38; --accent:#f2b25a;
+      --learner:#6d95ec; --learner-tint:#182238;
+      --teacher:#a688ee; --teacher-tint:#221c37;
+      --parent:#3fc2af; --parent-tint:#0f2823;
+      --principal:#e3b23c; --principal-tint:#2c2210;
+      --hod:#e08bab; --hod-tint:#2c1620;
+      --admin:#5fbd8b; --admin-tint:#14261c;
+      --good:#4cb579; --warn:#e3b23c; --bad:#f0776a;
+      --chip-bg:#1c2a20;
+      --shadow: 0 10px 30px rgba(0,0,0,.45);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1712; --surface:color-mix(in srgb, #16211a 93%, transparent); --ink:#eaf3ec; --ink-soft:#9db3a4; --border:#28362c;
+    --brand:#d9a13c; --brand-ink:#0f1a38; --accent:#f2b25a;
+    --learner:#6d95ec; --learner-tint:#182238;
+    --teacher:#a688ee; --teacher-tint:#221c37;
+    --parent:#3fc2af; --parent-tint:#0f2823;
+    --principal:#e3b23c; --principal-tint:#2c2210;
+    --hod:#e08bab; --hod-tint:#2c1620;
+    --admin:#5fbd8b; --admin-tint:#14261c;
+    --good:#4cb579; --warn:#e3b23c; --bad:#f0776a;
+    --chip-bg:#1c2a20;
+    --shadow: 0 10px 30px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box;}
+  body{
+    color:var(--ink); font-family:var(--font-body);
+    background:
+      radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--brand) 13%, transparent) 1px, transparent 0) 0 0/24px 24px,
+      var(--bg);
+  }
+  /* dashboard background photo — shown behind the app once someone is logged in */
+  body.in-app::before{
+    content:''; position:fixed; inset:0; z-index:-1;
+    background-image:
+      linear-gradient(180deg, color-mix(in srgb, var(--bg) 55%, transparent), color-mix(in srgb, var(--bg) 88%, transparent) 45%, var(--bg) 80%),
+      url('img/bg-dashboard-chalkboard.png');
+    background-size:cover; background-position:center top; background-repeat:no-repeat; background-attachment:fixed;
+  }
+  h1,h2,h3{ font-family:var(--font-display); letter-spacing:-.015em; text-wrap:balance; }
+  .app{ max-width:1180px; margin:0 auto; padding:24px 20px 110px; position:relative; }
+
+  .login-wrap{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px 16px; }
+  /* log in + sign up (not the forgot-password screen) share this full-page
+     background photo, dimmed with the brand gradient so the card stays legible */
+  .auth-bg{
+    background:
+      linear-gradient(160deg, color-mix(in srgb, var(--brand-ink) 78%, transparent), color-mix(in srgb, var(--brand-ink) 90%, transparent) 55%, var(--brand-ink) 100%),
+      url('img/bg-auth-learning.png') center/cover no-repeat fixed;
+  }
+  .login-card{ width:100%; max-width:420px; background:var(--surface); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow); overflow:hidden; }
+  .login-head{
+    position:relative; overflow:hidden;
+    background:
+      linear-gradient(160deg, color-mix(in srgb, var(--brand-ink) 88%, transparent), color-mix(in srgb, var(--brand) 80%, transparent) 75%),
+      url('img/classroom.png') center 30%/cover no-repeat;
+    color:#fff; padding:20px 24px 22px;
+  }
+  .hero-illustration{ display:block; width:100%; height:auto; max-height:132px; margin-bottom:6px; }
+  .hero-badge{
+    display:inline-flex; align-items:center; gap:6px; position:relative; z-index:1;
+    padding:5px 12px; margin-bottom:10px; border-radius:999px; font-size:10.5px; font-weight:800;
+    letter-spacing:.6px; color:var(--accent); border:1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    background:color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  .hero-badge::before{ content:''; width:6px; height:6px; border-radius:50%; background:var(--accent); }
+  .back-home-link{
+    display:block; text-align:center; margin:2px 0 0; font-size:12px; font-weight:700;
+    color:var(--ink-soft); text-decoration:none;
+  }
+  .back-home-link:hover{ color:var(--brand); text-decoration:underline; }
+  /* sign-up gets its own header tone (image + gradient direction flipped) so
+     it reads as a distinct screen from log in, not the same form re-skinned */
+  .login-head-signup{
+    background:
+      linear-gradient(200deg, color-mix(in srgb, var(--accent) 40%, transparent), color-mix(in srgb, var(--brand-ink) 90%, transparent) 70%),
+      url('img/books-stack.png') center 40%/cover no-repeat;
+  }
+  .login-card-signup{ border-color:color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .field-error{ margin:-6px 0 0; font-size:11.5px; font-weight:700; color:var(--bad); }
+
+  /* Landing page — a marketing-style hero shown before the login/sign-up form */
+  .landing-wrap{
+    min-height:100vh; position:relative; overflow:hidden;
+    display:flex; flex-direction:column;
+    color:#fff;
+    background:
+      radial-gradient(ellipse 900px 700px at 8% 15%, color-mix(in srgb, var(--brand) 32%, transparent), transparent 60%),
+      linear-gradient(100deg, color-mix(in srgb, var(--brand-ink) 62%, transparent), color-mix(in srgb, var(--brand-ink) 36%, transparent) 55%, color-mix(in srgb, var(--brand-ink) 14%, transparent) 100%),
+      url('img/bg-landing-learning.png') center/cover no-repeat;
+  }
+  .landing-topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 28px; position:relative; z-index:1;
+    border-bottom:1px solid rgba(255,255,255,.10);
+    background:linear-gradient(180deg, rgba(0,0,0,.18), transparent);
+  }
+  .landing-logo{ display:flex; align-items:center; gap:10px; font-size:15px; font-weight:700; }
+  .landing-topbar-actions{ display:flex; align-items:center; gap:10px; }
+  .landing-btn-outline{
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.5); color:#fff;
+    backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  }
+  .landing-btn-outline:hover{ background:rgba(255,255,255,.16); border-color:#fff; transform:translateY(-1px); }
+  .landing-hero{
+    flex:1; display:flex; flex-direction:column; justify-content:center;
+    max-width:660px; padding:24px 28px 70px; position:relative; z-index:1;
+    animation:landingIn .6s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes landingIn{ from{ opacity:0; transform:translateY(14px); } to{ opacity:1; transform:translateY(0); } }
+  .landing-hero .hero-badge{ background:rgba(255,255,255,.1); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); }
+  .landing-hero h1{
+    margin:0 0 16px; font-size:clamp(30px,5vw,46px); font-weight:800; line-height:1.12; letter-spacing:-.02em;
+    text-shadow:0 4px 24px rgba(0,0,0,.5);
+  }
+  .landing-hero h1 .highlight{
+    background:linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #fff));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .landing-hero p{ margin:0 0 26px; font-size:15px; line-height:1.65; opacity:.94; max-width:480px; text-shadow:0 1px 10px rgba(0,0,0,.4); }
+  .landing-cta-row{ display:flex; align-items:center; gap:20px; flex-wrap:wrap; margin-bottom:36px; }
+  .landing-cta{ padding:13px 26px; font-size:14px; }
+  .landing-already{ font-size:12.5px; opacity:.9; }
+  .landing-already a{ color:#fff; font-weight:800; text-decoration:underline; }
+  .landing-features{ display:flex; flex-direction:column; gap:12px; max-width:520px; }
+  .landing-feature{
+    display:flex; align-items:flex-start; gap:14px; padding:16px 18px; border-radius:16px;
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.16);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    transition:transform .15s ease, background .15s ease;
+  }
+  .landing-feature:hover{ transform:translateY(-2px); background:rgba(255,255,255,.13); }
+  .landing-feature-icon{
+    flex:none; width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+    background:color-mix(in srgb, var(--accent) 24%, transparent); color:var(--accent);
+  }
+  .landing-feature-icon svg{ width:22px; height:22px; }
+  .landing-feature div{ display:flex; flex-direction:column; gap:5px; }
+  .landing-feature b{ font-size:16px; font-weight:800; }
+  .landing-feature span{ font-size:14.5px; line-height:1.6; opacity:.9; }
+  @media (max-width:620px){
+    .landing-topbar{ padding:16px 18px; }
+    .landing-hero{ padding:20px 18px 50px; }
+    .landing-features{ gap:10px; }
+    .landing-feature{ flex:1 1 100%; }
+  }
+  .auth-toggle-line{ margin:2px 0 0; text-align:center; font-size:12.5px; color:var(--ink-soft); }
+  .auth-toggle-line a{ color:var(--brand); font-weight:800; text-decoration:none; }
+  .auth-toggle-line a:hover{ text-decoration:underline; }
+  .forgot-pw-line{ margin:-6px 0 0; text-align:right; font-size:12px; }
+  .forgot-pw-line a{ color:var(--brand); font-weight:700; text-decoration:none; }
+  .forgot-pw-line a:hover{ text-decoration:underline; }
+  .forgot-success{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; padding:4px 0 6px; }
+  .forgot-success .icon-badge{ width:44px; height:44px; border-radius:14px; }
+  .forgot-success .icon-badge svg{ width:22px; height:22px; }
+  .forgot-success h3{ margin:0; font-size:15px; font-weight:800; }
+  .forgot-success p{ margin:0; font-size:12.5px; color:var(--ink-soft); line-height:1.55; }
+  .login-head .brand-mark{ display:flex; align-items:center; gap:9px; margin-bottom:2px; position:relative; z-index:1; }
+  .login-head h1{ margin:0 0 4px; font-size:20px; font-weight:700; position:relative; z-index:1; }
+  .login-head p{ margin:0; font-size:12.5px; opacity:.85; position:relative; z-index:1; }
+  .login-body{ padding:22px 24px; display:flex; flex-direction:column; gap:14px; }
+  .field label{ display:block; font-size:12px; font-weight:700; margin-bottom:5px; color:var(--ink-soft); }
+  .login-foot{ padding:0 24px 22px; }
+  .login-lang{ padding:12px 24px 0; display:flex; align-items:center; gap:8px; }
+  .login-lang select{ flex:1; }
+  .logged-bar{ display:flex; align-items:center; gap:8px; font-size:12px; opacity:.92; }
+  .topbar{
+    position:relative; overflow:hidden;
+    background:
+      linear-gradient(115deg, color-mix(in srgb, var(--brand-ink) 92%, transparent), color-mix(in srgb, var(--brand) 86%, transparent) 65%),
+      url('img/book-icons.png') right -10px top -10px/280px no-repeat;
+    color:#fff;
+    border-radius:18px; padding:24px 26px; box-shadow:var(--shadow); margin-bottom:22px;
+  }
+  .topbar-watermark{
+    position:absolute; right:-10px; top:50%; transform:translateY(-50%); width:200px; height:auto;
+    opacity:.16; pointer-events:none;
+  }
+  .app-bg-illustration{
+    position:fixed; right:-120px; bottom:-90px; width:560px; height:auto; max-width:70vw;
+    opacity:.07; pointer-events:none; z-index:-1;
+  }
+  @media (max-width:620px){ .app-bg-illustration{ width:380px; } }
+  .logout-corner{
+    position:absolute; top:14px; right:16px; padding:5px 12px; font-size:11.5px; z-index:2;
+    background:rgba(255,255,255,.16); border-color:rgba(255,255,255,.4); color:#fff;
+  }
+  .logout-corner:hover{ background:rgba(255,255,255,.28); }
+  .topbar-head{ display:flex; flex-direction:column; align-items:flex-start; gap:10px; padding-right:88px; position:relative; z-index:1; }
+  .brand-mark{ display:flex; align-items:center; gap:10px; }
+  .topbar h1{ margin:0 0 2px; font-size:24px; font-weight:800; letter-spacing:-.02em; }
+  .topbar p{ margin:0; font-size:12.5px; opacity:.85; }
+  .lang-switch{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; flex:none; }
+  .lang-switch label{ font-size:11px; font-weight:700; opacity:.9; white-space:nowrap; }
+  .lang-switch select{
+    font-size:12.5px; padding:6px 8px; border-radius:8px; border:1px solid rgba(255,255,255,.4);
+    background:rgba(255,255,255,.16); color:#fff;
+  }
+  .lang-switch select option{ color:#111; }
+  .lang-switch .spin{ width:13px; height:13px; border-radius:50%; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; animation:spin .7s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .tabs{ display:flex; gap:6px; overflow-x:auto; padding:14px 0 2px; margin-top:6px; border-top:1px solid rgba(255,255,255,.22); }
+  .tab{
+    flex:none; display:flex; align-items:center; gap:6px; padding:8px 14px; border-radius:999px;
+    background:rgba(255,255,255,.14); color:#fff; border:1px solid rgba(255,255,255,.28);
+    font-size:12.5px; font-weight:700; cursor:pointer; white-space:nowrap;
+  }
+  .tab.active{ background:#fff; color:var(--brand-ink); }
+
+  /* Section nav — a dark navy sidebar (desktop) that groups a role's cards into
+     scannable sections; collapses to a horizontal pill bar on narrow screens */
+  .role-scope{
+    animation:cardIn .3s ease both;
+    display:grid; grid-template-columns:220px 1fr; gap:20px; align-items:start;
+  }
+  .role-scope > *{ grid-column:2; }
+  .role-scope > .section-nav{ grid-column:1; grid-row:1 / -1; }
+  .section-nav{
+    display:flex; flex-direction:column; gap:3px;
+    background:linear-gradient(160deg, var(--sidebar-bg2), var(--sidebar-bg));
+    border-radius:18px; padding:14px; box-shadow:var(--shadow); align-self:stretch;
+  }
+  .section-nav button{
+    display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:11px;
+    border:1px solid transparent; background:transparent; color:var(--sidebar-ink);
+    font-size:12.5px; font-weight:700; cursor:pointer; box-shadow:none; text-align:left;
+    transition:background .15s ease, color .15s ease, transform .12s ease;
+  }
+  .section-nav button:hover{ background:rgba(255,255,255,.08); transform:none; }
+  .section-nav button .count{
+    margin-left:auto; font-size:10px; font-weight:800; padding:1px 6px; border-radius:999px;
+    background:rgba(255,255,255,.12); color:var(--sidebar-ink);
+  }
+  .section-nav button.active{ background:var(--sidebar-active); border-color:var(--sidebar-active); color:#fff; box-shadow:0 8px 18px rgba(0,0,0,.28); }
+  .section-nav button.active .count{ background:rgba(255,255,255,.25); color:#fff; }
+  @media (max-width:820px){
+    .role-scope{ display:block; }
+    .role-scope > *{ grid-column:auto; }
+    .section-nav{
+      flex-direction:row; overflow-x:auto; margin-bottom:16px; border-radius:14px;
+      grid-column:auto; grid-row:auto;
+    }
+    .section-nav button{ flex:none; border-radius:999px; }
+  }
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:26px; box-shadow:var(--shadow);
+    position:relative; animation:cardIn .35s ease both;
+    transition:box-shadow .18s ease, transform .18s ease;
+  }
+  .card:hover{ box-shadow:0 14px 34px rgba(28,42,32,.14); transform:translateY(-2px); }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .card:hover{ box-shadow:0 14px 34px rgba(0,0,0,.55); } }
+  :root[data-theme="dark"] .card:hover{ box-shadow:0 14px 34px rgba(0,0,0,.55); }
+  .card-learner{ --accent-bar:var(--learner); }
+  .card-teacher{ --accent-bar:var(--teacher); }
+  .card-parent{ --accent-bar:var(--parent); }
+  .card-principal{ --accent-bar:var(--principal); }
+  .card-hod{ --accent-bar:var(--hod); }
+  .card-admin{ --accent-bar:var(--admin); }
+  @keyframes cardIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+  .grid{ display:grid; gap:16px; }
+  .grid-2{ grid-template-columns:1fr 1fr; }
+  .grid-3{ grid-template-columns:1fr 1fr 1fr; }
+  @media (max-width:760px){ .grid-2, .grid-3{ grid-template-columns:1fr; } }
+  .section-head{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    margin-bottom:18px; padding-bottom:14px;
+    border-bottom:2px solid color-mix(in srgb, var(--accent-bar, var(--brand)) 22%, transparent);
+  }
+  .section-head h2{ margin:0; font-size:17px; font-weight:800; letter-spacing:-.01em; display:flex; align-items:center; gap:9px; }
+  .icon-badge{
+    display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:8px;
+    font-size:14px; background:color-mix(in srgb, var(--accent-bar, var(--brand)) 16%, transparent); flex:none;
+    color:var(--accent-bar, var(--brand));
+  }
+  .icon-badge svg{ width:15px; height:15px; }
+  /* small clean-line icons dropped in wherever the app used to show an emoji */
+  .icon-inline{ display:inline-flex; align-items:center; justify-content:center; flex:none; vertical-align:-3px; }
+  .icon-inline svg{ width:14px; height:14px; }
+  .nav-icon{ display:inline-flex; align-items:center; justify-content:center; flex:none; }
+  .nav-icon svg{ width:16px; height:16px; }
+  .stat-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:14px; }
+  @media (max-width:620px){ .stat-row{ grid-template-columns:1fr; } }
+  .stat-tile{
+    background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px 16px;
+    box-shadow:var(--shadow); display:flex; align-items:center; gap:12px; animation:cardIn .35s ease both;
+  }
+  .stat-tile .icon-badge{ width:36px; height:36px; font-size:18px; border-radius:10px; }
+  .stat-tile .icon-badge svg{ width:19px; height:19px; }
+  .pill{ font-size:10.5px; font-weight:800; letter-spacing:.3px; padding:3px 9px; border-radius:999px; text-transform:uppercase; }
+  .pill-good{ background:color-mix(in srgb, var(--good) 16%, transparent); color:var(--good); }
+  .pill-warn{ background:color-mix(in srgb, var(--warn) 16%, transparent); color:var(--warn); }
+  .pill-bad{ background:color-mix(in srgb, var(--bad) 16%, transparent); color:var(--bad); }
+  /* subject chips above a learner's quiz list — pick one subject or see all */
+  .subject-filter{ display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px; }
+  .subject-filter button{
+    padding:6px 13px; border-radius:999px; border:1px solid var(--border); background:var(--bg);
+    color:var(--ink-soft); font-size:12px; font-weight:700; cursor:pointer; transition:all .15s ease;
+  }
+  .subject-filter button:hover{ border-color:var(--accent-bar, var(--brand)); color:var(--ink); }
+  .subject-filter button.active{
+    background:var(--accent-bar, var(--brand)); border-color:var(--accent-bar, var(--brand)); color:#fff;
+  }
+  .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 0; border-bottom:1px solid var(--border); }
+  .row:last-child{ border-bottom:none; }
+  .row .meta{ font-size:12px; color:var(--ink-soft); }
+  .bar{ height:7px; border-radius:99px; background:var(--chip-bg); overflow:hidden; margin-top:5px; }
+  .bar > span{ display:block; height:100%; border-radius:99px; }
+  .btn{
+    font-size:12.5px; font-weight:700; padding:9px 18px; border-radius:999px; cursor:pointer;
+    border:1px solid color-mix(in srgb, var(--brand) 35%, var(--border));
+    background:color-mix(in srgb, var(--brand) 12%, var(--surface));
+    color:var(--brand-ink);
+    transition:transform .12s ease, box-shadow .12s ease, background .15s ease, border-color .15s ease;
+  }
+  .btn:hover{ background:color-mix(in srgb, var(--brand) 20%, var(--surface)); border-color:var(--brand); transform:translateY(-1px); }
+  .btn-primary{
+    background:var(--brand); border-color:var(--brand); color:#fff; font-weight:800; letter-spacing:.2px;
+    padding:10px 22px; box-shadow:0 8px 20px color-mix(in srgb, var(--brand) 35%, transparent);
+  }
+  .btn-primary:hover{
+    background:color-mix(in srgb, var(--brand) 88%, black); border-color:color-mix(in srgb, var(--brand) 88%, black);
+    transform:translateY(-2px); box-shadow:0 12px 26px color-mix(in srgb, var(--brand) 45%, transparent);
+  }
+  .btn:disabled{ opacity:.5; cursor:default; transform:none; box-shadow:none; }
+  .muted{ color:var(--ink-soft); font-size:12.5px; }
+  .ai-note{
+    margin-top:10px; padding:10px 12px; border-radius:10px; font-size:12.5px; line-height:1.45;
+    background:color-mix(in srgb, var(--accent) 12%, transparent); border:1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+  .stat{ text-align:left; }
+  .stat .num{ font-size:24px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .stat .lbl{ font-size:11.5px; color:var(--ink-soft); }
+  textarea, select, input[type=text]{
+    width:100%; font-family:inherit; font-size:13px; padding:8px 10px; border-radius:9px;
+    border:1px solid var(--border); background:var(--bg); color:var(--ink);
+  }
+  .stars{ display:flex; gap:4px; }
+  .stars button{ background:none; border:none; font-size:20px; cursor:pointer; color:var(--border); padding:2px; }
+  .stars button.on{ color:var(--principal); }
+  .stars button .icon-inline{ vertical-align:middle; }
+  .stars button svg{ width:22px; height:22px; fill:currentColor; stroke:currentColor; stroke-width:1; }
+
+  /* Quiz */
+  .quiz-progress{ font-size:11.5px; color:var(--ink-soft); font-weight:700; margin-bottom:8px; }
+  .quiz-bar{ height:6px; border-radius:99px; background:var(--chip-bg); overflow:hidden; margin-bottom:16px; }
+  .quiz-bar > span{ display:block; height:100%; border-radius:99px; background:var(--learner); transition:width .3s ease; }
+  .quiz-question{ font-size:14px; font-weight:700; margin:0 0 12px; line-height:1.4; }
+  .quiz-options{ display:flex; flex-direction:column; gap:8px; }
+  .quiz-option{
+    display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; border:1px solid var(--border);
+    background:var(--bg); cursor:pointer; font-size:13px; transition:border-color .15s ease, background .15s ease;
+  }
+  .quiz-option:hover{ border-color:var(--learner); }
+  .quiz-option.selected{ border-color:var(--learner); background:var(--learner-tint); font-weight:700; }
+  .quiz-option .dot{
+    width:16px; height:16px; border-radius:50%; border:2px solid var(--border); flex:none; position:relative;
+  }
+  .quiz-option.selected .dot{ border-color:var(--learner); }
+  .quiz-option.selected .dot::after{
+    content:''; position:absolute; inset:3px; border-radius:50%; background:var(--learner);
+  }
+  .quiz-result{ text-align:center; padding:6px 0 4px; }
+  .quiz-result .ring{
+    width:84px; height:84px; border-radius:50%; margin:0 auto 12px; display:flex; align-items:center; justify-content:center;
+    font-size:19px; font-weight:800; position:relative;
+  }
+  .quiz-result .ring .num{ position:relative; z-index:1; }
+
+  /* Chat */
+  .chat-fab{
+    position:fixed; right:20px; bottom:20px; width:56px; height:56px; border-radius:50%;
+    background:var(--brand); color:#fff; border:none; box-shadow:var(--shadow); cursor:pointer; font-size:22px; z-index:40;
+  }
+  .chat-panel{
+    position:fixed; right:20px; bottom:88px; width:min(360px, calc(100vw - 40px)); max-height:min(560px, calc(100vh - 140px));
+    background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow);
+    display:flex; flex-direction:column; overflow:hidden; z-index:40;
+  }
+  .chat-head{ padding:12px 14px; background:linear-gradient(135deg,var(--brand-ink),var(--brand)); color:#fff; }
+  .chat-head b{ font-size:13px; }
+  .chat-head .muted2{ font-size:10.5px; color:#dce8fb; }
+  .chat-lang{ padding:8px 10px; border-bottom:1px solid var(--border); display:flex; gap:6px; align-items:center; }
+  .chat-lang .chip{ font-size:11px; padding:4px 9px; border-radius:999px; background:var(--chip-bg); color:var(--ink-soft); }
+  .chat-body{ flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:8px; min-height:160px; }
+  .msg{ max-width:86%; padding:8px 11px; border-radius:12px; font-size:12.8px; line-height:1.4; white-space:pre-wrap; }
+  .msg.user{ align-self:flex-end; background:var(--brand); color:#fff; border-bottom-right-radius:3px; }
+  .msg.bot{ align-self:flex-start; background:var(--chip-bg); color:var(--ink); border-bottom-left-radius:3px; }
+  .msg.sys{ align-self:center; color:var(--ink-soft); font-size:11px; }
+  .chat-input{ display:flex; gap:6px; padding:10px; border-top:1px solid var(--border); }
+  .chat-input input{ flex:1; }
+  .chat-input button{ flex:none; }
+  [hidden]{ display:none !important; }
+</style>
+
+<svg width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true">
+  <defs>
+    <!-- Illustration: sunrise over the hills, an open book rising into a digital
+         dashboard, a graduation cap and a small connected network — modern
+         digital learning growing out of a familiar, local foundation. -->
+    <symbol id="proactHero" viewBox="0 0 520 280">
+      <circle cx="392" cy="70" r="120" fill="#ffffff" opacity=".10"/>
+      <circle cx="392" cy="70" r="70" fill="#f6c453" opacity=".28"/>
+      <path d="M0,205 Q90,160 190,192 T400,178 T520,200 V280 H0 Z" fill="#ffffff" opacity=".10"/>
+      <path d="M0,232 Q110,196 230,222 T520,224 V280 H0 Z" fill="#ffffff" opacity=".16"/>
+      <g stroke="#f6c453" stroke-width="1.6" stroke-dasharray="2 6" opacity=".65" fill="none" stroke-linecap="round">
+        <path d="M110,108 C150,80 205,72 240,92"/>
+        <path d="M330,78 C356,96 360,122 340,140"/>
+        <path d="M140,168 C178,150 214,154 236,140"/>
+      </g>
+      <circle cx="110" cy="108" r="3.5" fill="#f6c453"/>
+      <circle cx="330" cy="78" r="3.5" fill="#ffffff"/>
+      <circle cx="140" cy="168" r="3.5" fill="#ffffff"/>
+      <g transform="translate(140,176)">
+        <path d="M0,36 C36,18 72,18 100,36 L100,10 C72,-6 36,-6 0,10 Z" fill="#ffffff" opacity=".95"/>
+        <path d="M100,36 C128,18 164,18 200,36 L200,10 C164,-6 128,-6 100,10 Z" fill="#ffffff" opacity=".95"/>
+        <path d="M100,10 L100,36" stroke="#0e4f33" stroke-width="3"/>
+        <path d="M14,18 Q50,7 92,16" stroke="#0e4f33" stroke-width="1.4" fill="none" opacity=".45"/>
+        <path d="M108,16 Q150,7 188,18" stroke="#0e4f33" stroke-width="1.4" fill="none" opacity=".45"/>
+      </g>
+      <g transform="translate(238,96)">
+        <rect x="0" y="0" width="88" height="66" rx="10" fill="#ffffff" opacity=".97"/>
+        <rect x="10" y="38" width="9" height="18" rx="2" fill="#dba222"/>
+        <rect x="25" y="26" width="9" height="30" rx="2" fill="#0e4f33"/>
+        <rect x="40" y="15" width="9" height="41" rx="2" fill="#1f8c5c"/>
+        <rect x="55" y="32" width="9" height="24" rx="2" fill="#dba222"/>
+        <path d="M8,13 l13,-9 l9,5 l15,-11" stroke="#1f8c5c" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+      <g transform="translate(296,14)">
+        <path d="M36,0 L72,14 L36,28 L0,14 Z" fill="#0e4f33"/>
+        <rect x="30" y="14" width="12" height="17" rx="2" fill="#1f8c5c"/>
+        <circle cx="70" cy="16" r="2.6" fill="#f6c453"/>
+        <path d="M70,16 L70,34" stroke="#f6c453" stroke-width="2"/>
+      </g>
+      <g fill="#f6c453">
+        <path d="M366,42 l2.6,6.8 l6.8,2.6 l-6.8,2.6 l-2.6,6.8 l-2.6,-6.8 l-6.8,-2.6 l6.8,-2.6 Z"/>
+        <path d="M402,72 l1.8,4.6 l4.6,1.8 l-4.6,1.8 l-1.8,4.6 l-1.8,-4.6 l-4.6,-1.8 l4.6,-1.8 Z" opacity=".8"/>
+      </g>
+    </symbol>
+
+    <!-- clean-line icon set — feather-style, stroked with currentColor, used via
+         <use href="#icon-NAME"/> anywhere the app used to show an emoji -->
+    <symbol id="icon-book" viewBox="0 0 24 24">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+    </symbol>
+    <symbol id="icon-star" viewBox="0 0 24 24">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+    </symbol>
+    <symbol id="icon-help" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M9.1 9a2.9 2.9 0 0 1 5.7.9c0 1.9-2.9 2.9-2.9 2.9"/>
+      <line x1="12" y1="16.5" x2="12" y2="16.51"/>
+    </symbol>
+    <symbol id="icon-paperclip" viewBox="0 0 24 24">
+      <path d="M20.5 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.5 3.5 0 0 1 5 5l-8.6 8.6a1.5 1.5 0 0 1-2.1-2.1l7.4-7.4"/>
+    </symbol>
+    <symbol id="icon-cap" viewBox="0 0 24 24">
+      <path d="M22 9L12 4 2 9l10 5 10-5z"/>
+      <path d="M6 11v4.5C6 17 8.7 18.5 12 18.5s6-1.5 6-3V11"/>
+      <path d="M22 9v6"/>
+    </symbol>
+    <symbol id="icon-edit" viewBox="0 0 24 24">
+      <path d="M12 20h9"/>
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+    </symbol>
+    <symbol id="icon-bot" viewBox="0 0 24 24">
+      <rect x="4" y="9" width="16" height="10" rx="2"/>
+      <circle cx="12" cy="4.5" r="1.7"/>
+      <line x1="12" y1="6.2" x2="12" y2="9"/>
+      <line x1="8" y1="14" x2="8" y2="14.01"/>
+      <line x1="16" y1="14" x2="16" y2="14.01"/>
+    </symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9"/>
+      <polyline points="8 12.5 11 15.5 16 9"/>
+    </symbol>
+    <symbol id="icon-lock" viewBox="0 0 24 24">
+      <rect x="4.5" y="10.5" width="15" height="10" rx="2"/>
+      <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>
+    </symbol>
+    <symbol id="icon-inbox" viewBox="0 0 24 24">
+      <polyline points="21 11 15.5 11 13.7 13.6 10.3 13.6 8.5 11 3 11"/>
+      <path d="M5.2 4.9L3 11v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7l-2.2-6.1A2 2 0 0 0 17 3.5H7a2 2 0 0 0-1.8 1.4z"/>
+    </symbol>
+    <symbol id="icon-clipboard" viewBox="0 0 24 24">
+      <path d="M15.5 3.5h2A2 2 0 0 1 19.5 5.5v15a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-15a2 2 0 0 1 2-2h2"/>
+      <rect x="7.5" y="1.5" width="7" height="3.6" rx="1"/>
+    </symbol>
+    <symbol id="icon-building" viewBox="0 0 24 24">
+      <path d="M3 21h18"/>
+      <path d="M5 21V6.5L12 3l7 3.5V21"/>
+      <path d="M9 21v-5h6v5"/>
+      <line x1="9" y1="10" x2="9" y2="10.01"/>
+      <line x1="15" y1="10" x2="15" y2="10.01"/>
+    </symbol>
+    <symbol id="icon-file" viewBox="0 0 24 24">
+      <path d="M13.5 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8.5z"/>
+      <polyline points="13.5 2.5 13.5 8.5 19.5 8.5"/>
+      <line x1="8.5" y1="13" x2="15.5" y2="13"/>
+      <line x1="8.5" y1="17" x2="15.5" y2="17"/>
+    </symbol>
+    <symbol id="icon-chart" viewBox="0 0 24 24">
+      <line x1="18" y1="20" x2="18" y2="10"/>
+      <line x1="12" y1="20" x2="12" y2="4"/>
+      <line x1="6" y1="20" x2="6" y2="14"/>
+    </symbol>
+    <symbol id="icon-bell" viewBox="0 0 24 24">
+      <path d="M18 8.5a6 6 0 0 0-12 0c0 6.5-3 8.5-3 8.5h18s-3-2-3-8.5"/>
+      <path d="M13.7 20.5a2 2 0 0 1-3.4 0"/>
+    </symbol>
+    <symbol id="icon-users" viewBox="0 0 24 24">
+      <path d="M16.5 20.5v-1.8a4 4 0 0 0-4-4h-5a4 4 0 0 0-4 4v1.8"/>
+      <circle cx="9.5" cy="7.5" r="3.7"/>
+      <path d="M22.5 20.5v-1.8a4 4 0 0 0-3-3.87"/>
+      <path d="M15.7 3.9a3.7 3.7 0 0 1 0 7.2"/>
+    </symbol>
+    <symbol id="icon-download" viewBox="0 0 24 24">
+      <path d="M12 3.5v11"/>
+      <polyline points="7 11 12 16 17 11"/>
+      <path d="M4.5 19.5h15"/>
+    </symbol>
+    <symbol id="icon-sparkle" viewBox="0 0 24 24">
+      <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/>
+      <path d="M19 3.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7.7-2z"/>
+    </symbol>
+    <symbol id="icon-eye" viewBox="0 0 24 24">
+      <path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"/>
+      <circle cx="12" cy="12" r="3.2"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="landing-wrap" id="landingScreen">
+  <div class="landing-topbar">
+    <div class="landing-logo">
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true" style="flex:none;">
+        <rect width="32" height="32" rx="9" fill="rgba(255,255,255,.16)"/>
+        <path d="M7,14 L16,9 L25,14 L16,19 Z" fill="#fff"/>
+        <path d="M16,19 L16,23" stroke="#fff" stroke-width="1.6"/>
+        <path d="M10,16 v4 q6,4 12,0 v-4" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      </svg>
+      <b id="landingLogoText">Smart Learning</b>
+    </div>
+    <div class="landing-topbar-actions">
+      <button class="btn landing-btn-outline" id="landingLoginBtn">Log In</button>
+      <button class="btn btn-primary" id="landingSignupBtn">Sign Up</button>
+    </div>
+  </div>
+  <div class="landing-hero">
+    <span class="hero-badge" id="landingBadge">SMART LEARNING</span>
+    <h1 id="landingHeadline">Every learner, <span class="highlight">taught, tracked</span> and supported in one place.</h1>
+    <p id="landingSubtitle">Welcome to Smart Learning! We&rsquo;re glad you&rsquo;re here. Log in or create an account to teach, learn and manage your school in one place.</p>
+    <div class="landing-cta-row">
+      <button class="btn btn-primary landing-cta" id="landingGetStartedBtn">Get Started &rarr;</button>
+      <span class="landing-already">
+        <span id="landingAlreadyText">Already have an account? </span><a href="#" id="landingLoginLink">Log in</a>
+      </span>
+    </div>
+    <div class="landing-features">
+      <div class="landing-feature">
+        <span class="landing-feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M10.5 3 L12.2 8.3 L17.5 10 L12.2 11.7 L10.5 17 L8.8 11.7 L3.5 10 L8.8 8.3 Z" fill="currentColor" stroke="currentColor"/>
+            <path d="M17.5 14 L18.3 16.3 L20.5 17 L18.3 17.7 L17.5 20 L16.7 17.7 L14.5 17 L16.7 16.3 Z" fill="currentColor" stroke="currentColor"/>
+          </svg>
+        </span>
+        <div>
+          <b id="landingFeat2Title">AI-assisted, every step</b>
+          <span id="landingFeat2Sub">Smart quizzes that mark themselves, personalised study tips for learners, and AI-drafted intervention and coaching suggestions for teachers, HODs and principals.</span>
+        </div>
+      </div>
+      <div class="landing-feature">
+        <span class="landing-feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M3 12 h18"/>
+            <path d="M12 3 a13 13 0 0 1 0 18 a13 13 0 0 1 0 -18 Z"/>
+          </svg>
+        </span>
+        <div>
+          <b id="landingFeat3Title">Truly multilingual</b>
+          <span id="landingFeat3Sub">The whole app &mdash; menus, lessons, quizzes and the AI assistant &mdash; translates into isiZulu, isiXhosa, Afrikaans, Sesotho and South Africa&rsquo;s other official languages, on the fly.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOG IN — returning-user screen: identity + password only, no registration fields -->
+<div class="login-wrap auth-bg" id="loginScreen" hidden>
+  <div class="login-card">
+    <div class="login-lang">
+      <select id="loginLangSelect">
+        <option value="English">English</option>
+        <option value="Afrikaans">Afrikaans</option>
+        <option value="Zulu">isiZulu</option>
+        <option value="Xhosa">isiXhosa</option>
+        <option value="Ndebele">isiNdebele</option>
+        <option value="Sepedi">Sepedi</option>
+        <option value="Sesotho">Sesotho</option>
+        <option value="Setswana">Setswana</option>
+        <option value="Swati">siSwati</option>
+        <option value="Tshivenda">Tshivenda</option>
+        <option value="Xitsonga">Xitsonga</option>
+      </select>
+      <input type="text" id="loginLangCustom" placeholder="Type a language" hidden/>
+      <div class="spin" id="loginLangSpinner" hidden style="border-color:var(--border); border-top-color:var(--brand);"></div>
+    </div>
+    <div class="login-head">
+      <svg class="hero-illustration" viewBox="0 0 520 280" role="img" aria-label="Illustration of a book opening into a digital learning dashboard, under a graduation cap and rising sun"><use href="#proactHero"/></svg>
+      <span class="hero-badge" id="heroBadge">SMART LEARNING</span>
+      <h1 id="loginTitle">Welcome back</h1>
+      <p id="loginSubtitle">Log in to continue &mdash; pick your role to open your dashboard</p>
+    </div>
+    <form class="login-body" id="loginForm">
+      <div class="field">
+        <label id="loginEmailLabel" for="loginEmail">Email or username</label>
+        <input type="text" id="loginEmail" placeholder="e.g. thabo@example.com" required/>
+      </div>
+      <div class="field">
+        <label id="loginRoleLabel" for="loginRole">I am a&hellip;</label>
+        <select id="loginRole">
+          <option value="learner">Learner</option>
+          <option value="teacher">Teacher</option>
+          <option value="parent">Parent/Guardian</option>
+          <option value="hod">Head of Department</option>
+          <option value="principal">Principal</option>
+          <option value="admin">School Administrator</option>
+        </select>
+      </div>
+      <div class="field" id="loginGradeField">
+        <label id="loginGradeLabel" for="loginGrade">Grade</label>
+        <select id="loginGrade">
+          <option value="10">Grade 10</option>
+          <option value="11">Grade 11</option>
+          <option value="12">Grade 12</option>
+        </select>
+      </div>
+      <div class="field" id="loginDeptField" hidden>
+        <label id="loginDeptLabel" for="loginDept">Department</label>
+        <select id="loginDept">
+          <option value="mathematics">Mathematics</option>
+          <option value="languages">Languages</option>
+          <option value="science">Science</option>
+        </select>
+      </div>
+      <div class="field" id="loginIdField">
+        <label id="loginIdLabel" for="loginId">ID Number</label>
+        <input type="text" id="loginId" placeholder="e.g. 0501015800083" required/>
+      </div>
+      <div class="field" id="loginStaffField" hidden>
+        <label id="loginStaffLabel" for="loginStaff">Staff Number</label>
+        <input type="text" id="loginStaff" placeholder="e.g. STF-2045" required/>
+      </div>
+      <div class="field">
+        <label id="loginPasswordLabel" for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" placeholder="any value works in this prototype"/>
+      </div>
+      <p class="forgot-pw-line" id="forgotPasswordLine"><a href="#" id="forgotPasswordLink">Forgot password?</a></p>
+      <button type="submit" class="btn btn-primary" id="loginSubmit" style="padding:10px; font-size:13px;">Log in</button>
+      <p class="auth-toggle-line"><span id="authToggleText">New here? </span><a href="#" id="authToggleLink">Sign up</a></p>
+      <a href="#" class="back-home-link" id="loginBackHomeLink">&larr; Back to home</a>
+    </form>
+  </div>
+</div>
+
+<!-- SIGN UP — new-account screen: full registration, its own fields and its own header tone -->
+<div class="login-wrap auth-bg" id="signupScreen" hidden>
+  <div class="login-card login-card-signup">
+    <div class="login-lang">
+      <select id="signupLangSelect">
+        <option value="English">English</option>
+        <option value="Afrikaans">Afrikaans</option>
+        <option value="Zulu">isiZulu</option>
+        <option value="Xhosa">isiXhosa</option>
+        <option value="Ndebele">isiNdebele</option>
+        <option value="Sepedi">Sepedi</option>
+        <option value="Sesotho">Sesotho</option>
+        <option value="Setswana">Setswana</option>
+        <option value="Swati">siSwati</option>
+        <option value="Tshivenda">Tshivenda</option>
+        <option value="Xitsonga">Xitsonga</option>
+      </select>
+      <input type="text" id="signupLangCustom" placeholder="Type a language" hidden/>
+      <div class="spin" id="signupLangSpinner" hidden style="border-color:var(--border); border-top-color:var(--brand);"></div>
+    </div>
+    <div class="login-head login-head-signup">
+      <svg class="hero-illustration" viewBox="0 0 520 280" role="img" aria-hidden="true"><use href="#proactHero"/></svg>
+      <span class="hero-badge" id="signupHeroBadge">JOIN SMART LEARNING</span>
+      <h1 id="signupTitle">Create your account</h1>
+      <p id="signupSubtitle">Join Smart Learning &mdash; pick your role to get started</p>
+    </div>
+    <form class="login-body" id="signupForm">
+      <div class="field">
+        <label id="signupNameLabel" for="signupName">Full name</label>
+        <input type="text" id="signupName" placeholder="e.g. Thabo Mokoena" required/>
+      </div>
+      <div class="field">
+        <label id="signupEmailLabel" for="signupEmail">Email address</label>
+        <input type="email" id="signupEmail" placeholder="e.g. thabo@example.com" required/>
+      </div>
+      <div class="field">
+        <label id="signupRoleLabel" for="signupRole">I am a&hellip;</label>
+        <select id="signupRole">
+          <option value="learner">Learner</option>
+          <option value="teacher">Teacher</option>
+          <option value="parent">Parent/Guardian</option>
+          <option value="hod">Head of Department</option>
+          <option value="principal">Principal</option>
+          <option value="admin">School Administrator</option>
+        </select>
+      </div>
+      <div class="field" id="signupGradeField">
+        <label id="signupGradeLabel" for="signupGrade">Grade</label>
+        <select id="signupGrade">
+          <option value="10">Grade 10</option>
+          <option value="11">Grade 11</option>
+          <option value="12">Grade 12</option>
+        </select>
+      </div>
+      <div class="field" id="signupDeptField" hidden>
+        <label id="signupDeptLabel" for="signupDept">Department</label>
+        <select id="signupDept">
+          <option value="mathematics">Mathematics</option>
+          <option value="languages">Languages</option>
+          <option value="science">Science</option>
+        </select>
+      </div>
+      <div class="field" id="signupSubjectField" hidden>
+        <label id="signupSubjectLabel" for="signupSubject">Subject</label>
+        <select id="signupSubject">
+          <option value="subject_1">Mathematics</option>
+          <option value="subject_2">English</option>
+          <option value="subject_3">Life Sciences</option>
+          <option value="subject_afrikaans">Afrikaans</option>
+          <option value="subject_lo">Life Orientation</option>
+        </select>
+      </div>
+      <div class="field">
+        <label id="signupPasswordLabel" for="signupPassword">Password</label>
+        <input type="password" id="signupPassword" placeholder="Create a password" required/>
+      </div>
+      <div class="field">
+        <label id="signupConfirmLabel" for="signupConfirmPassword">Confirm password</label>
+        <input type="password" id="signupConfirmPassword" placeholder="Re-enter your password" required/>
+      </div>
+      <p class="field-error" id="signupPasswordError" hidden></p>
+      <button type="submit" class="btn btn-primary" id="signupSubmit" style="padding:10px; font-size:13px;">Create account</button>
+      <p class="auth-toggle-line"><span id="signupToggleText">Already have an account? </span><a href="#" id="signupToggleLink">Log in</a></p>
+      <a href="#" class="back-home-link" id="signupBackHomeLink">&larr; Back to home</a>
+    </form>
+  </div>
+</div>
+
+<div class="login-wrap" id="forgotScreen" hidden>
+  <div class="login-card">
+    <div class="login-head">
+      <svg class="hero-illustration" viewBox="0 0 520 280" role="img" aria-hidden="true"><use href="#proactHero"/></svg>
+      <span class="hero-badge" id="forgotHeroBadge">SMART LEARNING</span>
+      <h1 id="forgotTitle">Reset your password</h1>
+      <p id="forgotSubtitle">Enter the email or username on your account and we&rsquo;ll send you a link to reset your password.</p>
+    </div>
+    <form class="login-body" id="forgotForm">
+      <div class="field">
+        <label id="forgotEmailLabel" for="forgotEmail">Email or username</label>
+        <input type="text" id="forgotEmail" placeholder="e.g. thabo@example.com" required/>
+      </div>
+      <button type="submit" class="btn btn-primary" id="forgotSubmit" style="padding:10px; font-size:13px;">Send reset link</button>
+      <p class="auth-toggle-line"><span id="forgotBackText">Remember your password? </span><a href="#" id="forgotBackLink">Log in</a></p>
+      <a href="#" class="back-home-link" id="forgotBackHomeLink">&larr; Back to home</a>
+    </form>
+    <div class="login-body" id="forgotSuccess" hidden>
+      <div class="forgot-success">
+        <span class="icon-badge" id="forgotSuccessIcon"></span>
+        <h3 id="forgotSuccessTitle">Check your inbox</h3>
+        <p id="forgotSuccessNote">If an account exists, we&rsquo;ve sent a link to reset the password.</p>
+      </div>
+      <button type="button" class="btn" id="forgotResendBtn">Send again</button>
+      <p class="auth-toggle-line"><span id="forgotBackText2">Remember your password? </span><a href="#" id="forgotBackLink2">Log in</a></p>
+      <a href="#" class="back-home-link" id="forgotBackHomeLink2">&larr; Back to home</a>
+    </div>
+  </div>
+</div>
+
+<div class="app" id="appRoot" hidden>
+  <svg class="app-bg-illustration" viewBox="0 0 520 280" aria-hidden="true"><use href="#proactHero"/></svg>
+  <div class="topbar">
+    <svg class="topbar-watermark" viewBox="0 0 520 280" aria-hidden="true"><use href="#proactHero"/></svg>
+    <button class="btn logout-corner" id="logoutBtn">Log out</button>
+    <div class="topbar-head">
+      <div class="brand-mark">
+        <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true" style="flex:none;">
+          <rect width="32" height="32" rx="9" fill="rgba(255,255,255,.16)"/>
+          <path d="M7,14 L16,9 L25,14 L16,19 Z" fill="#fff"/>
+          <path d="M16,19 L16,23" stroke="#fff" stroke-width="1.6"/>
+          <path d="M10,16 v4 q6,4 12,0 v-4" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+        </svg>
+        <h1 id="appTitle">Smart Learning &ndash; Prototype</h1>
+      </div>
+      <div class="lang-switch">
+        <div class="logged-bar">
+          <span id="loggedBarText">Logged in as</span>
+        </div>
+        <select id="globalLang">
+          <option value="English">English</option>
+          <option value="Afrikaans">Afrikaans</option>
+          <option value="Zulu">isiZulu</option>
+          <option value="Xhosa">isiXhosa</option>
+          <option value="Ndebele">isiNdebele</option>
+          <option value="Sepedi">Sepedi</option>
+          <option value="Sesotho">Sesotho</option>
+          <option value="Setswana">Setswana</option>
+          <option value="Swati">siSwati</option>
+          <option value="Tshivenda">Tshivenda</option>
+          <option value="Xitsonga">Xitsonga</option>
+        </select>
+        <input type="text" id="langCustomGlobal" placeholder="Type a language" hidden style="width:130px;"/>
+        <div class="spin" id="langSpinner" hidden></div>
+      </div>
+    </div>
+  </div>
+  <div id="view"></div>
+</div>
+
+<button class="chat-fab" id="chatFab" title="Open assistant" hidden>&#128172;</button>
+<div class="chat-panel" id="chatPanel" hidden>
+  <div class="chat-head">
+    <b id="chatTitle">Smart Learning Assistant</b><br/><span class="muted2" id="chatSub">Ask anything &middot; replies in your chosen language</span>
+  </div>
+  <div class="chat-lang">
+    <span class="muted" id="chatLangNote">Reply in:</span>
+    <select id="chatLangSelect" style="flex:1;">
+      <option value="__system">Same as app language</option>
+      <option value="English">English</option>
+      <option value="Afrikaans">Afrikaans</option>
+      <option value="Zulu">isiZulu</option>
+      <option value="Xhosa">isiXhosa</option>
+      <option value="Ndebele">isiNdebele</option>
+      <option value="Sepedi">Sepedi</option>
+      <option value="Sesotho">Sesotho</option>
+      <option value="Setswana">Setswana</option>
+      <option value="Swati">siSwati</option>
+      <option value="Tshivenda">Tshivenda</option>
+      <option value="Xitsonga">Xitsonga</option>
+    </select>
+    <input type="text" id="chatLangCustom" placeholder="Type a language" hidden style="width:110px;"/>
+  </div>
+  <div class="chat-body" id="chatBody"></div>
+  <div class="chat-input">
+    <input type="text" id="chatInput" placeholder="Type a message, in any language..."/>
+    <button class="btn btn-primary" id="chatSend">Send</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- translatable UI strings (English source of truth) ---------------- */
+  const UI = {
+    app_title:'Smart Learning – Prototype',
+    lang_label:'Language',
+    tab_learner:'Learner', tab_teacher:'Teacher', tab_parent:'Parent/Guardian',
+    tab_principal:'Principal', tab_admin:'School Administrator', tab_hod:'Head of Department',
+
+    landing_badge:'SMART LEARNING',
+    landing_headline_pre:'Every learner, ',
+    landing_headline_highlight:'taught, tracked',
+    landing_headline_post:' and supported in one place.',
+    landing_subtitle:'Welcome to Smart Learning! We’re glad you’re here. Log in or create an account to teach, learn and manage your school in one place.',
+    landing_get_started_btn:'Get Started →',
+    landing_login_btn:'Log In',
+    landing_signup_btn:'Sign Up',
+    landing_already_account:'Already have an account? ',
+    landing_already_login_link:'Log in',
+    landing_feat2_title:'AI-assisted, every step',
+    landing_feat2_sub:'Smart quizzes that mark themselves, personalised study tips for learners, and AI-drafted intervention and coaching suggestions for teachers, HODs and principals.',
+    landing_feat3_title:'Truly multilingual',
+    landing_feat3_sub:'The whole app — menus, lessons, quizzes and the AI assistant — translates into isiZulu, isiXhosa, Afrikaans, Sesotho and South Africa’s other official languages, on the fly.',
+
+    login_title:'Welcome back',
+    login_subtitle:'Log in to continue — pick your role to open your dashboard',
+    login_email_label:'Email or username',
+    login_email_placeholder:'e.g. thabo@example.com',
+    login_role_label:'I am a…',
+    login_grade_label:'Grade',
+    login_id_label:'ID Number',
+    login_id_placeholder:'e.g. 0501015800083',
+    login_staff_label:'Staff Number',
+    login_staff_placeholder:'e.g. STF-2045',
+    login_password_label:'Password',
+    login_password_placeholder:'any value works in this prototype',
+    login_button:'Log in',
+    auth_toggle_to_signup:'New here? ',
+    auth_toggle_to_signup_link:'Sign up',
+    forgot_password_link:'Forgot password?',
+    back_to_home_link:'← Back to home',
+
+    signup_title:'Create your account',
+    signup_subtitle:'Join Smart Learning — pick your role to get started',
+    signup_name_label:'Full name',
+    signup_name_placeholder:'e.g. Thabo Mokoena',
+    signup_email_label:'Email address',
+    signup_email_placeholder:'e.g. thabo@example.com',
+    signup_role_label:'I am a…',
+    signup_grade_label:'Grade',
+    signup_subject_label:'Subject',
+    signup_password_label:'Password',
+    signup_password_placeholder:'Create a password',
+    signup_confirm_label:'Confirm password',
+    signup_confirm_placeholder:'Re-enter your password',
+    signup_password_mismatch:'Passwords don’t match — please try again.',
+    signup_button:'Create account',
+    auth_toggle_to_login:'Already have an account? ',
+    auth_toggle_to_login_link:'Log in',
+
+    forgot_title:'Reset your password',
+    forgot_subtitle:'Enter the email or username on your account and we’ll send you a link to reset your password.',
+    forgot_email_label:'Email or username',
+    forgot_email_placeholder:'e.g. thabo@example.com',
+    forgot_submit_btn:'Send reset link',
+    forgot_success_title:'Check your inbox',
+    forgot_success_note:'If an account exists for {value}, we’ve sent a link to reset the password. It can take a few minutes to arrive.',
+    forgot_resend_btn:'Send again',
+    forgot_back_to_login:'Remember your password? ',
+    forgot_back_to_login_link:'Log in',
+    logged_in_as:'Logged in as {name} · {role}',
+    logged_in_as_grade:'Logged in as {name} · {role} · Grade {grade}',
+    logout_button:'Log out',
+
+    grade_10:'Grade 10', grade_11:'Grade 11', grade_12:'Grade 12',
+
+    lesson_1:'Algebraic Functions & Graphs',
+    lesson_2:'Comprehension: Analytical Texts',
+    lesson_3:'Cell Structure & Function',
+    learner_lessons_title:'My Lessons & Assessments',
+    learner_mark_complete:'Mark complete',
+    learner_completed:'Completed',
+    learner_ai_prefix:'AI recommendation: ',
+    learner_ai_placeholder:'Complete a lesson to get a personalised recommendation from the AI engine.',
+    learner_ai_thinking:'Thinking…',
+    learner_rate_title:'Rate Your Teacher',
+    learner_rate_sub:'How is {teacher}’s teaching this term?',
+    learner_rate_thanks:'Thanks — your rating ({n}/5) will be aggregated anonymously and shown to the Principal.',
+
+    nav_overview:'Overview',
+    nav_quizzes:'Quizzes',
+    nav_rate_teacher:'Rate Teacher',
+    nav_my_class:'My Class',
+    nav_set_quiz:'Set a Quiz',
+    nav_papers:'Papers',
+
+    stat_progress:'Overall progress',
+    stat_lessons_done:'Lessons completed',
+    stat_quiz_status:'Quiz check-in',
+    stat_not_taken:'Not taken yet',
+
+    assess_view_btn:'View assessment',
+    assess_hide_btn:'Hide assessment',
+    assess_due:'Due {date}',
+    assess_viewed_note:'Assessment viewed — you can now mark this lesson complete.',
+    assess_gate_note:'View the assessment before marking this lesson complete.',
+
+    assess_g10_math_title:'Algebra Test: Equations & Inequalities',
+    assess_g10_math_desc:'Covers solving linear equations, inequalities and word problems. Bring your formula sheet and a calculator.',
+    assess_g10_eng_title:'Essay: Analytical Response',
+    assess_g10_eng_desc:'A 300-word analytical essay on the set short story. Focus on theme, tone and character development.',
+    assess_g10_ls_title:'Practical: Cell Structures',
+    assess_g10_ls_desc:'Practical write-up identifying plant and animal cell organelles under the microscope.',
+
+    assess_g11_math_title:'Trigonometry Assessment',
+    assess_g11_math_desc:'Covers trig ratios, identities and graphs of sine, cosine and tangent functions.',
+    assess_g11_eng_title:'Essay: Literary Analysis',
+    assess_g11_eng_desc:'A structured essay analysing themes and characterisation in the prescribed novel.',
+    assess_g11_ls_title:'Test: Human Reproduction',
+    assess_g11_ls_desc:'Covers the male and female reproductive systems, the menstrual cycle and fertilisation.',
+
+    assess_g12_math_title:'Calculus & Functions Exam',
+    assess_g12_math_desc:'Covers differentiation, function graphs and optimisation problems — key matric exam topics.',
+    assess_g12_eng_title:'Essay: Critical Analysis (Matric Prep)',
+    assess_g12_eng_desc:'A timed critical essay in matric exam format, covering the prescribed poetry and drama texts.',
+    assess_g12_ls_title:'Test: Genetics & Evolution',
+    assess_g12_ls_desc:'Covers Mendelian genetics, DNA, meiosis and the theory of evolution by natural selection.',
+
+    quiz_title:'Quick Check-in Quiz',
+    quiz_intro:'5 short questions across your subjects — this helps your teacher see who needs a bit of extra help.',
+    quiz_start_btn:'Start quiz',
+    quiz_progress:'Question {current} of {total}',
+    quiz_next_btn:'Next',
+    quiz_submit_btn:'Submit quiz',
+    quiz_retake_btn:'Retake quiz',
+    quiz_result_title:'Your results',
+    quiz_score_caption:'You got {correct} out of {total} correct',
+    quiz_status_good:'On track — great job!',
+    quiz_status_watch:'A little extra practice will help',
+    quiz_status_bad:'Needs assistance',
+    quiz_ai_prefix:'What to focus on: ',
+    quiz_teacher_note:'Your teacher has been notified so they can help where it counts.',
+
+    quiz_q1:'Solve for x: 2x + 6 = 14',
+    quiz_q1_a:'x = 4', quiz_q1_b:'x = 10', quiz_q1_c:'x = 8', quiz_q1_d:'x = 2',
+    quiz_q2:'What is the gradient of the line y = 3x − 5?',
+    quiz_q2_a:'3', quiz_q2_b:'−5', quiz_q2_c:'5', quiz_q2_d:'−3',
+    quiz_q3:'Which word is closest in meaning to "concise"?',
+    quiz_q3_a:'Brief', quiz_q3_b:'Lengthy', quiz_q3_c:'Vague', quiz_q3_d:'Loud',
+    quiz_q4:'Which organelle is known as the "powerhouse of the cell"?',
+    quiz_q4_a:'Mitochondria', quiz_q4_b:'Nucleus', quiz_q4_c:'Ribosome', quiz_q4_d:'Golgi body',
+    quiz_q5:'Photosynthesis mainly takes place in which part of a plant cell?',
+    quiz_q5_a:'Chloroplast', quiz_q5_b:'Mitochondria', quiz_q5_c:'Nucleus', quiz_q5_d:'Vacuole',
+
+    teacher_dashboard_title:'Class Dashboard',
+    teacher_dashboard_sub:'Grade 10 Mathematics',
+    status_on_track:'on track', status_at_risk:'at risk', status_watch:'watch',
+    learner1_note:'Completed Fractions unit with 92% average.',
+    learner2_note:'Missed 3 assessments this month; engagement dropping.',
+    learner3_note:'Reading comprehension scores below class average.',
+    teacher_suggest_btn:'Suggest intervention',
+    teacher_ai_prefix:'Suggested intervention: ',
+    teacher_principal_feedback_title:'Feedback From Your Principal',
+
+    teacher_quiz_builder_title:'Set a Quiz for Your Class',
+    teacher_quiz_builder_sub:'Build short-answer questions for learners to type their own answers to',
+    teacher_quiz_title_label:'Quiz title',
+    teacher_quiz_title_placeholder:'e.g. Chapter 4 Test — Algebraic Functions',
+    teacher_quiz_grade_label:'Grade',
+    teacher_quiz_subject_label:'Subject',
+    teacher_quiz_time_limit_label:'Time limit (minutes)',
+    teacher_quiz_time_limit_hint:'Leave at 0 for no time limit',
+    teacher_quiz_questions_label:'Questions',
+    teacher_quiz_question_n:'Question {n}',
+    teacher_quiz_question_placeholder:'Type the question…',
+    teacher_quiz_answer_label:'Expected answer',
+    teacher_quiz_answer_placeholder:'Type the expected answer…',
+    teacher_quiz_add_question:'+ Add question',
+    teacher_quiz_remove_question:'Remove question',
+    teacher_quiz_publish_btn:'Publish quiz to class',
+    teacher_quiz_validation_alert:'Add a title and at least one complete question (with an expected answer) before publishing.',
+    teacher_quiz_published_note:'Quiz published — learners in Grade {grade} can now take it.',
+    teacher_quiz_list_title:'Quizzes You’ve Set',
+    teacher_quiz_list_empty:'No quizzes published yet — build one above.',
+    teacher_quiz_list_item_meta:'{grade} · {subject} · {n} questions',
+    teacher_quiz_time_limit_pill:'⏱ {n} min',
+    teacher_quiz_delete_btn:'Delete',
+    teacher_quiz_results_show_btn:'See learner marks',
+    teacher_quiz_results_hide_btn:'Hide marks',
+    teacher_quiz_results_empty:'No learners have taken this quiz yet.',
+    teacher_quiz_results_row:'{score}/{total}',
+
+    teacher_papers_title:'Question Papers',
+    teacher_papers_sub:'Upload past papers and worksheets for your class to download',
+    paper_title_label:'Paper title',
+    paper_title_placeholder:'e.g. Term 3 Revision Paper',
+    paper_file_label:'File',
+    paper_file_hint:'Upload a PDF, Word doc or image (under 5MB).',
+    paper_uploaded:'Attached: {name}',
+    paper_remove:'Remove',
+    paper_too_big:'That file is too large for this prototype — please choose one under 5MB.',
+    paper_publish_btn:'Publish paper to class',
+    paper_validation_alert:'Add a title and a file before publishing.',
+    paper_list_title:'Papers You’ve Uploaded',
+    paper_list_empty:'No question papers uploaded yet — add one above.',
+    paper_list_item_meta:'{grade} · {subject}',
+    paper_delete_btn:'Delete',
+    paper_link:'Download',
+    paper_view:'View',
+    paper_ocr_btn:'Generate quiz with AI',
+    paper_ocr_loading:'Reading the paper and writing questions…',
+    paper_ocr_image_only:'AI quiz generation reads image uploads only in this prototype — upload the paper as a photo or scan (PNG/JPG) to use it.',
+    paper_ocr_success:'Read “{title}” and drafted {n} questions below — review them and publish when ready.',
+    paper_ocr_empty:'Couldn’t find any clear questions in that paper — try a clearer photo or add questions manually below.',
+    paper_ocr_not_granted:'AI generation isn’t allowed for this artifact yet — the viewer needs to approve it when asked.',
+    paper_ocr_unavailable:'AI generation isn’t available in this view right now.',
+    paper_ocr_rate_limited:'Too many AI requests right now — please try again in a moment.',
+    paper_ocr_error:'Something went wrong reading that paper — please try again.',
+
+    learner_quizzes_title:'Quizzes From Your Teacher',
+    learner_quizzes_empty:'No quizzes have been set for your grade yet — check back soon.',
+    learner_quiz_filter_all:'All subjects',
+    learner_quiz_filter_empty:'No {subject} quizzes for your grade yet — check back soon.',
+    learner_quiz_locked_note:'You can only take one quiz at a time — finish or leave your current quiz first.',
+    learner_papers_title:'Question Papers',
+    learner_papers_empty:'No question papers have been uploaded for your grade yet.',
+    learner_quiz_take_btn:'Take quiz',
+    learner_quiz_retake_btn:'Retake quiz',
+    learner_quiz_back_btn:'← Back to quizzes',
+    learner_quiz_progress:'Question {current} of {total}',
+    learner_quiz_answer_placeholder:'Type your answer…',
+    learner_quiz_time_remaining:'⏱ Time remaining: {time}',
+    learner_quiz_time_up_note:'Time’s up — your quiz was submitted automatically.',
+    learner_quiz_next_btn:'Next',
+    learner_quiz_submit_btn:'Submit answers',
+    learner_quiz_result_caption:'You scored {correct}/{total}',
+    learner_quiz_score_pill:'Scored {correct}/{total}',
+
+    parent_progress_title:'Child’s Progress',
+    parent_progress_caption:'{pct}% overall progress this term',
+    parent_notifications_title:'Notifications',
+    parent_download_btn:'Download child’s report',
+    parent_mark_read:'Mark all as read',
+    notif_1:'{child} completed the Fractions unit with 92%.',
+    notif_2:'New personalised recommendation assigned: Reading Comprehension.',
+    notif_3:'Parent-teacher check-in suggested for next week.',
+    time_1:'Today, 08:14', time_2:'Yesterday', time_3:'2 days ago',
+
+    principal_teachers_title:'All Teachers',
+    principal_see_teachers_btn:'See all teachers',
+    principal_hide_teachers_btn:'Hide list',
+    principal_teachers_hint:'Currently reviewing {name} — see all teachers to switch.',
+    principal_ask_pill:'Awaiting check-in',
+    principal_oversight_title:'Teacher Oversight',
+    principal_ask:'Has this teacher completed their assigned interventions this week?',
+    principal_not_yet:'Not yet',
+    principal_yes:'Yes, completed',
+    principal_reminder_pill:'Reminder sent',
+    principal_reminder_note:'An escalation reminder has been sent to the teacher’s dashboard.',
+    principal_work_done_pill:'Work completed',
+    principal_download_btn:'Download performance report',
+    principal_ratings_title:'Learner Ratings Summary',
+    principal_ratings_caption:'from {n} anonymous learner ratings',
+    principal_feedback_placeholder:'Write feedback for the teacher...',
+    principal_send_feedback:'Send feedback',
+    principal_feedback_sent_alert:'Feedback sent to {teacher}.',
+
+    hod_dept_title:'My Department',
+    hod_dept_select_label:'Department',
+    dept_mathematics:'Mathematics', dept_languages:'Languages', dept_science:'Science',
+    hod_teachers_empty:'No teachers in this department yet.',
+    hod_avg_caption:'from {n} learner ratings',
+    hod_suggest_btn:'Suggest intervention',
+    hod_ai_prefix:'Suggested focus: ',
+    hod_escalate_btn:'Escalate to Principal',
+    hod_escalate_note:'Escalated — flagged on the Principal’s dashboard for follow-up.',
+    hod_escalated_pill:'Escalated',
+    hod_clear_flag_btn:'Clear flag',
+    hod_on_track_pill:'On track',
+    hod_report_title:'Department Report',
+    hod_report_desc:'Compile each teacher’s attendance, performance and learner ratings into one report for the Principal.',
+    hod_report_send_btn:'Send report to Principal',
+    hod_report_sent_note:'Report sent to the Principal.',
+    hod_report_col_teacher:'Teacher',
+    hod_report_col_attendance:'Attendance',
+    hod_report_col_performance:'Performance',
+    hod_report_col_rating:'Rating',
+
+    principal_reports_title:'Reports From HODs',
+    principal_reports_empty:'No department reports submitted yet.',
+    principal_reports_caption:'{dept} · sent {time}',
+    admin_users_title:'All Users',
+    admin_filter_role_label:'Show',
+    admin_filter_all:'All roles',
+    admin_users_empty:'No users yet.',
+    admin_user_name_placeholder:'Full name',
+    admin_add_user_btn:'Add user',
+    admin_remove_user_btn:'Remove',
+    admin_user_added_note:'User added.',
+
+    admin_title:'School-wide Trends',
+    admin_needs_intervention:'Needs intervention',
+    admin_on_track:'On track',
+    admin_caption:'Attendance {a}% · Performance {p}%',
+    subject_1:'Mathematics', subject_2:'English', subject_3:'Life Sciences',
+    subject_afrikaans:'Afrikaans', subject_lo:'Life Orientation',
+
+    chat_title:'Smart Learning Assistant',
+    chat_sub:'Ask anything · replies in your chosen language',
+    chat_lang_note:'Reply in:',
+    chat_placeholder:'Type a message, in any language...',
+    chat_send:'Send',
+    chat_welcome:'Ask me anything about Smart Learning. I can also translate any message into any language — just ask, e.g. “translate this to Portuguese: …”',
+    chat_unavailable:'The assistant isn’t available in this preview (needs the "sample" capability granted by the viewer).',
+    chat_thinking:'Thinking…',
+    chat_error:'Sorry, I couldn’t reach the assistant just now.',
+  };
+
+  /* ---------------- app state ---------------- */
+  const QUIZ_BANK = [
+    { qKey:'quiz_q1', optKeys:['quiz_q1_a','quiz_q1_b','quiz_q1_c','quiz_q1_d'], correct:0 },
+    { qKey:'quiz_q2', optKeys:['quiz_q2_a','quiz_q2_b','quiz_q2_c','quiz_q2_d'], correct:0 },
+    { qKey:'quiz_q3', optKeys:['quiz_q3_a','quiz_q3_b','quiz_q3_c','quiz_q3_d'], correct:0 },
+    { qKey:'quiz_q4', optKeys:['quiz_q4_a','quiz_q4_b','quiz_q4_c','quiz_q4_d'], correct:0 },
+    { qKey:'quiz_q5', optKeys:['quiz_q5_a','quiz_q5_b','quiz_q5_c','quiz_q5_d'], correct:0 },
+  ];
+
+  // school departments an HOD leads — grouped around real subject families
+  // (Mathematics, Languages, Science) rather than exposing raw subject keys
+  const DEPARTMENTS = [
+    { id:'mathematics', labelKey:'dept_mathematics' },
+    { id:'languages', labelKey:'dept_languages' },
+    { id:'science', labelKey:'dept_science' },
+  ];
+
+  // subjects offered in the sign-up form's subject dropdown (shown for the
+  // Teacher role, so a teacher account records what they teach)
+  const SUBJECT_OPTIONS = ['subject_1','subject_2','subject_3','subject_afrikaans','subject_lo'];
+
+  const ASSESSMENTS_BANK = {
+    '10': [
+      { subjectKey:'subject_1', titleKey:'assess_g10_math_title', descKey:'assess_g10_math_desc', due:'22 Sep' },
+      { subjectKey:'subject_2', titleKey:'assess_g10_eng_title', descKey:'assess_g10_eng_desc', due:'18 Sep' },
+      { subjectKey:'subject_3', titleKey:'assess_g10_ls_title', descKey:'assess_g10_ls_desc', due:'29 Sep' },
+    ],
+    '11': [
+      { subjectKey:'subject_1', titleKey:'assess_g11_math_title', descKey:'assess_g11_math_desc', due:'23 Sep' },
+      { subjectKey:'subject_2', titleKey:'assess_g11_eng_title', descKey:'assess_g11_eng_desc', due:'19 Sep' },
+      { subjectKey:'subject_3', titleKey:'assess_g11_ls_title', descKey:'assess_g11_ls_desc', due:'30 Sep' },
+    ],
+    '12': [
+      { subjectKey:'subject_1', titleKey:'assess_g12_math_title', descKey:'assess_g12_math_desc', due:'24 Sep' },
+      { subjectKey:'subject_2', titleKey:'assess_g12_eng_title', descKey:'assess_g12_eng_desc', due:'20 Sep' },
+      { subjectKey:'subject_3', titleKey:'assess_g12_ls_title', descKey:'assess_g12_ls_desc', due:'1 Oct' },
+    ],
+  };
+
+  const state = {
+    auth: { loggedIn:false, name:'', role:'learner', grade:'10' },
+    role: 'learner',
+    lang: 'English',
+    translating: false,
+    translations: {}, // lang -> {key: text}
+    learner: {
+      teacherName:'Mrs. Dlamini',
+      lessons: [
+        { id:1, key:'lesson_1', progress:100, done:true, assessmentViewed:true },
+        { id:2, key:'lesson_2', progress:60, done:false, assessmentViewed:false },
+        { id:3, key:'lesson_3', progress:0, done:false, assessmentViewed:false },
+      ],
+      recommendation: null,
+      rating: 0,
+      quiz: { started:false, submitted:false, index:0, answers:[], score:null, feedback:null },
+      expandedAssessment: null,
+      quizAttempts: {}, // teacherQuizId -> { index, answers, submitted, score }
+      activeQuizId: null,
+      quizSubjectFilter: 'all', // 'all' or a subjectKey — narrows the quiz list to one subject
+      tab: 'overview', // 'overview' | 'quizzes' | 'rate'
+    },
+    teacher: {
+      tab: 'class', // 'class' | 'quiz'
+      learners: [
+        { id:1, name:'Thabo M.', status:'on_track', noteKey:'learner1_note' },
+        { id:2, name:'Lindiwe K.', status:'at_risk', noteKey:'learner2_note' },
+        { id:3, name:'Sipho N.', status:'watch', noteKey:'learner3_note' },
+      ],
+      suggestion: {},
+      quizzes: [
+        // one quiz per core subject (Mathematics, English, Life Sciences), for
+        // every grade — so a learner always has a quiz of each subject to take
+        { id:1, title:'Quick Practice Quiz', grade:'10', subjectKey:'subject_1', timeLimitMin:3, questions:[
+          { text:'What is 7 + 5?', answer:'12' },
+          { text:'What is 9 x 3?', answer:'27' },
+          { text:'What is the capital city of South Africa’s executive branch (Union Buildings)?', answer:'Pretoria' },
+        ] },
+        { id:2, title:'Functions & Graphs Quiz', grade:'11', subjectKey:'subject_1', timeLimitMin:3, questions:[
+          { text:'What is the gradient of y = 2x + 3?', answer:'2' },
+          { text:'Solve for x: 3x = 15', answer:'5' },
+        ] },
+        { id:3, title:'Calculus Basics Quiz', grade:'12', subjectKey:'subject_1', timeLimitMin:3, questions:[
+          { text:'What is the derivative of x^2?', answer:'2x' },
+          { text:'What is the derivative of a constant?', answer:'0' },
+        ] },
+        { id:4, title:'Grammar & Vocabulary Quiz', grade:'10', subjectKey:'subject_2', timeLimitMin:3, questions:[
+          { text:'What is the past tense of "go"?', answer:'went' },
+          { text:'Identify the noun: The dog barked loudly.', answer:'dog' },
+        ] },
+        { id:5, title:'Comprehension Quiz', grade:'11', subjectKey:'subject_2', timeLimitMin:3, questions:[
+          { text:'What is a synonym for "happy"?', answer:'joyful' },
+          { text:'What is the plural of "child"?', answer:'children' },
+        ] },
+        { id:6, title:'Literary Devices Quiz', grade:'12', subjectKey:'subject_2', timeLimitMin:3, questions:[
+          { text:'What figure of speech compares two things using "like" or "as"?', answer:'simile' },
+          { text:'What is the repetition of consonant sounds called?', answer:'alliteration' },
+        ] },
+        { id:7, title:'Cell Biology Quiz', grade:'10', subjectKey:'subject_3', timeLimitMin:3, questions:[
+          { text:'What is the basic unit of life?', answer:'cell' },
+          { text:'Which organelle produces energy in a cell?', answer:'mitochondria' },
+        ] },
+        { id:8, title:'Human Systems Quiz', grade:'11', subjectKey:'subject_3', timeLimitMin:3, questions:[
+          { text:'Which organ pumps blood around the body?', answer:'heart' },
+          { text:'What gas do plants release during photosynthesis?', answer:'oxygen' },
+        ] },
+        { id:9, title:'Genetics Quiz', grade:'12', subjectKey:'subject_3', timeLimitMin:3, questions:[
+          { text:'What molecule carries genetic information?', answer:'DNA' },
+          { text:'What is a segment of DNA that codes for a protein called?', answer:'gene' },
+        ] },
+      ], // teacher-authored quizzes: { id, title, grade, subjectKey, timeLimitMin, questions:[{text,answer}] }
+      quizDraft: { title:'', grade:'10', subjectKey:'subject_1', timeLimitMin:0, questions:[{text:'', answer:''}] },
+      nextQuizId: 10,
+      quizResults: {
+        1: [
+          { learner:'Thabo M.', score:3, total:3 },
+          { learner:'Lindiwe K.', score:1, total:3 },
+          { learner:'Sipho N.', score:2, total:3 },
+        ],
+      }, // quizId -> [{ learner, score, total }]
+      showResultsFor: null,
+      papers: [], // question papers: { id, title, grade, subjectKey, fileName, fileUrl }
+      paperDraft: { title:'', grade:'10', subjectKey:'subject_1', fileName:null, fileUrl:null },
+      nextPaperId: 1,
+      ocrGeneratingId: null, // id of the paper currently being read by AI, or null
+      ocrErrorId: null, ocrErrorCode: null, // id + code of the paper whose last AI attempt failed
+    },
+    parent: {
+      child: 'Thabo M.',
+      progress: 78,
+      notifications: [
+        { key:'notif_1', timeKey:'time_1', read:false },
+        { key:'notif_2', timeKey:'time_2', read:false },
+        { key:'notif_3', timeKey:'time_3', read:true },
+      ],
+    },
+    principal: {
+      teachers: [
+        { id:1, name:'Mrs. Dlamini', subjectKey:'subject_1', dept:'mathematics', gradeKey:'grade_10', workDone:null, ratings:[5,4,5,3,4,5,2,4], attendance:96, performance:71, feedback:'', feedbackSent:false },
+        { id:4, name:'Mr. Nkosi', subjectKey:'subject_1', dept:'mathematics', gradeKey:'grade_12', workDone:true, ratings:[5,5,4,5,5,4], attendance:92, performance:74, feedback:'', feedbackSent:false },
+        { id:2, name:'Mr. Khumalo', subjectKey:'subject_2', dept:'languages', gradeKey:'grade_11', workDone:true, ratings:[4,4,3,5,4,4], attendance:91, performance:78, feedback:'', feedbackSent:false },
+        { id:5, name:'Ms. van Wyk', subjectKey:'subject_afrikaans', dept:'languages', gradeKey:'grade_10', workDone:null, ratings:[4,3,4,4,5], attendance:89, performance:73, feedback:'', feedbackSent:false },
+        { id:7, name:'Ms. Mokoena', subjectKey:'subject_lo', dept:'languages', gradeKey:'grade_11', workDone:false, ratings:[4,5,4,3,4], attendance:85, performance:69, feedback:'', feedbackSent:false },
+        { id:3, name:'Ms. Naidoo', subjectKey:'subject_3', dept:'science', gradeKey:'grade_12', workDone:false, ratings:[5,5,4,5,3,4,4], attendance:88, performance:65, feedback:'', feedbackSent:false },
+        { id:6, name:'Mr. Zulu', subjectKey:'subject_3', dept:'science', gradeKey:'grade_11', workDone:true, ratings:[5,4,5,5,4,5,3], attendance:93, performance:70, feedback:'', feedbackSent:false },
+      ],
+      selectedTeacherId: 1,
+      showTeacherList: false,
+      reports: [], // HOD-submitted department reports: { id, dept, sentAt, rows:[{name,subjectKey,gradeKey,attendance,performance,avgRating}] }
+    },
+    hod: {
+      dept: 'mathematics',
+      suggestion: {}, // teacherId -> suggestion text
+      lastReportSentAt: null,
+    },
+    admin: {
+      rows: [
+        { key:'subject_1', attendance:94, performance:71 },
+        { key:'subject_2', attendance:91, performance:78 },
+        { key:'subject_3', attendance:88, performance:65 },
+      ],
+      users: [
+        { id:1, name:'Thabo Mokoena', role:'learner' },
+        { id:2, name:'Lindiwe Khoza', role:'learner' },
+        { id:3, name:'Mrs. Dlamini', role:'teacher' },
+        { id:4, name:'Mr. Khumalo', role:'teacher' },
+        { id:5, name:'Nomsa Mokoena', role:'parent' },
+        { id:6, name:'Mrs. Dlamini', role:'hod' },
+        { id:7, name:'Mr. Sithole', role:'principal' },
+        { id:8, name:'Ms. Pillay', role:'admin' },
+      ],
+      nextUserId: 9,
+      newUser: { name:'', role:'learner' },
+      userFilter: 'all',
+    },
+    nextReportId: 1,
+  };
+
+  const ROLES = ['learner','teacher','parent','hod','principal','admin'];
+
+  /* ---------------- translation helper ---------------- */
+  function t(key, vars){
+    let text;
+    if(state.lang!=='English'){
+      const map = state.translations[state.lang];
+      text = map && map[key];
+    }
+    if(text==null) text = UI[key] || key;
+    if(vars){
+      Object.entries(vars).forEach(([k,v])=>{ text = text.replace(new RegExp('\\{'+k+'\\}','g'), v); });
+    }
+    return text;
+  }
+
+  function setSpinners(on){
+    [$('#langSpinner'), $('#loginLangSpinner'), $('#signupLangSpinner')].forEach(el=>{ if(el) el.hidden = !on; });
+  }
+  function syncLangSelectors(lang){
+    // the app-wide selectors (login screen, sign-up screen + topbar) only —
+    // the chat's own language choice is separate and is never overridden by this
+    ['#globalLang','#loginLangSelect','#signupLangSelect'].forEach(sel=>{
+      const node = $(sel);
+      if(!node) return;
+      const has = Array.from(node.options).some(o=>o.value===lang);
+      node.value = has ? lang : 'English';
+    });
+  }
+  async function setLanguage(lang){
+    state.lang = lang;
+    syncLangSelectors(lang);
+    if(lang==='English' || state.translations[lang]){ renderAll(); return; }
+    state.translating = true;
+    setSpinners(true);
+    try{
+      const sample = await claude.use('sample');
+      if(!sample){ state.translations[lang] = {}; state.translating=false; setSpinners(false); renderAll(); return; }
+      const keys = Object.keys(UI);
+      const items = keys.map(k=>({ key:k, text:UI[k] }));
+      const prompt = 'Translate the "text" field of every item below into '+lang+' (a South African language). '+
+        'Return ONLY a JSON array, same length and order, each item {"key": same key, "text": translated text}. '+
+        'Keep any {placeholder} tokens (like {n}, {teacher}, {pct}) unchanged and in the same relative position. '+
+        'Keep it natural and concise, matching a simple app UI tone.\n\n'+JSON.stringify(items);
+      const res = await sample.json(prompt, { modelTier:'default' });
+      const arr = Array.isArray(res) ? res : (res && res.items) || [];
+      const map = {};
+      arr.forEach(it=>{ if(it && it.key) map[it.key] = it.text; });
+      state.translations[lang] = map;
+    } catch(e){
+      state.translations[lang] = {};
+    }
+    state.translating = false;
+    setSpinners(false);
+    renderAll();
+  }
+  function renderAll(){
+    renderLanding();
+    renderLogin();
+    renderSignup();
+    renderForgot();
+    if(state.auth.loggedIn) render();
+  }
+
+  const $ = (sel, root) => (root||document).querySelector(sel);
+  const el = (tag, attrs, ...kids) => {
+    const e = document.createElement(tag);
+    Object.entries(attrs||{}).forEach(([k,v])=>{
+      if(k==='class') e.className=v;
+      else if(k==='html') e.innerHTML=v;
+      else if(k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else if(v!=null) e.setAttribute(k,v);
+    });
+    kids.flat().forEach(k=>{ if(k==null) return; e.appendChild(typeof k==='string'?document.createTextNode(k):k); });
+    return e;
+  };
+
+  // small clean-line (feather-style) icon, built from the sprite defs in the
+  // document head — used everywhere an emoji used to stand in for an icon
+  const icon = (name, cls) => el('span',{class:'icon-inline'+(cls?(' '+cls):''),
+    html:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#icon-'+name+'"/></svg>'});
+
+  function renderChrome(){
+    $('#appTitle').textContent = t('app_title');
+    $('#chatTitle').textContent = t('chat_title');
+    $('#chatSub').textContent = t('chat_sub');
+    $('#chatLangNote').textContent = t('chat_lang_note');
+    $('#chatInput').placeholder = t('chat_placeholder');
+    $('#chatSend').textContent = t('chat_send');
+    const surname = (state.auth.name||'').trim().split(/\s+/).pop();
+    $('#loggedBarText').textContent = surname ? t('tab_'+state.auth.role)+' · '+surname : t('tab_'+state.auth.role);
+    $('#logoutBtn').textContent = t('logout_button');
+  }
+
+  function renderLanding(){
+    $('#landingLogoText').textContent = t('app_title').replace(/\s*[––-]\s*Prototype$/i, '');
+    $('#landingLoginBtn').textContent = t('landing_login_btn');
+    $('#landingSignupBtn').textContent = t('landing_signup_btn');
+    $('#landingBadge').textContent = t('landing_badge');
+    $('#landingHeadline').innerHTML = '';
+    $('#landingHeadline').appendChild(document.createTextNode(t('landing_headline_pre')));
+    $('#landingHeadline').appendChild(el('span',{class:'highlight'}, t('landing_headline_highlight')));
+    $('#landingHeadline').appendChild(document.createTextNode(t('landing_headline_post')));
+    $('#landingSubtitle').textContent = t('landing_subtitle');
+    $('#landingGetStartedBtn').textContent = t('landing_get_started_btn');
+    $('#landingAlreadyText').textContent = t('landing_already_account');
+    $('#landingLoginLink').textContent = t('landing_already_login_link');
+    $('#landingFeat2Title').textContent = t('landing_feat2_title');
+    $('#landingFeat2Sub').textContent = t('landing_feat2_sub');
+    $('#landingFeat3Title').textContent = t('landing_feat3_title');
+    $('#landingFeat3Sub').textContent = t('landing_feat3_sub');
+  }
+
+  let forgotSent = false; // whether the forgot-password form has been submitted this visit
+  let forgotValue = '';   // the email/username the reset link would have gone to
+  function showLanding(){
+    $('#landingScreen').hidden = false;
+    $('#loginScreen').hidden = true;
+    $('#signupScreen').hidden = true;
+    $('#forgotScreen').hidden = true;
+  }
+  // log in and sign up are two separate screens (own fields, own copy) — not
+  // one shared form with the text swapped underneath it
+  function showLogin(){
+    $('#landingScreen').hidden = true;
+    $('#loginScreen').hidden = false;
+    $('#signupScreen').hidden = true;
+    $('#forgotScreen').hidden = true;
+    renderLogin();
+  }
+  function showSignup(){
+    $('#landingScreen').hidden = true;
+    $('#loginScreen').hidden = true;
+    $('#signupScreen').hidden = false;
+    $('#forgotScreen').hidden = true;
+    renderSignup();
+  }
+  function showForgotScreen(){
+    forgotSent = false;
+    $('#landingScreen').hidden = true;
+    $('#loginScreen').hidden = true;
+    $('#signupScreen').hidden = true;
+    $('#forgotScreen').hidden = false;
+    renderForgot();
+  }
+
+  function renderLogin(){
+    $('#loginTitle').textContent = t('login_title');
+    $('#loginSubtitle').textContent = t('login_subtitle');
+    $('#loginEmailLabel').textContent = t('login_email_label');
+    $('#loginEmail').placeholder = t('login_email_placeholder');
+    $('#loginRoleLabel').textContent = t('login_role_label');
+    $('#loginGradeLabel').textContent = t('login_grade_label');
+    $('#loginDeptLabel').textContent = t('hod_dept_select_label');
+    $('#loginIdLabel').textContent = t('login_id_label');
+    $('#loginId').placeholder = t('login_id_placeholder');
+    $('#loginStaffLabel').textContent = t('login_staff_label');
+    $('#loginStaff').placeholder = t('login_staff_placeholder');
+    $('#loginPasswordLabel').textContent = t('login_password_label');
+    $('#loginPassword').placeholder = t('login_password_placeholder');
+    $('#loginSubmit').textContent = t('login_button');
+    $('#authToggleText').textContent = t('auth_toggle_to_signup');
+    $('#authToggleLink').textContent = t('auth_toggle_to_signup_link');
+    $('#forgotPasswordLink').textContent = t('forgot_password_link');
+    $('#loginBackHomeLink').textContent = t('back_to_home_link');
+    Array.from($('#loginRole').options).forEach(o=>{ o.textContent = t('tab_'+o.value); });
+    Array.from($('#loginGrade').options).forEach(o=>{ o.textContent = t('grade_'+o.value); });
+    DEPARTMENTS.forEach((dep,i)=>{ $('#loginDept').options[i].textContent = t(dep.labelKey); });
+  }
+
+  function renderSignup(){
+    $('#signupTitle').textContent = t('signup_title');
+    $('#signupSubtitle').textContent = t('signup_subtitle');
+    $('#signupNameLabel').textContent = t('signup_name_label');
+    $('#signupName').placeholder = t('signup_name_placeholder');
+    $('#signupEmailLabel').textContent = t('signup_email_label');
+    $('#signupEmail').placeholder = t('signup_email_placeholder');
+    $('#signupRoleLabel').textContent = t('signup_role_label');
+    $('#signupGradeLabel').textContent = t('signup_grade_label');
+    $('#signupDeptLabel').textContent = t('hod_dept_select_label');
+    $('#signupSubjectLabel').textContent = t('signup_subject_label');
+    $('#signupPasswordLabel').textContent = t('signup_password_label');
+    $('#signupPassword').placeholder = t('signup_password_placeholder');
+    $('#signupConfirmLabel').textContent = t('signup_confirm_label');
+    $('#signupConfirmPassword').placeholder = t('signup_confirm_placeholder');
+    $('#signupSubmit').textContent = t('signup_button');
+    $('#signupToggleText').textContent = t('auth_toggle_to_login');
+    $('#signupToggleLink').textContent = t('auth_toggle_to_login_link');
+    $('#signupBackHomeLink').textContent = t('back_to_home_link');
+    Array.from($('#signupRole').options).forEach(o=>{ o.textContent = t('tab_'+o.value); });
+    Array.from($('#signupGrade').options).forEach(o=>{ o.textContent = t('grade_'+o.value); });
+    DEPARTMENTS.forEach((dep,i)=>{ $('#signupDept').options[i].textContent = t(dep.labelKey); });
+    SUBJECT_OPTIONS.forEach((sk,i)=>{ $('#signupSubject').options[i].textContent = t(sk); });
+  }
+
+  function renderForgot(){
+    $('#forgotHeroBadge').textContent = $('#heroBadge') ? $('#heroBadge').textContent : t('app_title').replace(/\s*[––-]\s*Prototype$/i, '').toUpperCase();
+    $('#forgotTitle').textContent = t('forgot_title');
+    $('#forgotSubtitle').textContent = t('forgot_subtitle');
+    $('#forgotEmailLabel').textContent = t('forgot_email_label');
+    $('#forgotEmail').placeholder = t('forgot_email_placeholder');
+    $('#forgotSubmit').textContent = t('forgot_submit_btn');
+    $('#forgotBackText').textContent = t('forgot_back_to_login');
+    $('#forgotBackLink').textContent = t('forgot_back_to_login_link');
+    $('#forgotBackText2').textContent = t('forgot_back_to_login');
+    $('#forgotBackLink2').textContent = t('forgot_back_to_login_link');
+    $('#forgotSuccessTitle').textContent = t('forgot_success_title');
+    $('#forgotSuccessNote').textContent = t('forgot_success_note',{value:forgotValue});
+    $('#forgotResendBtn').textContent = t('forgot_resend_btn');
+    $('#forgotBackHomeLink').textContent = t('back_to_home_link');
+    $('#forgotBackHomeLink2').textContent = t('back_to_home_link');
+    if(!$('#forgotSuccessIcon').firstChild){ $('#forgotSuccessIcon').appendChild(icon('inbox')); }
+    $('#forgotForm').hidden = forgotSent;
+    $('#forgotSuccess').hidden = !forgotSent;
+  }
+
+  function updateGradeVisibility(prefix){
+    // NOTE: a hidden field that is still `required` blocks form submission —
+    // browsers validate required fields even when hidden via the `hidden`
+    // attribute, so `required` is toggled off/on together with visibility
+    const role = $('#'+prefix+'Role').value;
+    $('#'+prefix+'GradeField').hidden = (role!=='learner');
+    $('#'+prefix+'DeptField').hidden = (role!=='hod');
+    const subjField = $('#'+prefix+'SubjectField'); // only sign-up has this field
+    if(subjField) subjField.hidden = (role!=='teacher');
+    const idField = $('#'+prefix+'IdField'); // only log in has these two fields
+    if(idField){
+      idField.hidden = (role!=='learner');
+      const idInput = $('#'+prefix+'Id');
+      if(idInput) idInput.required = (role==='learner');
+    }
+    const staffField = $('#'+prefix+'StaffField');
+    if(staffField){
+      staffField.hidden = (role!=='teacher');
+      const staffInput = $('#'+prefix+'Staff');
+      if(staffInput) staffInput.required = (role==='teacher');
+    }
+  }
+
+
+  /* ---------------- role views ---------------- */
+  function viewLearner(){
+    const s = state.learner;
+    const root = el('div',{class:'card-learner role-scope'});
+
+
+    // section nav — groups the growing feature set (lessons, teacher quizzes, check-in quiz,
+    // ratings) into three scannable sections instead of one long stack of cards
+    const teacherQuizCount = state.teacher.quizzes.filter(q=>q.grade===state.auth.grade).length;
+    const paperCount = state.teacher.papers.filter(p=>p.grade===state.auth.grade).length;
+    const tabs = [
+      { id:'overview', icon:'book', labelKey:'nav_overview' },
+      { id:'quizzes', icon:'help', labelKey:'nav_quizzes', count:teacherQuizCount+1 },
+      { id:'papers', icon:'paperclip', labelKey:'nav_papers', count:paperCount },
+      { id:'rate', icon:'star', labelKey:'nav_rate_teacher' },
+    ];
+    const nav = el('div',{class:'section-nav'});
+    tabs.forEach(tb=>{
+      nav.appendChild(el('button',{class:s.tab===tb.id?'active':'', onclick:()=>{ s.tab=tb.id; render(); } },
+        el('span',{class:'nav-icon'}, icon(tb.icon)), el('span',{}, t(tb.labelKey)),
+        tb.count!=null ? el('span',{class:'count'}, String(tb.count)) : null
+      ));
+    });
+    root.appendChild(nav);
+
+    if(s.tab==='overview'){
+      const assessList = ASSESSMENTS_BANK[state.auth.grade] || [];
+      const lessonsCard = el('div',{class:'card card-learner'});
+      lessonsCard.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('book')), t('learner_lessons_title')), el('span',{class:'muted'}, t('grade_'+state.auth.grade)+' · '+s.teacherName)));
+      s.lessons.forEach((l,i)=>{
+        const assessment = assessList[i];
+        const row = el('div',{class:'row', style:'flex-direction:column; align-items:stretch; gap:6px;'});
+        const top = el('div',{class:'row', style:'border:none; padding:0;'},
+          el('div',{style:'flex:1;'},
+            el('div',{}, t(l.key)),
+            el('div',{class:'bar'}, el('span',{style:`width:${l.progress}%; background:${l.progress===100?'var(--good)':'var(--learner)'};`}))
+          ),
+          el('button',{class:'btn'+(l.done?'':' btn-primary'), disabled:(l.done || !l.assessmentViewed)?'true':null,
+            onclick:()=>{ l.progress=100; l.done=true; getRecommendation(l); render(); }
+          }, l.done?t('learner_completed'):t('learner_mark_complete'))
+        );
+        row.appendChild(top);
+        if(assessment){
+          const expanded = s.expandedAssessment===l.id;
+          const assessRow = el('div',{style:'display:flex; align-items:center; gap:8px; flex-wrap:wrap;'},
+            el('button',{class:'btn', style:'font-size:11.5px; padding:5px 10px;',
+              onclick:()=>{
+                s.expandedAssessment = expanded ? null : l.id;
+                l.assessmentViewed = true;
+                render();
+              }
+            }, expanded ? t('assess_hide_btn') : t('assess_view_btn')),
+            el('span',{class:'meta'}, t(assessment.titleKey)+' · '+t('assess_due',{date:assessment.due}))
+          );
+          row.appendChild(assessRow);
+          if(expanded){
+            row.appendChild(el('p',{class:'muted', style:'margin:2px 0 0;'}, t(assessment.descKey)));
+          }
+          if(!l.done){
+            row.appendChild(el('p',{class:'muted', style:'margin:2px 0 0; font-size:11px;'},
+              l.assessmentViewed ? icon('check') : icon('lock'), l.assessmentViewed ? ' '+t('assess_viewed_note') : ' '+t('assess_gate_note')
+            ));
+          }
+        }
+        lessonsCard.appendChild(row);
+      });
+      if(s.recommendation){
+        lessonsCard.appendChild(el('div',{class:'ai-note'}, el('b',{}, icon('bot'), ' '+t('learner_ai_prefix')), s.recommendation));
+      } else {
+        lessonsCard.appendChild(el('p',{class:'muted', style:'margin-top:10px;'}, t('learner_ai_placeholder')));
+      }
+      root.appendChild(lessonsCard);
+    } else if(s.tab==='quizzes'){
+      // a learner may only have one quiz open at a time — while a teacher's
+      // quiz is in progress, the built-in check-in quiz card is hidden
+      // entirely rather than shown as a second quiz to jump into
+      root.appendChild(renderTeacherQuizzesCard());
+      if(!isTeacherQuizActive()){
+        root.appendChild(renderQuizCard());
+      }
+    } else if(s.tab==='papers'){
+      root.appendChild(renderLearnerPapersCard());
+    } else {
+      const rateCard = el('div',{class:'card card-learner'});
+      rateCard.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('star')), t('learner_rate_title'))));
+      rateCard.appendChild(el('p',{class:'muted'}, t('learner_rate_sub',{teacher:s.teacherName})));
+      const stars = el('div',{class:'stars'});
+      for(let i=1;i<=5;i++){
+        stars.appendChild(el('button',{class:i<=s.rating?'on':'', onclick:()=>{ s.rating=i; render(); }}, icon('star')));
+      }
+      rateCard.appendChild(stars);
+      if(s.rating>0){ rateCard.appendChild(el('p',{class:'ai-note'}, t('learner_rate_thanks',{n:s.rating}))); }
+      root.appendChild(rateCard);
+    }
+    return root;
+  }
+
+  /* ---------------- learner: quizzes set by the teacher (from the teacher's quiz builder) ---------------- */
+  function renderTeacherQuizzesCard(){
+    const card = el('div',{class:'card card-learner', style:'margin-top:14px;'});
+    card.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('edit')), t('learner_quizzes_title'))));
+
+    const allMyQuizzes = state.teacher.quizzes.filter(q=>q.grade===state.auth.grade);
+    const activeId = state.learner.activeQuizId;
+    const activeQuiz = activeId!=null ? allMyQuizzes.find(q=>q.id===activeId) : null;
+
+    if(activeQuiz){
+      card.appendChild(renderTeacherQuizTaking(activeQuiz));
+      return card;
+    }
+    clearQuizTimer();
+
+    if(allMyQuizzes.length===0){
+      card.appendChild(el('p',{class:'muted'}, t('learner_quizzes_empty')));
+      return card;
+    }
+
+    // one chip per subject that has a quiz at this grade, so a learner can
+    // jump straight to any subject's quiz instead of scanning one long list
+    const subjectsPresent = [...new Set(allMyQuizzes.map(q=>q.subjectKey))];
+    if(subjectsPresent.length>1){
+      if(!subjectsPresent.includes(state.learner.quizSubjectFilter) && state.learner.quizSubjectFilter!=='all'){
+        state.learner.quizSubjectFilter = 'all';
+      }
+      const filterRow = el('div',{class:'subject-filter'});
+      filterRow.appendChild(el('button',{class:state.learner.quizSubjectFilter==='all'?'active':'',
+        onclick:()=>{ state.learner.quizSubjectFilter='all'; render(); } }, t('learner_quiz_filter_all')));
+      subjectsPresent.forEach(sk=>{
+        filterRow.appendChild(el('button',{class:state.learner.quizSubjectFilter===sk?'active':'',
+          onclick:()=>{ state.learner.quizSubjectFilter=sk; render(); } }, t(sk)));
+      });
+      card.appendChild(filterRow);
+    }
+
+    const myQuizzes = (state.learner.quizSubjectFilter==='all')
+      ? allMyQuizzes
+      : allMyQuizzes.filter(q=>q.subjectKey===state.learner.quizSubjectFilter);
+
+    if(myQuizzes.length===0){
+      card.appendChild(el('p',{class:'muted'}, t('learner_quiz_filter_empty',{subject:t(state.learner.quizSubjectFilter)})));
+      return card;
+    }
+    // a learner may only have one quiz open at a time — while the built-in
+    // check-in quiz is in progress, these Take/Retake buttons are disabled
+    const checkinActive = isCheckinQuizActive();
+    if(checkinActive){
+      card.appendChild(el('p',{class:'muted', style:'margin-bottom:4px;'}, t('learner_quiz_locked_note')));
+    }
+    myQuizzes.forEach(quiz=>{
+      const attempt = state.learner.quizAttempts[quiz.id];
+      const row = el('div',{class:'row', style:'flex-direction:column; align-items:stretch; gap:6px;'});
+      row.appendChild(el('div',{class:'row', style:'border:none; padding:0;'},
+        el('div',{},
+          el('b',{}, quiz.title),
+          el('div',{class:'meta'}, t('teacher_quiz_list_item_meta',{grade:t('grade_'+quiz.grade), subject:t(quiz.subjectKey), n:quiz.questions.length}))
+        ),
+        attempt && attempt.submitted ? el('span',{class:'pill pill-good'}, t('learner_quiz_score_pill',{correct:attempt.score, total:quiz.questions.length})) : null
+      ));
+      const actionRow = el('div',{style:'display:flex; align-items:center; gap:10px; flex-wrap:wrap;'},
+        el('button',{class:'btn btn-primary', disabled:checkinActive?'true':null,
+          onclick:()=>{ if(checkinActive) return; state.learner.activeQuizId = quiz.id; render(); } },
+          (attempt && attempt.submitted) ? t('learner_quiz_retake_btn') : t('learner_quiz_take_btn'))
+      );
+      row.appendChild(actionRow);
+      card.appendChild(row);
+    });
+    return card;
+  }
+
+  /* ---------------- learner: question papers (its own section, separate from quizzes) ---------------- */
+  function renderLearnerPapersCard(){
+    const card = el('div',{class:'card card-learner'});
+    card.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('paperclip')), t('learner_papers_title'))));
+    const myPapers = state.teacher.papers.filter(p=>p.grade===state.auth.grade);
+    if(myPapers.length===0){
+      card.appendChild(el('p',{class:'muted'}, t('learner_papers_empty')));
+      return card;
+    }
+    myPapers.forEach(paper=>{
+      const row = el('div',{class:'row'},
+        el('div',{},
+          el('b',{}, paper.title),
+          el('div',{class:'meta'}, t('paper_list_item_meta',{grade:t('grade_'+paper.grade), subject:t(paper.subjectKey)}))
+        ),
+        el('div',{style:'display:flex; gap:8px;'},
+          el('a',{href:paper.fileUrl, target:'_blank', rel:'noopener', class:'btn'}, icon('eye'), ' '+t('paper_view')),
+          el('a',{href:paper.fileUrl, download:paper.fileName, class:'btn'}, icon('paperclip'), ' '+t('paper_link'))
+        )
+      );
+      card.appendChild(row);
+    });
+    return card;
+  }
+
+  let quizTimerHandle = null;
+  function clearQuizTimer(){
+    if(quizTimerHandle){ clearInterval(quizTimerHandle); quizTimerHandle = null; }
+  }
+  function formatQuizTime(totalSeconds){
+    const s = Math.max(0, Math.round(totalSeconds));
+    const m = Math.floor(s/60);
+    const r = s%60;
+    return String(m).padStart(2,'0')+':'+String(r).padStart(2,'0');
+  }
+  function scoreTeacherQuizAttempt(quiz, attempt){
+    let score = 0;
+    quiz.questions.forEach((q,i)=>{
+      const given = (attempt.answers[i]||'').trim().toLowerCase();
+      const correct = (q.answer||'').trim().toLowerCase();
+      if(given && given===correct) score++;
+    });
+    attempt.score = score;
+    attempt.submitted = true;
+  }
+
+  function renderTeacherQuizTaking(quiz){
+    const wrap = el('div',{});
+    wrap.appendChild(el('button',{class:'btn', style:'margin-bottom:10px;', onclick:()=>{ clearQuizTimer(); state.learner.activeQuizId=null; render(); } }, t('learner_quiz_back_btn')));
+    let attempt = state.learner.quizAttempts[quiz.id];
+    if(!attempt){ attempt = state.learner.quizAttempts[quiz.id] = { index:0, answers:[], submitted:false, score:null, deadline:null, timedOut:false }; }
+
+    if(!attempt.submitted && quiz.timeLimitMin && !attempt.deadline){
+      attempt.deadline = Date.now() + quiz.timeLimitMin*60000;
+    }
+    if(!attempt.submitted && attempt.deadline && Date.now() >= attempt.deadline){
+      attempt.timedOut = true;
+      scoreTeacherQuizAttempt(quiz, attempt);
+      recordTeacherQuizResult(quiz, attempt);
+    }
+
+    if(!attempt.submitted){
+      const item = quiz.questions[attempt.index];
+      if(attempt.deadline){
+        wrap.appendChild(el('div',{class:'quiz-progress', id:'quizTimerDisplay', style:'font-weight:800;'}, t('learner_quiz_time_remaining',{time:formatQuizTime((attempt.deadline-Date.now())/1000)})));
+        clearQuizTimer();
+        quizTimerHandle = setInterval(()=>{
+          const remaining = (attempt.deadline-Date.now())/1000;
+          if(remaining<=0){ render(); return; }
+          const disp = document.getElementById('quizTimerDisplay');
+          if(disp){ disp.textContent = t('learner_quiz_time_remaining',{time:formatQuizTime(remaining)}); }
+          else { render(); }
+        }, 1000);
+      }
+      wrap.appendChild(el('div',{class:'quiz-progress'}, t('learner_quiz_progress',{current:attempt.index+1, total:quiz.questions.length})));
+      wrap.appendChild(el('div',{class:'quiz-bar'}, el('span',{style:`width:${(attempt.index/quiz.questions.length)*100}%;`})));
+      wrap.appendChild(el('p',{class:'quiz-question'}, item.text));
+      wrap.appendChild(el('input',{type:'text', value:attempt.answers[attempt.index]||'', placeholder:t('learner_quiz_answer_placeholder'), style:'margin-top:4px;',
+        oninput:(e)=>{ attempt.answers[attempt.index] = e.target.value; } }));
+      const isLast = attempt.index===quiz.questions.length-1;
+      wrap.appendChild(el('button',{
+        class:'btn btn-primary', style:'margin-top:14px;',
+        disabled: !(attempt.answers[attempt.index]||'').trim() ? 'true' : null,
+        onclick: isLast ? ()=>submitTeacherQuiz(quiz) : ()=>{ attempt.index++; render(); }
+      }, isLast ? t('learner_quiz_submit_btn') : t('learner_quiz_next_btn')));
+    } else {
+      clearQuizTimer();
+      const pct = attempt.score/quiz.questions.length;
+      const ringColor = pct>=0.8?'var(--good)':(pct>=0.5?'var(--warn)':'var(--bad)');
+      if(attempt.timedOut){
+        wrap.appendChild(el('p',{class:'ai-note'}, t('learner_quiz_time_up_note')));
+      }
+      const result = el('div',{class:'quiz-result'});
+      result.appendChild(el('div',{class:'ring', style:`background:color-mix(in srgb, ${ringColor} 18%, transparent); border:3px solid ${ringColor}; color:${ringColor};`},
+        el('span',{class:'num'}, attempt.score+'/'+quiz.questions.length)
+      ));
+      result.appendChild(el('p',{class:'muted', style:'margin:0 0 10px;'}, t('learner_quiz_result_caption',{correct:attempt.score, total:quiz.questions.length})));
+      wrap.appendChild(result);
+      wrap.appendChild(el('button',{class:'btn', style:'margin-top:6px;', onclick:()=>{
+        state.learner.quizAttempts[quiz.id] = { index:0, answers:[], submitted:false, score:null, deadline:null, timedOut:false };
+        render();
+      } }, t('learner_quiz_retake_btn')));
+    }
+    return wrap;
+  }
+
+  function recordTeacherQuizResult(quiz, attempt){
+    const learnerName = (state.auth.name||'').trim() || 'Learner';
+    if(!state.teacher.quizResults[quiz.id]) state.teacher.quizResults[quiz.id] = [];
+    const list = state.teacher.quizResults[quiz.id];
+    const existing = list.find(r=>r.learner===learnerName);
+    if(existing){ existing.score = attempt.score; existing.total = quiz.questions.length; }
+    else { list.push({ learner:learnerName, score:attempt.score, total:quiz.questions.length }); }
+  }
+
+  function submitTeacherQuiz(quiz){
+    const attempt = state.learner.quizAttempts[quiz.id];
+    scoreTeacherQuizAttempt(quiz, attempt);
+    recordTeacherQuizResult(quiz, attempt);
+    clearQuizTimer();
+    render();
+  }
+
+  function renderQuizCard(){
+    const q = state.learner.quiz;
+    const card = el('div',{class:'card card-learner', style:'margin-top:14px;'});
+    card.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('help')), t('quiz_title'))));
+
+    if(!q.started){
+      const locked = isTeacherQuizActive();
+      card.appendChild(el('p',{class:'muted'}, locked ? t('learner_quiz_locked_note') : t('quiz_intro')));
+      card.appendChild(el('button',{class:'btn btn-primary', style:'margin-top:6px;', disabled:locked?'true':null, onclick:startQuiz}, t('quiz_start_btn')));
+    } else if(!q.submitted){
+      const item = QUIZ_BANK[q.index];
+      card.appendChild(el('div',{class:'quiz-progress'}, t('quiz_progress',{current:q.index+1, total:QUIZ_BANK.length})));
+      card.appendChild(el('div',{class:'quiz-bar'}, el('span',{style:`width:${((q.index)/QUIZ_BANK.length)*100}%;`})));
+      card.appendChild(el('p',{class:'quiz-question'}, t(item.qKey)));
+      const opts = el('div',{class:'quiz-options'});
+      item.optKeys.forEach((optKey,i)=>{
+        opts.appendChild(el('div',{class:'quiz-option'+(q.answers[q.index]===i?' selected':''), onclick:()=>selectQuizAnswer(i)},
+          el('span',{class:'dot'}), el('span',{}, t(optKey))
+        ));
+      });
+      card.appendChild(opts);
+      const isLast = q.index===QUIZ_BANK.length-1;
+      const nextBtn = el('button',{
+        class:'btn btn-primary', style:'margin-top:14px;',
+        disabled: q.answers[q.index]==null ? 'true' : null,
+        onclick: isLast ? submitQuiz : nextQuizQuestion
+      }, isLast ? t('quiz_submit_btn') : t('quiz_next_btn'));
+      card.appendChild(nextBtn);
+    } else {
+      const pct = q.score/QUIZ_BANK.length;
+      const statusKey = pct>=0.8?'quiz_status_good':(pct>=0.5?'quiz_status_watch':'quiz_status_bad');
+      const ringColor = pct>=0.8?'var(--good)':(pct>=0.5?'var(--warn)':'var(--bad)');
+      const result = el('div',{class:'quiz-result'});
+      result.appendChild(el('div',{class:'ring', style:`background:color-mix(in srgb, ${ringColor} 18%, transparent); border:3px solid ${ringColor}; color:${ringColor};`},
+        el('span',{class:'num'}, q.score+'/'+QUIZ_BANK.length)
+      ));
+      result.appendChild(el('p',{style:'font-weight:800; margin:0 0 4px;'}, t(statusKey)));
+      result.appendChild(el('p',{class:'muted', style:'margin:0 0 10px;'}, t('quiz_score_caption',{correct:q.score, total:QUIZ_BANK.length})));
+      card.appendChild(result);
+      if(q.feedback){
+        card.appendChild(el('div',{class:'ai-note'}, el('b',{}, icon('bot'), ' '+t('quiz_ai_prefix')), q.feedback));
+      }
+      if(pct<0.8){
+        card.appendChild(el('p',{class:'muted', style:'margin-top:10px;'}, icon('inbox'), ' '+t('quiz_teacher_note')));
+      }
+      card.appendChild(el('button',{class:'btn', style:'margin-top:12px;', onclick:retakeQuiz}, t('quiz_retake_btn')));
+    }
+    return card;
+  }
+
+  // a learner may only have one quiz in progress at a time — either the
+  // built-in check-in quiz or one of the teacher's quizzes, never both
+  function isCheckinQuizActive(){
+    const q = state.learner.quiz;
+    return q.started && !q.submitted;
+  }
+  function isTeacherQuizActive(){
+    const id = state.learner.activeQuizId;
+    if(id==null) return false;
+    const attempt = state.learner.quizAttempts[id];
+    return !attempt || !attempt.submitted;
+  }
+
+  function startQuiz(){
+    if(isTeacherQuizActive()) return;
+    state.learner.quiz = { started:true, submitted:false, index:0, answers:[], score:null, feedback:null };
+    render();
+  }
+  function selectQuizAnswer(i){
+    state.learner.quiz.answers[state.learner.quiz.index] = i;
+    render();
+  }
+  function nextQuizQuestion(){
+    state.learner.quiz.index++;
+    render();
+  }
+  function retakeQuiz(){
+    state.learner.quiz = { started:false, submitted:false, index:0, answers:[], score:null, feedback:null };
+    render();
+  }
+  async function submitQuiz(){
+    const q = state.learner.quiz;
+    let score = 0;
+    const missedTopics = [];
+    QUIZ_BANK.forEach((item,i)=>{
+      if(q.answers[i]===item.correct) score++;
+      else missedTopics.push(t(item.qKey));
+    });
+    q.score = score;
+    q.submitted = true;
+
+    // reflect the result onto the matching demo learner on the teacher's dashboard
+    const teacherEntry = state.teacher.learners.find(l=>l.name===state.parent.child);
+    if(teacherEntry){
+      const pct = score/QUIZ_BANK.length;
+      teacherEntry.status = pct>=0.8 ? 'on_track' : (pct>=0.5 ? 'watch' : 'at_risk');
+      teacherEntry.noteKey = null;
+      teacherEntry.noteText = t('quiz_score_caption',{correct:score,total:QUIZ_BANK.length});
+    }
+    render();
+
+    if(missedTopics.length===0){ render(); return; }
+    try{
+      const sample = await claude.use('sample');
+      if(!sample) return;
+      const langNote = state.lang==='English' ? '' : ` Reply in ${state.lang}.`;
+      const res = await sample(`A Grade ${state.auth.grade||'10'} learner just took a short check-in quiz on a platform called Smart Learning and got ${score} out of ${QUIZ_BANK.length} correct. They struggled with questions about: ${missedTopics.join('; ')}. In ONE short, encouraging sentence (max 25 words), tell them what to focus on next.${langNote}`, { modelTier:'quick' });
+      q.feedback = res.text.trim();
+    } catch(e){ /* no-op: feedback is a nice-to-have */ }
+    render();
+  }
+
+  async function getRecommendation(lesson){
+    const learner = state.learner;
+    learner.recommendation = t('learner_ai_thinking');
+    render();
+    try{
+      const sample = await claude.use('sample');
+      if(!sample){ learner.recommendation = null; render(); return; }
+      const langNote = state.lang==='English' ? '' : ` Reply in ${state.lang}.`;
+      const res = await sample(`A learner just completed the lesson "${t(lesson.key)}" on an education platform called Smart Learning. In ONE short sentence (max 25 words), recommend the next best personalised learning activity for them, warmly and specifically.${langNote}`, { modelTier:'quick' });
+      learner.recommendation = res.text.trim();
+    } catch(e){
+      learner.recommendation = null;
+    }
+    render();
+  }
+
+  function viewTeacher(){
+    const s = state.teacher;
+    const root = el('div',{class:'card-teacher role-scope'});
+
+    const tabs = [
+      { id:'class', icon:'cap', labelKey:'nav_my_class' },
+      { id:'quiz', icon:'edit', labelKey:'nav_set_quiz', count:s.quizzes.length },
+      { id:'papers', icon:'paperclip', labelKey:'nav_papers', count:s.papers.length },
+    ];
+    const nav = el('div',{class:'section-nav'});
+    tabs.forEach(tb=>{
+      nav.appendChild(el('button',{class:s.tab===tb.id?'active':'', onclick:()=>{ s.tab=tb.id; render(); } },
+        el('span',{class:'nav-icon'}, icon(tb.icon)), el('span',{}, t(tb.labelKey)),
+        tb.count!=null ? el('span',{class:'count'}, String(tb.count)) : null
+      ));
+    });
+    root.appendChild(nav);
+
+    if(s.tab==='class'){
+      const wrap = el('div',{class:'card card-teacher'});
+      wrap.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('cap')), t('teacher_dashboard_title')), el('span',{class:'muted'},t('teacher_dashboard_sub'))));
+      const pillLabel = { on_track:'status_on_track', at_risk:'status_at_risk', watch:'status_watch' };
+      const pillClassMap = { on_track:'pill-good', at_risk:'pill-bad', watch:'pill-warn' };
+      s.learners.forEach(l=>{
+        const row = el('div',{class:'row', style:'flex-direction:column; align-items:stretch; gap:6px;'});
+        const top = el('div',{class:'row', style:'border:none; padding:0;'},
+          el('div',{}, el('b',{},l.name), el('div',{class:'meta'}, l.noteText || t(l.noteKey))),
+          el('span',{class:'pill '+pillClassMap[l.status]}, t(pillLabel[l.status]))
+        );
+        row.appendChild(top);
+        if(l.status!=='on_track'){
+          const btnRow = el('div',{style:'display:flex; gap:8px; align-items:center;'});
+          const btn = el('button',{class:'btn btn-primary', onclick:()=>suggestIntervention(l)}, t('teacher_suggest_btn'));
+          btnRow.appendChild(btn);
+          row.appendChild(btnRow);
+        }
+        if(s.suggestion[l.id]){
+          row.appendChild(el('div',{class:'ai-note'}, el('b',{}, icon('bot'), ' '+t('teacher_ai_prefix')), s.suggestion[l.id]));
+        }
+        wrap.appendChild(row);
+      });
+      root.appendChild(wrap);
+
+      // feedback the Principal has sent this teacher (Mrs. Dlamini is the
+      // shared demo persona for the logged-in teacher across roles)
+      const me = state.principal.teachers.find(tc=>tc.name==='Mrs. Dlamini');
+      if(me && me.feedbackSent && me.feedback.trim()){
+        const fbCard = el('div',{class:'card card-teacher', style:'margin-top:14px;'});
+        fbCard.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('inbox')), t('teacher_principal_feedback_title'))));
+        fbCard.appendChild(el('p',{}, me.feedback));
+        root.appendChild(fbCard);
+      }
+    } else if(s.tab==='quiz'){
+      root.appendChild(renderTeacherQuizBuilderCard());
+      root.appendChild(renderTeacherQuizListCard());
+    } else {
+      root.appendChild(renderTeacherPapersCard());
+    }
+    return root;
+  }
+
+  /* ---------------- teacher: quiz builder (set short-answer quizzes for the class) ---------------- */
+  function makeEmptyQuizDraft(){
+    return { title:'', grade:state.auth.grade||'10', subjectKey:'subject_1', timeLimitMin:0, questions:[{text:'', answer:''}] };
+  }
+
+  function renderTeacherQuizBuilderCard(){
+    const draft = state.teacher.quizDraft || (state.teacher.quizDraft = makeEmptyQuizDraft());
+    const card = el('div',{class:'card card-teacher', style:'margin-top:14px;'});
+    card.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('edit')), t('teacher_quiz_builder_title'))));
+    card.appendChild(el('p',{class:'muted', style:'margin-top:-4px;'}, t('teacher_quiz_builder_sub')));
+    if(state.teacher.ocrSuccessNote){
+      card.appendChild(el('p',{class:'ai-note', style:'margin-top:10px;'}, icon('sparkle'), ' ' + state.teacher.ocrSuccessNote));
+    }
+
+    const titleField = el('div',{class:'field', style:'margin-top:10px;'},
+      el('label',{}, t('teacher_quiz_title_label')),
+      el('input',{type:'text', value:draft.title, placeholder:t('teacher_quiz_title_placeholder'),
+        oninput:(e)=>{ draft.title = e.target.value; } })
+    );
+    card.appendChild(titleField);
+
+    const metaRow = el('div',{class:'grid grid-2', style:'margin-top:10px;'});
+    const gradeSel = el('select',{ onchange:(e)=>{ draft.grade = e.target.value; } });
+    ['10','11','12'].forEach(g=>{ gradeSel.appendChild(el('option',{value:g, selected:draft.grade===g?'true':null}, t('grade_'+g))); });
+    metaRow.appendChild(el('div',{class:'field'}, el('label',{}, t('teacher_quiz_grade_label')), gradeSel));
+    const subjSel = el('select',{ onchange:(e)=>{ draft.subjectKey = e.target.value; } });
+    ['subject_1','subject_2','subject_3'].forEach(k=>{ subjSel.appendChild(el('option',{value:k, selected:draft.subjectKey===k?'true':null}, t(k))); });
+    metaRow.appendChild(el('div',{class:'field'}, el('label',{}, t('teacher_quiz_subject_label')), subjSel));
+    card.appendChild(metaRow);
+
+    const timeField = el('div',{class:'field', style:'margin-top:10px;'},
+      el('label',{}, t('teacher_quiz_time_limit_label')),
+      el('input',{type:'number', min:'0', value:String(draft.timeLimitMin||0),
+        oninput:(e)=>{ draft.timeLimitMin = Math.max(0, parseInt(e.target.value,10)||0); } }),
+      el('p',{class:'muted', style:'margin:4px 0 0; font-size:11px;'}, t('teacher_quiz_time_limit_hint'))
+    );
+    card.appendChild(timeField);
+
+    card.appendChild(el('div',{style:'margin-top:14px; font-weight:800; font-size:12.5px;'}, t('teacher_quiz_questions_label')));
+    draft.questions.forEach((q,qi)=>{
+      const qBlock = el('div',{style:'margin-top:8px; padding:10px; border:1px solid var(--border); border-radius:10px;'});
+      qBlock.appendChild(el('div',{style:'display:flex; align-items:center; justify-content:space-between; gap:8px;'},
+        el('label',{style:'font-weight:700;'}, t('teacher_quiz_question_n',{n:qi+1})),
+        draft.questions.length>1 ? el('button',{class:'btn', style:'font-size:11px; padding:4px 9px;', onclick:()=>{ draft.questions.splice(qi,1); render(); } }, t('teacher_quiz_remove_question')) : null
+      ));
+      qBlock.appendChild(el('input',{type:'text', value:q.text, placeholder:t('teacher_quiz_question_placeholder'), style:'margin-top:6px;',
+        oninput:(e)=>{ q.text = e.target.value; } }));
+      qBlock.appendChild(el('div',{class:'field', style:'margin-top:8px;'},
+        el('label',{}, t('teacher_quiz_answer_label')),
+        el('input',{type:'text', value:q.answer, placeholder:t('teacher_quiz_answer_placeholder'),
+          oninput:(e)=>{ q.answer = e.target.value; } })
+      ));
+      card.appendChild(qBlock);
+    });
+    card.appendChild(el('button',{class:'btn', style:'margin-top:10px;', onclick:()=>{ draft.questions.push({text:'', answer:''}); render(); } }, t('teacher_quiz_add_question')));
+
+    if(state.teacher.quizValidationError){
+      card.appendChild(el('p',{class:'ai-note', style:'margin-top:10px;'}, t('teacher_quiz_validation_alert')));
+    }
+    card.appendChild(el('div',{style:'margin-top:14px;'},
+      el('button',{class:'btn btn-primary', onclick:publishTeacherQuiz}, t('teacher_quiz_publish_btn'))
+    ));
+    return card;
+  }
+
+  function publishTeacherQuiz(){
+    const draft = state.teacher.quizDraft;
+    const cleanQuestions = draft.questions.filter(q=>q.text.trim() && q.answer.trim());
+    if(!draft.title.trim() || cleanQuestions.length===0){
+      state.teacher.quizValidationError = true;
+      render();
+      return;
+    }
+    const quiz = {
+      id: state.teacher.nextQuizId++,
+      title: draft.title.trim(),
+      grade: draft.grade,
+      subjectKey: draft.subjectKey,
+      timeLimitMin: draft.timeLimitMin||0,
+      questions: cleanQuestions.map(q=>({ text:q.text.trim(), answer:q.answer.trim() })),
+    };
+    state.teacher.quizzes.push(quiz);
+    state.teacher.quizDraft = makeEmptyQuizDraft();
+    state.teacher.quizValidationError = false;
+    state.teacher.ocrSuccessNote = null;
+    render();
+  }
+
+  function deleteTeacherQuiz(id){
+    state.teacher.quizzes = state.teacher.quizzes.filter(q=>q.id!==id);
+    render();
+  }
+
+  function renderTeacherQuizListCard(){
+    const card = el('div',{class:'card card-teacher', style:'margin-top:14px;'});
+    card.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('clipboard')), t('teacher_quiz_list_title'))));
+    if(state.teacher.quizzes.length===0){
+      card.appendChild(el('p',{class:'muted'}, t('teacher_quiz_list_empty')));
+      return card;
+    }
+    state.teacher.quizzes.forEach(quiz=>{
+      const row = el('div',{class:'row', style:'flex-direction:column; align-items:stretch; gap:6px;'});
+      row.appendChild(el('div',{class:'row', style:'border:none; padding:0;'},
+        el('div',{},
+          el('b',{}, quiz.title),
+          el('div',{class:'meta'}, t('teacher_quiz_list_item_meta',{grade:t('grade_'+quiz.grade), subject:t(quiz.subjectKey), n:quiz.questions.length}) + (quiz.timeLimitMin ? ' · ' + t('teacher_quiz_time_limit_pill',{n:quiz.timeLimitMin}) : ''))
+        ),
+        el('div',{style:'display:flex; gap:8px;'},
+          el('button',{class:'btn'+(state.teacher.showResultsFor===quiz.id?' btn-primary':''), style:'font-size:11px; padding:5px 10px;',
+            onclick:()=>{ state.teacher.showResultsFor = state.teacher.showResultsFor===quiz.id ? null : quiz.id; render(); } },
+            state.teacher.showResultsFor===quiz.id ? t('teacher_quiz_results_hide_btn') : t('teacher_quiz_results_show_btn')),
+          el('button',{class:'btn', style:'font-size:11px; padding:5px 10px;', onclick:()=>deleteTeacherQuiz(quiz.id)}, t('teacher_quiz_delete_btn'))
+        )
+      ));
+      if(state.teacher.showResultsFor===quiz.id){
+        const results = state.teacher.quizResults[quiz.id] || [];
+        const resultsBox = el('div',{style:'margin-top:2px; padding:8px 10px; background:var(--tint,#f6f6f8); border-radius:8px;'});
+        if(results.length===0){
+          resultsBox.appendChild(el('p',{class:'muted', style:'margin:0;'}, t('teacher_quiz_results_empty')));
+        } else {
+          results.forEach(r=>{
+            const pct = r.score/r.total;
+            const pillClass = pct>=0.8?'pill-good':(pct>=0.5?'pill-warn':'pill-bad');
+            resultsBox.appendChild(el('div',{style:'display:flex; align-items:center; justify-content:space-between; padding:4px 0;'},
+              el('span',{}, r.learner),
+              el('span',{class:'pill '+pillClass}, t('teacher_quiz_results_row',{score:r.score, total:r.total}))
+            ));
+          });
+        }
+        row.appendChild(resultsBox);
+      }
+      card.appendChild(row);
+    });
+    return card;
+  }
+
+  /* ---------------- teacher: question papers (its own feature, separate from the quiz builder) ---------------- */
+  function makeEmptyPaperDraft(){
+    return { title:'', grade:state.auth.grade||'10', subjectKey:'subject_1', fileName:null, fileUrl:null };
+  }
+
+  function renderTeacherPapersCard(){
+    const s = state.teacher;
+    const draft = s.paperDraft || (s.paperDraft = makeEmptyPaperDraft());
+    const root = el('div',{});
+
+    const builder = el('div',{class:'card card-teacher'});
+    builder.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('paperclip')), t('teacher_papers_title'))));
+    builder.appendChild(el('p',{class:'muted', style:'margin-top:-4px;'}, t('teacher_papers_sub')));
+
+    builder.appendChild(el('div',{class:'field', style:'margin-top:10px;'},
+      el('label',{}, t('paper_title_label')),
+      el('input',{type:'text', value:draft.title, placeholder:t('paper_title_placeholder'),
+        oninput:(e)=>{ draft.title = e.target.value; } })
+    ));
+
+    const metaRow = el('div',{class:'grid grid-2', style:'margin-top:10px;'});
+    const gradeSel = el('select',{ onchange:(e)=>{ draft.grade = e.target.value; } });
+    ['10','11','12'].forEach(g=>{ gradeSel.appendChild(el('option',{value:g, selected:draft.grade===g?'true':null}, t('grade_'+g))); });
+    metaRow.appendChild(el('div',{class:'field'}, el('label',{}, t('teacher_quiz_grade_label')), gradeSel));
+    const subjSel = el('select',{ onchange:(e)=>{ draft.subjectKey = e.target.value; } });
+    ['subject_1','subject_2','subject_3'].forEach(k=>{ subjSel.appendChild(el('option',{value:k, selected:draft.subjectKey===k?'true':null}, t(k))); });
+    metaRow.appendChild(el('div',{class:'field'}, el('label',{}, t('teacher_quiz_subject_label')), subjSel));
+    builder.appendChild(metaRow);
+
+    const fileField = el('div',{class:'field', style:'margin-top:10px;'});
+    fileField.appendChild(el('label',{}, t('paper_file_label')));
+    fileField.appendChild(el('p',{class:'muted', style:'margin:0 0 6px;'}, t('paper_file_hint')));
+    if(draft.fileName){
+      fileField.appendChild(el('div',{style:'display:flex; align-items:center; gap:8px; flex-wrap:wrap;'},
+        el('span',{class:'meta'}, icon('paperclip'), ' '+t('paper_uploaded',{name:draft.fileName})),
+        el('button',{class:'btn', style:'font-size:11px; padding:4px 9px;', onclick:()=>{ draft.fileName=null; draft.fileUrl=null; render(); } }, t('paper_remove'))
+      ));
+    } else {
+      fileField.appendChild(el('input',{type:'file', accept:'.pdf,.doc,.docx,.png,.jpg,.jpeg', onchange:(e)=>handleTeacherPaperUpload(e.target.files && e.target.files[0])}));
+    }
+    builder.appendChild(fileField);
+
+    if(state.teacher.paperTooBig){
+      builder.appendChild(el('p',{class:'ai-note', style:'margin-top:10px;'}, t('paper_too_big')));
+    }
+    if(state.teacher.paperValidationError){
+      builder.appendChild(el('p',{class:'ai-note', style:'margin-top:10px;'}, t('paper_validation_alert')));
+    }
+    builder.appendChild(el('div',{style:'margin-top:14px;'},
+      el('button',{class:'btn btn-primary', onclick:publishTeacherPaper}, t('paper_publish_btn'))
+    ));
+    root.appendChild(builder);
+
+    const list = el('div',{class:'card card-teacher', style:'margin-top:14px;'});
+    list.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('clipboard')), t('paper_list_title'))));
+    if(s.papers.length===0){
+      list.appendChild(el('p',{class:'muted'}, t('paper_list_empty')));
+    } else {
+      s.papers.forEach(paper=>{
+        const row = el('div',{class:'row', style:'flex-direction:column; align-items:stretch; gap:6px;'});
+        row.appendChild(el('div',{class:'row', style:'border:none; padding:0;'},
+          el('div',{},
+            el('b',{}, paper.title),
+            el('div',{class:'meta'}, t('paper_list_item_meta',{grade:t('grade_'+paper.grade), subject:t(paper.subjectKey)}))
+          ),
+          el('button',{class:'btn', style:'font-size:11px; padding:5px 10px;', onclick:()=>deleteTeacherPaper(paper.id)}, t('paper_delete_btn'))
+        ));
+        const linksRow = el('div',{style:'display:flex; align-items:center; gap:14px; flex-wrap:wrap;'});
+        linksRow.appendChild(el('a',{href:paper.fileUrl, download:paper.fileName, class:'meta', style:'color:var(--teacher);'}, icon('paperclip'), ' '+t('paper_link')));
+        if(isImagePaper(paper)){
+          linksRow.appendChild(el('button',{
+            class:'btn', style:'font-size:11px; padding:5px 10px;',
+            disabled: s.ocrGeneratingId===paper.id ? 'true' : null,
+            onclick:()=>generateQuizFromPaper(paper),
+          }, s.ocrGeneratingId===paper.id ? t('paper_ocr_loading') : [icon('sparkle'), ' '+t('paper_ocr_btn')]));
+        } else {
+          linksRow.appendChild(el('span',{class:'meta'}, t('paper_ocr_image_only')));
+        }
+        row.appendChild(linksRow);
+        if(s.ocrErrorId===paper.id){
+          row.appendChild(el('p',{class:'ai-note'}, ocrErrorCopy(s.ocrErrorCode)));
+        }
+        list.appendChild(row);
+      });
+    }
+    root.appendChild(list);
+    return root;
+  }
+
+  function isImagePaper(paper){
+    return /\.(png|jpe?g|gif|webp)$/i.test(paper.fileName||'') || /^data:image\//i.test(paper.fileUrl||'');
+  }
+
+  function ocrErrorCopy(code){
+    const map = {
+      not_granted: 'paper_ocr_not_granted',
+      images_unavailable: 'paper_ocr_unavailable',
+      image_rejected: 'paper_ocr_unavailable',
+      sampling_disabled: 'paper_ocr_unavailable',
+      not_declared: 'paper_ocr_unavailable',
+      capability_disabled: 'paper_ocr_unavailable',
+      capability_removed: 'paper_ocr_unavailable',
+      rate_limited: 'paper_ocr_rate_limited',
+      invalid_json: 'paper_ocr_empty',
+      empty_completion: 'paper_ocr_empty',
+    };
+    return t(map[code] || 'paper_ocr_error');
+  }
+
+  async function generateQuizFromPaper(paper){
+    const s = state.teacher;
+    const sample = await (window.claude && window.claude.use ? window.claude.use('sample') : Promise.resolve(null));
+    if(!sample){ s.ocrErrorId = paper.id; s.ocrErrorCode = 'not_declared'; render(); return; }
+    s.ocrGeneratingId = paper.id;
+    s.ocrErrorId = null; s.ocrErrorCode = null;
+    render();
+    try{
+      const blob = await (await fetch(paper.fileUrl)).blob();
+      const prompt = 'This image is a photo or scan of a Grade '+t('grade_'+paper.grade)+' '+t(paper.subjectKey)+
+        ' question paper titled "'+paper.title+'". Read the questions in the image and write up to 6 short-answer '+
+        'quiz questions based on its content, each with a concise correct answer a learner would type themselves. '+
+        'Reply with ONLY a JSON array, like [{"text":"...","answer":"..."}, ...], no other text.';
+      const data = await sample.json(prompt, { images:[blob], modelTier:'default', cache:false });
+      const questions = (Array.isArray(data) ? data : [])
+        .map(q=>({ text:String((q&&q.text)||'').trim(), answer:String((q&&q.answer)||'').trim() }))
+        .filter(q=>q.text && q.answer)
+        .slice(0,6);
+      if(questions.length===0){ s.ocrErrorId = paper.id; s.ocrErrorCode = 'invalid_json'; render(); return; }
+      s.quizDraft = {
+        title: 'AI Quiz — ' + paper.title,
+        grade: paper.grade,
+        subjectKey: paper.subjectKey,
+        timeLimitMin: 0,
+        questions,
+      };
+      s.tab = 'quiz';
+      s.ocrErrorId = null; s.ocrErrorCode = null;
+      s.ocrSuccessNote = t('paper_ocr_success', {title:paper.title, n:questions.length});
+    } catch(e){
+      s.ocrErrorId = paper.id;
+      s.ocrErrorCode = (e && e.code) || 'upstream_error';
+    } finally {
+      s.ocrGeneratingId = null;
+      render();
+    }
+  }
+
+  function handleTeacherPaperUpload(file){
+    if(!file) return;
+    if(file.size > 5*1024*1024){ state.teacher.paperTooBig = true; render(); return; }
+    state.teacher.paperTooBig = false;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      state.teacher.paperDraft.fileName = file.name;
+      state.teacher.paperDraft.fileUrl = reader.result;
+      render();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function publishTeacherPaper(){
+    const draft = state.teacher.paperDraft;
+    if(!draft.title.trim() || !draft.fileUrl){ state.teacher.paperValidationError = true; render(); return; }
+    state.teacher.paperValidationError = false;
+    state.teacher.papers.push({
+      id: state.teacher.nextPaperId++,
+      title: draft.title.trim(),
+      grade: draft.grade,
+      subjectKey: draft.subjectKey,
+      fileName: draft.fileName,
+      fileUrl: draft.fileUrl,
+    });
+    state.teacher.paperDraft = makeEmptyPaperDraft();
+    render();
+  }
+
+  function deleteTeacherPaper(id){
+    state.teacher.papers = state.teacher.papers.filter(p=>p.id!==id);
+    render();
+  }
+
+  async function suggestIntervention(learner){
+    state.teacher.suggestion[learner.id] = t('chat_thinking');
+    render();
+    try{
+      const sample = await claude.use('sample');
+      if(!sample){ delete state.teacher.suggestion[learner.id]; render(); return; }
+      const langNote = state.lang==='English' ? '' : ` Reply in ${state.lang}.`;
+      const res = await sample(`Learner ${learner.name} is flagged "${learner.status.replace('_',' ')}" on a school platform. Context: ${learner.noteText || t(learner.noteKey)}. In ONE short, practical sentence (max 25 words), suggest a concrete classroom intervention a teacher could assign today.${langNote}`, { modelTier:'quick' });
+      state.teacher.suggestion[learner.id] = res.text.trim();
+    } catch(e){
+      delete state.teacher.suggestion[learner.id];
+    }
+    render();
+  }
+
+  async function suggestHodIntervention(teacher){
+    const h = state.hod;
+    h.suggestion[teacher.id] = t('chat_thinking');
+    render();
+    try{
+      const sample = await claude.use('sample');
+      if(!sample){ delete h.suggestion[teacher.id]; render(); return; }
+      const avg = teacherAvg(teacher).toFixed(1);
+      const langNote = state.lang==='English' ? '' : ` Reply in ${state.lang}.`;
+      const res = await sample(`${teacher.name} teaches ${t(teacher.gradeKey)} ${t(teacher.subjectKey)} at a school on a platform called Smart Learning, and has an average learner rating of ${avg}/5 from ${teacher.ratings.length} responses. In ONE short, practical sentence (max 25 words), suggest a concrete area of support or coaching the Head of Department could offer this teacher.${langNote}`, { modelTier:'quick' });
+      h.suggestion[teacher.id] = res.text.trim();
+    } catch(e){
+      delete h.suggestion[teacher.id];
+    }
+    render();
+  }
+
+  function viewHOD(){
+    const h = state.hod;
+    const root = el('div',{class:'card-hod role-scope'});
+
+    const deptCard = el('div',{class:'card card-hod'});
+    const currentDept = DEPARTMENTS.find(dep=>dep.id===h.dept) || DEPARTMENTS[0];
+    const head = el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('building')), t('hod_dept_title')), el('span',{class:'muted'}, t(currentDept.labelKey)));
+    deptCard.appendChild(head);
+
+    const teachers = state.principal.teachers.filter(tc=>tc.dept===h.dept);
+    if(teachers.length===0){
+      deptCard.appendChild(el('p',{class:'muted'}, t('hod_teachers_empty')));
+    }
+    teachers.forEach(tc=>{
+      const avg = teacherAvg(tc);
+      const row = el('div',{class:'row', style:'flex-direction:column; align-items:stretch; gap:6px;'});
+      row.appendChild(el('div',{class:'row', style:'border:none; padding:0;'},
+        el('div',{},
+          el('b',{}, tc.name),
+          el('div',{class:'meta'}, t(tc.gradeKey)+' '+t(tc.subjectKey)+' · '+avg.toFixed(1)+' ', icon('star'), ' · '+t('hod_avg_caption',{n:tc.ratings.length}))
+        ),
+        tc.workDone===false ? el('span',{class:'pill pill-bad'}, t('hod_escalated_pill')) : el('span',{class:'pill pill-good'}, t('hod_on_track_pill'))
+      ));
+      const btnRow = el('div',{style:'display:flex; gap:8px; flex-wrap:wrap;'},
+        el('button',{class:'btn', onclick:()=>suggestHodIntervention(tc)}, t('hod_suggest_btn')),
+        tc.workDone===false
+          ? el('button',{class:'btn', onclick:()=>{ tc.workDone=null; render(); }}, t('hod_clear_flag_btn'))
+          : el('button',{class:'btn btn-primary', onclick:()=>{ tc.workDone=false; render(); }}, t('hod_escalate_btn'))
+      );
+      row.appendChild(btnRow);
+      if(h.suggestion[tc.id]){
+        row.appendChild(el('div',{class:'ai-note'}, el('b',{}, icon('bot'), ' '+t('hod_ai_prefix')), h.suggestion[tc.id]));
+      }
+      if(tc.workDone===false){
+        row.appendChild(el('p',{class:'muted', style:'margin:2px 0 0; font-size:11px;'}, icon('inbox'), ' '+t('hod_escalate_note')));
+      }
+      deptCard.appendChild(row);
+    });
+    root.appendChild(deptCard);
+
+    // compile attendance, performance and ratings for every teacher in this
+    // department into one report, and send it to the Principal's dashboard
+    const reportCard = el('div',{class:'card card-hod', style:'margin-top:14px;'});
+    reportCard.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('file')), t('hod_report_title'))));
+    reportCard.appendChild(el('p',{class:'muted'}, t('hod_report_desc')));
+    if(teachers.length){
+      const head2 = el('div',{class:'row', style:'border:none; padding:6px 0; font-size:11px; font-weight:800; color:var(--ink-soft);'},
+        el('span',{style:'flex:1;'}, t('hod_report_col_teacher')),
+        el('span',{style:'width:80px; text-align:right;'}, t('hod_report_col_attendance')),
+        el('span',{style:'width:80px; text-align:right;'}, t('hod_report_col_performance')),
+        el('span',{style:'width:60px; text-align:right;'}, t('hod_report_col_rating'))
+      );
+      reportCard.appendChild(head2);
+      teachers.forEach(tc=>{
+        reportCard.appendChild(el('div',{class:'row', style:'padding:6px 0;'},
+          el('span',{style:'flex:1;'}, tc.name),
+          el('span',{style:'width:80px; text-align:right;'}, tc.attendance+'%'),
+          el('span',{style:'width:80px; text-align:right;'}, tc.performance+'%'),
+          el('span',{style:'width:60px; text-align:right; display:flex; align-items:center; justify-content:flex-end; gap:2px;'}, teacherAvg(tc).toFixed(1)+' ', icon('star'))
+        ));
+      });
+    }
+    reportCard.appendChild(el('button',{class:'btn btn-primary', style:'margin-top:10px;', onclick:()=>sendHodReport(currentDept, teachers)}, t('hod_report_send_btn')));
+    if(h.lastReportSentAt){
+      reportCard.appendChild(el('p',{class:'ai-note'}, icon('check'), ' '+t('hod_report_sent_note')));
+    }
+    root.appendChild(reportCard);
+    return root;
+  }
+
+  function sendHodReport(dept, teachers){
+    const report = {
+      id: state.nextReportId++,
+      dept: dept.id,
+      deptLabelKey: dept.labelKey,
+      sentAt: new Date().toLocaleString(),
+      rows: teachers.map(tc=>({ name:tc.name, subjectKey:tc.subjectKey, gradeKey:tc.gradeKey, attendance:tc.attendance, performance:tc.performance, avgRating:teacherAvg(tc) })),
+    };
+    state.principal.reports.push(report);
+    state.hod.lastReportSentAt = report.sentAt;
+    render();
+  }
+
+  function viewParent(){
+    const s = state.parent;
+    const wrap = el('div',{class:'grid grid-2'});
+
+    const progressCard = el('div',{class:'card card-parent'});
+    progressCard.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('chart')), t('parent_progress_title')), el('span',{class:'muted'},s.child)));
+    progressCard.appendChild(el('div',{class:'bar', style:'height:10px;'}, el('span',{style:`width:${s.progress}%; background:var(--parent);`})));
+    progressCard.appendChild(el('p',{class:'muted', style:'margin-top:6px;'}, t('parent_progress_caption',{pct:s.progress})));
+    const dlBtn = el('button',{class:'btn btn-primary', style:'margin-top:12px;', onclick:downloadChildReport}, icon('download'), ' '+t('parent_download_btn'));
+    progressCard.appendChild(dlBtn);
+    wrap.appendChild(progressCard);
+
+    const notifCard = el('div',{class:'card card-parent'});
+    const unread = s.notifications.filter(n=>!n.read).length;
+    const head = el('div',{class:'section-head'},
+      el('h2',{}, el('span',{class:'icon-badge'}, icon('bell')), t('parent_notifications_title'), unread>0 ? el('span',{class:'pill pill-bad', style:'margin-left:8px;'}, String(unread)) : null)
+    );
+    if(unread>0){
+      head.appendChild(el('button',{class:'btn', onclick:()=>{ s.notifications.forEach(n=>n.read=true); render(); }}, t('parent_mark_read')));
+    }
+    notifCard.appendChild(head);
+    s.notifications.forEach(n=>{
+      notifCard.appendChild(el('div',{class:'row'},
+        el('div',{style:n.read?'':'font-weight:700;'}, n.read?'':'● ', t(n.key,{child:s.child})),
+        el('span',{class:'meta'}, t(n.timeKey))
+      ));
+    });
+    wrap.appendChild(notifCard);
+    return wrap;
+  }
+
+  async function downloadChildReport(){
+    const p = state.parent, l = state.learner;
+    const lines = [
+      'Smart Learning - Learner Progress Report',
+      'Learner: '+p.child,
+      'Generated: '+new Date().toLocaleString(),
+      '',
+      'Overall progress this term: '+p.progress+'%',
+      '',
+      'Lessons & assessments:',
+      ...l.lessons.map(les=>`  - ${t(les.key)}: ${les.progress}% ${les.done?'(completed)':''}`),
+      '',
+      'Recent notifications:',
+      ...p.notifications.map(n=>`  - [${t(n.timeKey)}] ${t(n.key,{child:p.child})}`),
+    ].join('\n');
+    try{
+      const downloads = await claude.use('downloads');
+      if(downloads){ await downloads.save({ filename: p.child.replace(/\s+/g,'_')+'-progress-report.txt', data:lines }); return; }
+    } catch(e){}
+    alert(lines);
+  }
+
+  function teacherAvg(teacher){
+    return (teacher.ratings.reduce((a,b)=>a+b,0)/teacher.ratings.length);
+  }
+
+  function viewPrincipal(){
+    const s = state.principal;
+    const selected = s.teachers.find(tc=>tc.id===s.selectedTeacherId) || s.teachers[0];
+    const wrap = el('div',{});
+
+    // all teachers at a glance, behind a button — a principal can open the full
+    // list to scan every teacher's rating and pick one to review below
+    const listToggle = el('div',{class:'card card-principal'});
+    const toggleHead = el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('cap')), t('principal_teachers_title')));
+    toggleHead.appendChild(el('button',{class:'btn'+(s.showTeacherList?' btn-primary':''), onclick:()=>{ s.showTeacherList = !s.showTeacherList; render(); } },
+      s.showTeacherList ? t('principal_hide_teachers_btn') : t('principal_see_teachers_btn')));
+    listToggle.appendChild(toggleHead);
+    if(s.showTeacherList){
+      s.teachers.forEach(tc=>{
+        const avg = teacherAvg(tc);
+        const isSelected = tc.id===selected.id;
+        const row = el('div',{class:'row', style:`cursor:pointer; ${isSelected?'background:color-mix(in srgb, var(--principal) 10%, transparent); border-radius:10px; padding-left:8px; padding-right:8px;':''}`,
+          onclick:()=>{ s.selectedTeacherId = tc.id; render(); } },
+          el('div',{},
+            el('b',{}, tc.name),
+            el('div',{class:'meta'}, t(tc.gradeKey)+' · '+t(tc.subjectKey))
+          ),
+          el('div',{style:'display:flex; align-items:center; gap:10px;'},
+            el('span',{class:'meta', style:'display:flex; align-items:center; gap:2px;'}, avg.toFixed(1)+' ', icon('star'), ' · '+tc.ratings.length),
+            tc.workDone===true ? el('span',{class:'pill pill-good'}, t('principal_work_done_pill'))
+              : tc.workDone===false ? el('span',{class:'pill pill-bad'}, t('principal_reminder_pill'))
+              : el('span',{class:'pill pill-warn'}, t('principal_ask_pill'))
+          )
+        );
+        listToggle.appendChild(row);
+      });
+    } else {
+      listToggle.appendChild(el('p',{class:'muted'}, t('principal_teachers_hint',{name:selected.name})));
+    }
+    wrap.appendChild(listToggle);
+
+    // department reports submitted by HODs — attendance, performance and
+    // ratings rolled up per teacher, most recent first
+    const reportsCard = el('div',{class:'card card-principal', style:'margin-top:14px;'});
+    reportsCard.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('file')), t('principal_reports_title'))));
+    if(s.reports.length===0){
+      reportsCard.appendChild(el('p',{class:'muted'}, t('principal_reports_empty')));
+    } else {
+      s.reports.slice().reverse().forEach(rep=>{
+        const repBlock = el('div',{class:'row', style:'flex-direction:column; align-items:stretch; gap:6px;'});
+        repBlock.appendChild(el('div',{},
+          el('b',{}, t(rep.deptLabelKey)),
+          el('div',{class:'meta'}, t('principal_reports_caption',{dept:t(rep.deptLabelKey), time:rep.sentAt}))
+        ));
+        rep.rows.forEach(row=>{
+          repBlock.appendChild(el('div',{class:'row', style:'padding:4px 0; border:none; font-size:12px;'},
+            el('span',{style:'flex:1;'}, row.name+' — '+t(row.gradeKey)+' '+t(row.subjectKey)),
+            el('span',{class:'meta', style:'display:flex; align-items:center; gap:2px;'}, row.attendance+'% att · '+row.performance+'% perf · '+row.avgRating.toFixed(1)+' ', icon('star'))
+          ));
+        });
+        reportsCard.appendChild(repBlock);
+      });
+    }
+    wrap.appendChild(reportsCard);
+
+    const detailGrid = el('div',{class:'grid grid-2', style:'margin-top:14px;'});
+
+    const workCard = el('div',{class:'card card-principal'});
+    workCard.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('clipboard')), t('principal_oversight_title')), el('span',{class:'muted'},selected.name)));
+    if(selected.workDone===null){
+      workCard.appendChild(el('p',{class:'muted'}, t('principal_ask')));
+      const btns = el('div',{style:'display:flex; gap:8px;'});
+      btns.appendChild(el('button',{class:'btn', onclick:()=>{ selected.workDone=false; render(); }}, t('principal_not_yet')));
+      btns.appendChild(el('button',{class:'btn btn-primary', onclick:()=>{ selected.workDone=true; render(); }}, t('principal_yes')));
+      workCard.appendChild(btns);
+    } else if(selected.workDone===false){
+      workCard.appendChild(el('p',{class:'pill pill-bad'}, t('principal_reminder_pill')));
+      workCard.appendChild(el('p',{class:'muted'}, t('principal_reminder_note')));
+    } else {
+      workCard.appendChild(el('p',{class:'pill pill-good'}, t('principal_work_done_pill')));
+      const dlBtn = el('button',{class:'btn btn-primary', style:'margin-top:8px;', onclick:()=>downloadReport(selected)}, icon('download'), ' '+t('principal_download_btn'));
+      workCard.appendChild(dlBtn);
+    }
+    detailGrid.appendChild(workCard);
+
+    const ratingsCard = el('div',{class:'card card-principal'});
+    ratingsCard.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('star')), t('principal_ratings_title')), el('span',{class:'muted'},selected.name)));
+    const avg = teacherAvg(selected).toFixed(1);
+    ratingsCard.appendChild(el('div',{class:'stat'}, el('div',{class:'num'},avg+' / 5'), el('div',{class:'lbl'}, t('principal_ratings_caption',{n:selected.ratings.length}))));
+    const dist = [5,4,3,2,1].map(v=>selected.ratings.filter(r=>r===v).length);
+    const maxD = Math.max(...dist,1);
+    dist.forEach((count,i)=>{
+      const star = 5-i;
+      ratingsCard.appendChild(el('div',{class:'row', style:'padding:5px 0; border:none;'},
+        el('span',{class:'meta', style:'width:34px; display:flex; align-items:center; gap:2px;'}, String(star), icon('star')),
+        el('div',{class:'bar', style:'flex:1; margin:0 8px;'}, el('span',{style:`width:${(count/maxD)*100}%; background:var(--principal);`})),
+        el('span',{class:'meta'}, String(count))
+      ));
+    });
+    ratingsCard.appendChild(el('textarea',{rows:'2', placeholder:t('principal_feedback_placeholder'), style:'margin-top:10px;',
+      oninput:(e)=>{ selected.feedback = e.target.value; } }, selected.feedback));
+    ratingsCard.appendChild(el('button',{class:'btn btn-primary', style:'margin-top:8px;',
+      onclick:()=>{ selected.feedbackSent = !!selected.feedback.trim(); render(); } }, t('principal_send_feedback')));
+    if(selected.feedbackSent){
+      ratingsCard.appendChild(el('p',{class:'ai-note'}, icon('check'), ' '+t('principal_feedback_sent_alert',{teacher:selected.name})));
+    }
+    detailGrid.appendChild(ratingsCard);
+
+    wrap.appendChild(detailGrid);
+    return wrap;
+  }
+
+  async function downloadReport(teacher){
+    const avg = teacherAvg(teacher).toFixed(2);
+    const lines = [
+      'Smart Learning - Teacher Performance Report',
+      'Teacher: '+teacher.name+' ('+t(teacher.gradeKey)+' '+t(teacher.subjectKey)+')',
+      'Generated: '+new Date().toLocaleString(),
+      '',
+      'Average learner rating: '+avg+' / 5 ('+teacher.ratings.length+' responses)',
+      'Assigned interventions completed: Yes',
+      '',
+      'Rating breakdown:',
+      ...[5,4,3,2,1].map(v=>`  ${v} stars: ${teacher.ratings.filter(r=>r===v).length}`),
+    ].join('\n');
+    try{
+      const downloads = await claude.use('downloads');
+      if(downloads){ await downloads.save({ filename: teacher.name.replace(/\s+/g,'_')+'-performance-report.txt', data:lines }); return; }
+    } catch(e){}
+    alert(lines);
+  }
+
+  function viewAdmin(){
+    const s = state.admin;
+    const wrap = el('div',{});
+
+    const trendsCard = el('div',{class:'card card-admin'});
+    trendsCard.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('building')), t('admin_title'))));
+    s.rows.forEach(row=>{
+      const needsAttention = row.performance < 70;
+      trendsCard.appendChild(el('div',{class:'row', style:'flex-direction:column; align-items:stretch; gap:6px;'},
+        el('div',{class:'row', style:'border:none; padding:0;'},
+          el('b',{}, t(row.key)),
+          needsAttention ? el('span',{class:'pill pill-bad'}, t('admin_needs_intervention')) : el('span',{class:'pill pill-good'}, t('admin_on_track'))
+        ),
+        el('div',{class:'meta'}, t('admin_caption',{a:row.attendance,p:row.performance})),
+        el('div',{class:'bar'}, el('span',{style:`width:${row.performance}%; background:${needsAttention?'var(--bad)':'var(--admin)'};`}))
+      ));
+    });
+    wrap.appendChild(trendsCard);
+
+    // user management — the administrator can register a new person for any
+    // role and remove an existing one, without touching any of the demo data
+    const usersCard = el('div',{class:'card card-admin', style:'margin-top:14px;'});
+    usersCard.appendChild(el('div',{class:'section-head'}, el('h2',{}, el('span',{class:'icon-badge'}, icon('users')), t('admin_users_title')), el('span',{class:'muted'}, String(s.users.length))));
+
+    const filterField = el('div',{class:'field', style:'margin-bottom:12px;'});
+    filterField.appendChild(el('label',{}, t('admin_filter_role_label')));
+    const filterSel = el('select',{ onchange:(e)=>{ s.userFilter = e.target.value; render(); } });
+    filterSel.appendChild(el('option',{value:'all', selected:s.userFilter==='all'?'true':null}, t('admin_filter_all')));
+    ROLES.forEach(r=>{ filterSel.appendChild(el('option',{value:r, selected:s.userFilter===r?'true':null}, t('tab_'+r))); });
+    filterField.appendChild(filterSel);
+    usersCard.appendChild(filterField);
+
+    const addRow = el('div',{class:'grid grid-2', style:'margin-bottom:12px;'});
+    addRow.appendChild(el('input',{type:'text', placeholder:t('admin_user_name_placeholder'), value:s.newUser.name,
+      oninput:(e)=>{ s.newUser.name = e.target.value; } }));
+    const roleSel = el('select',{ onchange:(e)=>{ s.newUser.role = e.target.value; } });
+    ROLES.forEach(r=>{ roleSel.appendChild(el('option',{value:r, selected:s.newUser.role===r?'true':null}, t('tab_'+r))); });
+    addRow.appendChild(roleSel);
+    usersCard.appendChild(addRow);
+    usersCard.appendChild(el('button',{class:'btn btn-primary', style:'margin-bottom:10px;', onclick:()=>{
+      const name = s.newUser.name.trim();
+      if(!name) return;
+      s.users.push({ id:s.nextUserId++, name, role:s.newUser.role });
+      s.newUser.name = '';
+      render();
+    } }, '+ '+t('admin_add_user_btn')));
+
+    const filteredUsers = s.userFilter==='all' ? s.users : s.users.filter(u=>u.role===s.userFilter);
+    if(filteredUsers.length===0){
+      usersCard.appendChild(el('p',{class:'muted'}, t('admin_users_empty')));
+    } else {
+      filteredUsers.forEach(u=>{
+        usersCard.appendChild(el('div',{class:'row'},
+          el('div',{},
+            el('b',{}, u.name),
+            el('div',{class:'meta'}, t('tab_'+u.role))
+          ),
+          el('button',{class:'btn', style:'font-size:11px; padding:5px 10px;', onclick:()=>{
+            s.users = s.users.filter(x=>x.id!==u.id);
+            render();
+          } }, t('admin_remove_user_btn'))
+        ));
+      });
+    }
+    wrap.appendChild(usersCard);
+
+    return wrap;
+  }
+
+  function render(){
+    renderChrome();
+    const view = $('#view'); view.innerHTML='';
+    const map = { learner:viewLearner, teacher:viewTeacher, parent:viewParent, hod:viewHOD, principal:viewPrincipal, admin:viewAdmin };
+    view.appendChild(map[state.role]());
+  }
+
+  /* ---------------- chat widget (its own language choice, independent of the app's language) ---------------- */
+  // '__system' = follow the app-wide language; any other value = the person's own pick for this chat only
+  const chatState = { open:false, sending:false, welcomed:false, lang:'__system' };
+
+  function chatTargetLang(){
+    if(chatState.lang==='__system'){
+      return state.lang==='English' ? 'the same language the user writes in' : state.lang;
+    }
+    return chatState.lang;
+  }
+
+  function addMsg(role, text){
+    const body = $('#chatBody');
+    const cls = role==='user'?'user':(role==='sys'?'sys':'bot');
+    const m = el('div',{class:'msg '+cls}, text);
+    body.appendChild(m);
+    body.scrollTop = body.scrollHeight;
+    return m;
+  }
+
+  async function sendChat(){
+    const input = $('#chatInput');
+    const text = input.value.trim();
+    if(!text || chatState.sending) return;
+    input.value='';
+    addMsg('user', text);
+    chatState.sending = true;
+    const thinkingEl = addMsg('bot', t('chat_thinking'));
+
+    try{
+      const sample = await claude.use('sample');
+      if(!sample){ thinkingEl.textContent = t('chat_unavailable'); chatState.sending=false; return; }
+      const lang = chatTargetLang();
+      const prompt = `You are the Smart Learning support assistant, helping learners, teachers, parents and school staff. `+
+        `You understand and can translate to and from South Africa's official languages (English, Afrikaans, isiZulu, isiXhosa, isiNdebele, Sepedi, Sesotho, Setswana, siSwati, Tshivenda, Xitsonga). `+
+        `Always reply in ${lang} — this is the person's own chosen language for this chat, chosen independently of the rest of the app, so use it regardless of what language they type in, translating their message naturally. `+
+        `If they explicitly paste text and ask you to translate it into a different one-off South African language, do that translation in your answer, but still write the rest of your reply (any explanation) in ${lang}. `+
+        `Keep replies concise (2-4 sentences unless a longer translation is requested) and friendly.\n\nUser: ${text}`;
+      const res = await sample(prompt, {
+        modelTier:'quick', cache:false,
+        onText: ({text})=>{ thinkingEl.textContent = text; $('#chatBody').scrollTop = $('#chatBody').scrollHeight; }
+      });
+      thinkingEl.textContent = res.text.trim();
+    } catch(e){
+      thinkingEl.textContent = t('chat_error');
+    }
+    chatState.sending = false;
+  }
+
+  function initChat(){
+    $('#chatFab').addEventListener('click', ()=>{
+      chatState.open = !chatState.open;
+      $('#chatPanel').hidden = !chatState.open;
+      if(chatState.open && !chatState.welcomed){
+        addMsg('sys', t('chat_welcome'));
+        chatState.welcomed = true;
+      }
+    });
+    $('#chatSend').addEventListener('click', sendChat);
+    $('#chatInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') sendChat(); });
+
+    const langSel = $('#chatLangSelect');
+    langSel.addEventListener('change', ()=>{
+      chatState.lang = langSel.value;
+    });
+  }
+
+  function initLangSwitch(){
+    // the login screen, sign-up screen and the in-app topbar each carry a
+    // language picker; any one of them drives the same global state.lang
+    ['#globalLang', '#loginLangSelect', '#signupLangSelect'].forEach(selId=>{
+      const sel = $(selId);
+      if(!sel) return;
+      sel.addEventListener('change', ()=>{
+        setLanguage(sel.value);
+      });
+    });
+  }
+
+  // shared by both the log-in and sign-up submit handlers once each has
+  // gathered its own fields — state.hod.dept is set by the caller first
+  function enterApp(name, role, grade, extra){
+    state.auth = Object.assign({ loggedIn:true, name, role, grade }, extra||{});
+    state.role = role;
+    $('#loginScreen').hidden = true;
+    $('#signupScreen').hidden = true;
+    $('#appRoot').hidden = false;
+    $('#chatFab').hidden = false;
+    document.body.classList.add('in-app');
+    render();
+  }
+
+  function initLogin(){
+    // LOG IN — email/username + role (to open the right dashboard) + password
+    $('#loginRole').addEventListener('change', ()=>updateGradeVisibility('login'));
+    updateGradeVisibility('login');
+    $('#loginForm').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const name = $('#loginEmail').value.trim() || $('#loginEmail').placeholder;
+      const role = $('#loginRole').value;
+      const grade = $('#loginGrade').value;
+      if(role==='hod'){ state.hod.dept = $('#loginDept').value; }
+      // a learner must give their ID number and a teacher their staff number
+      // to log in — captured here and carried onto state.auth
+      const extra = {};
+      if(role==='learner') extra.idNumber = $('#loginId').value.trim();
+      if(role==='teacher') extra.staffNumber = $('#loginStaff').value.trim();
+      enterApp(name, role, grade, extra);
+    });
+
+    // SIGN UP — full registration: name, email, role, password + confirmation
+    $('#signupRole').addEventListener('change', ()=>updateGradeVisibility('signup'));
+    updateGradeVisibility('signup');
+    $('#signupForm').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const pw = $('#signupPassword').value;
+      const confirm = $('#signupConfirmPassword').value;
+      if(pw !== confirm){
+        $('#signupPasswordError').textContent = t('signup_password_mismatch');
+        $('#signupPasswordError').hidden = false;
+        return;
+      }
+      $('#signupPasswordError').hidden = true;
+      const name = $('#signupName').value.trim() || $('#signupName').placeholder;
+      const role = $('#signupRole').value;
+      const grade = $('#signupGrade').value;
+      if(role==='hod'){ state.hod.dept = $('#signupDept').value; }
+      if(role==='teacher'){
+        // carry the subject picked at sign-up into the teacher's quiz/paper
+        // builders, so they default to the subject this account teaches
+        const subjectKey = $('#signupSubject').value;
+        state.teacher.quizDraft.subjectKey = subjectKey;
+        state.teacher.paperDraft.subjectKey = subjectKey;
+      }
+      enterApp(name, role, grade);
+    });
+
+    $('#logoutBtn').addEventListener('click', ()=>{
+      state.auth = { loggedIn:false, name:'', role:'learner', grade:'10' };
+      document.body.classList.remove('in-app');
+      $('#appRoot').hidden = true;
+      $('#chatFab').hidden = true;
+      $('#chatPanel').hidden = true;
+      chatState.open = false;
+      $('#loginForm').reset();
+      $('#signupForm').reset();
+      $('#signupPasswordError').hidden = true;
+      updateGradeVisibility('login');
+      updateGradeVisibility('signup');
+      showLanding();
+    });
+    $('#landingLoginBtn').addEventListener('click', ()=>showLogin());
+    $('#landingSignupBtn').addEventListener('click', ()=>showSignup());
+    $('#landingGetStartedBtn').addEventListener('click', ()=>showSignup());
+    $('#landingLoginLink').addEventListener('click', (e)=>{ e.preventDefault(); showLogin(); });
+    $('#authToggleLink').addEventListener('click', (e)=>{ e.preventDefault(); showSignup(); });
+    $('#signupToggleLink').addEventListener('click', (e)=>{ e.preventDefault(); showLogin(); });
+
+    // forgot password — a standalone screen linked from the log-in form; this
+    // is a prototype, so "sending" the link just shows the confirmation state
+    $('#forgotPasswordLink').addEventListener('click', (e)=>{ e.preventDefault(); showForgotScreen(); });
+    $('#forgotForm').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      forgotValue = $('#forgotEmail').value.trim() || $('#forgotEmail').placeholder;
+      forgotSent = true;
+      renderForgot();
+    });
+    $('#forgotResendBtn').addEventListener('click', ()=>{ renderForgot(); });
+    $('#forgotBackLink').addEventListener('click', (e)=>{ e.preventDefault(); $('#forgotForm').reset(); showLogin(); });
+    $('#forgotBackLink2').addEventListener('click', (e)=>{ e.preventDefault(); $('#forgotForm').reset(); showLogin(); });
+
+    // every auth screen (log in, sign up, forgot password) offers a way
+    // straight back to the landing page
+    $('#loginBackHomeLink').addEventListener('click', (e)=>{ e.preventDefault(); showLanding(); });
+    $('#signupBackHomeLink').addEventListener('click', (e)=>{ e.preventDefault(); showLanding(); });
+    $('#forgotBackHomeLink').addEventListener('click', (e)=>{ e.preventDefault(); $('#forgotForm').reset(); showLanding(); });
+    $('#forgotBackHomeLink2').addEventListener('click', (e)=>{ e.preventDefault(); $('#forgotForm').reset(); showLanding(); });
+  }
+
+  renderLanding();
+  renderLogin();
+  renderSignup();
+  renderForgot();
+  initChat();
+  initLangSwitch();
+  initLogin();
+})();
+</script>
+
+</body></html>
