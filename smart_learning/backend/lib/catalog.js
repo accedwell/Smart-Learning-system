@@ -1,32 +1,25 @@
 // The school catalog (grades, subjects, departments, check-in quiz, assessments) and the
-// English UI strings, imported from the frontend so both sides share one source of truth.
-// The backend uses the strings to write AI prompts and notifications in plain English.
-const path = require('node:path');
-const { pathToFileURL } = require('node:url');
-const config = require('./config');
+// English labels the backend uses in AI prompts and notifications.
+//
+// catalog-data.json is the backend's own copy of what the frontend has in
+// frontend/src/data/seed.js and frontend/src/i18n/strings.js. When you add a subject,
+// grade, lesson or check-in question there, add it to catalog-data.json too.
+const data = require('./catalog-data.json');
 
-const catalog = {};
-
-async function load() {
-  const importFrontend = (rel) => import(pathToFileURL(path.join(config.frontendSrc, rel)).href);
-  const seed = await importFrontend('data/seed.js');
-  const { UI } = await importFrontend('i18n/strings.js');
-  Object.assign(catalog, {
-    ROLES: seed.ROLES,
-    GRADES: seed.GRADES,
-    SUBJECT_GROUPS: seed.SUBJECT_GROUPS,
-    SUBJECT_OPTIONS: seed.SUBJECT_OPTIONS,
-    DEPARTMENTS: seed.DEPARTMENTS,
-    LANGUAGES: seed.LANGUAGES,
-    QUIZ_BANK: seed.QUIZ_BANK,
-    ASSESSMENTS_BANK: seed.ASSESSMENTS_BANK,
-    UI,
-  });
-}
+const catalog = {
+  ROLES: data.roles,
+  GRADES: data.grades,
+  SUBJECT_GROUPS: data.subjectGroups,
+  SUBJECT_OPTIONS: data.subjectGroups.flatMap((g) => g.subjects),
+  DEPARTMENTS: data.subjectGroups.map((g) => ({ id: g.id, labelKey: g.labelKey })),
+  LANGUAGES: data.languages,
+  QUIZ_BANK: data.checkinQuiz,
+  ASSESSMENTS_BANK: data.assessments,
+};
 
 // English label for an i18n key, with {name} placeholders filled in
 function t(key, vars = {}) {
-  const template = (catalog.UI && catalog.UI[key]) || key;
+  const template = data.strings[key] || key;
   return template.replace(/\{(\w+)\}/g, (m, name) => (name in vars ? String(vars[name]) : m));
 }
 
@@ -42,4 +35,4 @@ function langNote(lang) {
   return !known || lang === 'English' ? '' : ` Reply in ${lang}.`;
 }
 
-module.exports = { catalog, load, t, deptForSubject, langNote };
+module.exports = { catalog, t, deptForSubject, langNote };

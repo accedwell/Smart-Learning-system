@@ -54,8 +54,6 @@ module.exports = {
 
   uploadDir: path.resolve(ROOT, env.UPLOAD_DIR || 'uploads'),
   maxUploadBytes: 5 * 1024 * 1024,
-  // the frontend's catalog (subjects, grades, quiz bank) and English UI strings are reused as-is
-  frontendSrc: path.resolve(ROOT, env.FRONTEND_SRC || '../frontend/src'),
 
   ai: {
     enabled: env.AI_ENABLED !== 'false',

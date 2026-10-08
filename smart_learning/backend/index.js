@@ -4,7 +4,6 @@ const cors = require('cors');
 const multer = require('multer');
 const config = require('./lib/config');
 const db = require('./lib/db');
-const catalog = require('./lib/catalog');
 const { ensureLessonCatalog, seedDemoData, DEMO_PASSWORD } = require('./lib/seed');
 const { HttpError } = require('./lib/http');
 const mailer = require('./lib/mailer');
@@ -51,7 +50,6 @@ app.use((err, req, res, next) => {
 });
 
 async function start() {
-  await catalog.load();
   try {
     await db.init();
   } catch (err) {

@@ -1,0 +1,361 @@
+{
+  "roles": [
+    "learner",
+    "teacher",
+    "parent",
+    "hod",
+    "principal",
+    "admin"
+  ],
+  "grades": [
+    "10",
+    "11",
+    "12"
+  ],
+  "subjectGroups": [
+    {
+      "id": "languages",
+      "labelKey": "subject_group_languages",
+      "subjects": [
+        "subject_2",
+        "subject_afrikaans",
+        "subject_isizulu",
+        "subject_isixhosa",
+        "subject_isindebele",
+        "subject_sepedi",
+        "subject_sesotho",
+        "subject_setswana",
+        "subject_siswati",
+        "subject_tshivenda",
+        "subject_xitsonga",
+        "subject_sasl",
+        "subject_lo"
+      ]
+    },
+    {
+      "id": "mathematics",
+      "labelKey": "subject_group_compulsory",
+      "subjects": [
+        "subject_1",
+        "subject_math_lit",
+        "subject_tech_math"
+      ]
+    },
+    {
+      "id": "science",
+      "labelKey": "subject_group_sciences",
+      "subjects": [
+        "subject_physical_sciences",
+        "subject_3",
+        "subject_tech_sciences",
+        "subject_agri_sciences",
+        "subject_agri_technology",
+        "subject_agri_management",
+        "subject_marine_sciences",
+        "subject_sport_science"
+      ]
+    },
+    {
+      "id": "commerce",
+      "labelKey": "subject_group_commerce",
+      "subjects": [
+        "subject_accounting",
+        "subject_business",
+        "subject_economics"
+      ]
+    },
+    {
+      "id": "humanities",
+      "labelKey": "subject_group_humanities",
+      "subjects": [
+        "subject_geography",
+        "subject_history",
+        "subject_religion"
+      ]
+    },
+    {
+      "id": "technology",
+      "labelKey": "subject_group_technology",
+      "subjects": [
+        "subject_cat",
+        "subject_it",
+        "subject_egd",
+        "subject_civil_tech",
+        "subject_electrical_tech",
+        "subject_mechanical_tech",
+        "subject_maritime_economics",
+        "subject_nautical_science"
+      ]
+    },
+    {
+      "id": "services",
+      "labelKey": "subject_group_services",
+      "subjects": [
+        "subject_consumer",
+        "subject_hospitality",
+        "subject_tourism"
+      ]
+    },
+    {
+      "id": "arts",
+      "labelKey": "subject_group_arts",
+      "subjects": [
+        "subject_dance",
+        "subject_design",
+        "subject_drama",
+        "subject_music",
+        "subject_visual_arts"
+      ]
+    }
+  ],
+  "languages": [
+    {
+      "value": "English",
+      "label": "English"
+    },
+    {
+      "value": "Afrikaans",
+      "label": "Afrikaans"
+    },
+    {
+      "value": "Zulu",
+      "label": "isiZulu"
+    },
+    {
+      "value": "Xhosa",
+      "label": "isiXhosa"
+    },
+    {
+      "value": "Ndebele",
+      "label": "isiNdebele"
+    },
+    {
+      "value": "Sepedi",
+      "label": "Sepedi"
+    },
+    {
+      "value": "Sesotho",
+      "label": "Sesotho"
+    },
+    {
+      "value": "Setswana",
+      "label": "Setswana"
+    },
+    {
+      "value": "Swati",
+      "label": "siSwati"
+    },
+    {
+      "value": "Tshivenda",
+      "label": "Tshivenda"
+    },
+    {
+      "value": "Xitsonga",
+      "label": "Xitsonga"
+    }
+  ],
+  "checkinQuiz": [
+    {
+      "qKey": "quiz_q1",
+      "optKeys": [
+        "quiz_q1_a",
+        "quiz_q1_b",
+        "quiz_q1_c",
+        "quiz_q1_d"
+      ],
+      "correct": 0
+    },
+    {
+      "qKey": "quiz_q2",
+      "optKeys": [
+        "quiz_q2_a",
+        "quiz_q2_b",
+        "quiz_q2_c",
+        "quiz_q2_d"
+      ],
+      "correct": 0
+    },
+    {
+      "qKey": "quiz_q3",
+      "optKeys": [
+        "quiz_q3_a",
+        "quiz_q3_b",
+        "quiz_q3_c",
+        "quiz_q3_d"
+      ],
+      "correct": 0
+    },
+    {
+      "qKey": "quiz_q4",
+      "optKeys": [
+        "quiz_q4_a",
+        "quiz_q4_b",
+        "quiz_q4_c",
+        "quiz_q4_d"
+      ],
+      "correct": 0
+    },
+    {
+      "qKey": "quiz_q5",
+      "optKeys": [
+        "quiz_q5_a",
+        "quiz_q5_b",
+        "quiz_q5_c",
+        "quiz_q5_d"
+      ],
+      "correct": 0
+    }
+  ],
+  "assessments": {
+    "10": [
+      {
+        "subjectKey": "subject_1",
+        "titleKey": "assess_g10_math_title",
+        "descKey": "assess_g10_math_desc",
+        "due": "22 Sep"
+      },
+      {
+        "subjectKey": "subject_2",
+        "titleKey": "assess_g10_eng_title",
+        "descKey": "assess_g10_eng_desc",
+        "due": "18 Sep"
+      },
+      {
+        "subjectKey": "subject_3",
+        "titleKey": "assess_g10_ls_title",
+        "descKey": "assess_g10_ls_desc",
+        "due": "29 Sep"
+      }
+    ],
+    "11": [
+      {
+        "subjectKey": "subject_1",
+        "titleKey": "assess_g11_math_title",
+        "descKey": "assess_g11_math_desc",
+        "due": "23 Sep"
+      },
+      {
+        "subjectKey": "subject_2",
+        "titleKey": "assess_g11_eng_title",
+        "descKey": "assess_g11_eng_desc",
+        "due": "19 Sep"
+      },
+      {
+        "subjectKey": "subject_3",
+        "titleKey": "assess_g11_ls_title",
+        "descKey": "assess_g11_ls_desc",
+        "due": "30 Sep"
+      }
+    ],
+    "12": [
+      {
+        "subjectKey": "subject_1",
+        "titleKey": "assess_g12_math_title",
+        "descKey": "assess_g12_math_desc",
+        "due": "24 Sep"
+      },
+      {
+        "subjectKey": "subject_2",
+        "titleKey": "assess_g12_eng_title",
+        "descKey": "assess_g12_eng_desc",
+        "due": "20 Sep"
+      },
+      {
+        "subjectKey": "subject_3",
+        "titleKey": "assess_g12_ls_title",
+        "descKey": "assess_g12_ls_desc",
+        "due": "1 Oct"
+      }
+    ]
+  },
+  "strings": {
+    "grade_10": "Grade 10",
+    "grade_11": "Grade 11",
+    "grade_12": "Grade 12",
+    "subject_2": "English",
+    "subject_afrikaans": "Afrikaans",
+    "subject_isizulu": "isiZulu",
+    "subject_isixhosa": "isiXhosa",
+    "subject_isindebele": "isiNdebele",
+    "subject_sepedi": "Sepedi",
+    "subject_sesotho": "Sesotho",
+    "subject_setswana": "Setswana",
+    "subject_siswati": "siSwati",
+    "subject_tshivenda": "Tshivenda",
+    "subject_xitsonga": "Xitsonga",
+    "subject_sasl": "South African Sign Language",
+    "subject_lo": "Life Orientation",
+    "subject_1": "Mathematics",
+    "subject_math_lit": "Mathematical Literacy",
+    "subject_tech_math": "Technical Mathematics",
+    "subject_physical_sciences": "Physical Sciences",
+    "subject_3": "Life Sciences",
+    "subject_tech_sciences": "Technical Sciences",
+    "subject_agri_sciences": "Agricultural Sciences",
+    "subject_agri_technology": "Agricultural Technology",
+    "subject_agri_management": "Agricultural Management Practices",
+    "subject_marine_sciences": "Marine Sciences",
+    "subject_sport_science": "Sport and Exercise Science",
+    "subject_accounting": "Accounting",
+    "subject_business": "Business Studies",
+    "subject_economics": "Economics",
+    "subject_geography": "Geography",
+    "subject_history": "History",
+    "subject_religion": "Religion Studies",
+    "subject_cat": "Computer Applications Technology",
+    "subject_it": "Information Technology",
+    "subject_egd": "Engineering Graphics and Design",
+    "subject_civil_tech": "Civil Technology",
+    "subject_electrical_tech": "Electrical Technology",
+    "subject_mechanical_tech": "Mechanical Technology",
+    "subject_maritime_economics": "Maritime Economics",
+    "subject_nautical_science": "Nautical Science",
+    "subject_consumer": "Consumer Studies",
+    "subject_hospitality": "Hospitality Studies",
+    "subject_tourism": "Tourism",
+    "subject_dance": "Dance Studies",
+    "subject_design": "Design",
+    "subject_drama": "Dramatic Arts",
+    "subject_music": "Music",
+    "subject_visual_arts": "Visual Arts",
+    "subject_group_languages": "Languages",
+    "subject_group_compulsory": "Mathematics",
+    "subject_group_sciences": "Sciences",
+    "subject_group_commerce": "Commerce",
+    "subject_group_humanities": "Humanities",
+    "subject_group_technology": "Technology",
+    "subject_group_services": "Services",
+    "subject_group_arts": "Creative Arts",
+    "lesson_1": "Algebraic Functions & Graphs",
+    "lesson_2": "Comprehension: Analytical Texts",
+    "lesson_3": "Cell Structure & Function",
+    "quiz_q1": "Solve for x: 2x + 6 = 14",
+    "quiz_q1_a": "x = 4",
+    "quiz_q1_b": "x = 10",
+    "quiz_q1_c": "x = 8",
+    "quiz_q1_d": "x = 2",
+    "quiz_q2": "What is the gradient of the line y = 3x − 5?",
+    "quiz_q2_a": "3",
+    "quiz_q2_b": "−5",
+    "quiz_q2_c": "5",
+    "quiz_q2_d": "−3",
+    "quiz_q3": "Which word is closest in meaning to \"concise\"?",
+    "quiz_q3_a": "Brief",
+    "quiz_q3_b": "Lengthy",
+    "quiz_q3_c": "Vague",
+    "quiz_q3_d": "Loud",
+    "quiz_q4": "Which organelle is known as the \"powerhouse of the cell\"?",
+    "quiz_q4_a": "Mitochondria",
+    "quiz_q4_b": "Nucleus",
+    "quiz_q4_c": "Ribosome",
+    "quiz_q4_d": "Golgi body",
+    "quiz_q5": "Photosynthesis mainly takes place in which part of a plant cell?",
+    "quiz_q5_a": "Chloroplast",
+    "quiz_q5_b": "Mitochondria",
+    "quiz_q5_c": "Nucleus",
+    "quiz_q5_d": "Vacuole",
+    "status_on_track": "on track",
+    "status_at_risk": "at risk",
+    "status_watch": "watch"
+  }
+}
