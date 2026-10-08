@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# secrets (Vite reads .env files; keep keys out of GitHub)
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

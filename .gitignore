@@ -1,0 +1,34 @@
+# Applies to the whole repo. backend/ and frontend/ have their own .gitignore too.
+
+# secrets and local settings (passwords, API keys, mail logins)
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+*.p12
+*.pfx
+
+# dependencies, builds and test output
+node_modules/
+dist/
+dist-ssr/
+build/
+coverage/
+
+# logs
+logs/
+*.log
+
+# editors and operating systems
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code's personal settings for this repo
+.claude/settings.local.json
