@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useStore } from './store/AppStore.jsx'
 import { findAccount } from './services/accounts.js'
+import { apiPost, errorText } from './services/api.js'
+import { useI18n } from './i18n/I18nContext.jsx'
 import Landing from './auth/Landing.jsx'
 import Login from './auth/Login.jsx'
 import ForgotPassword from './auth/ForgotPassword.jsx'
@@ -21,9 +23,10 @@ const initialResetToken = takeResetToken();
 
 export default function App(){
   const { state, update } = useStore();
+  const { t } = useI18n();
   const [resetToken, setResetToken] = useState(initialResetToken);
   const [screen, setScreen] = useState(initialResetToken ? 'reset' : 'landing'); // 'landing' | 'login' | 'forgot' | 'reset' | 'first-login'
-  const [pendingLogin, setPendingLogin] = useState(null); // { accountId, extra } while a temporary password is being replaced
+  const [pendingLogin, setPendingLogin] = useState(null); // the backend session ({ token, user }) while a temporary password is being replaced
   const loggedIn = state.auth.loggedIn;
 
   // a reset link opened in a tab already showing the app changes only the #, without a reload
@@ -62,27 +65,39 @@ export default function App(){
     });
   }
 
+  // Opens the app for a backend session. The token (state.auth.token) is what the connected
+  // dashboards (so far the HOD's) send to the API. Dashboards still on the in-browser demo
+  // data find their records by the matching demo account's id, so that id is kept when the
+  // email matches one.
+  function enterWithSession({ token, user }){
+    const local = findAccount(state.admin.users, user.email);
+    const account = {
+      id: local ? local.id : user.id,
+      name: user.name, email: user.email, role: user.role,
+      grade: user.grade || (local && local.grade),
+      dept: user.dept || (local && local.dept),
+    };
+    enterWithAccount(account, { token, apiUserId:user.id });
+  }
+
   // email + password only: the account decides the role (and a learner's grade)
-  function handleLogin({ email, password }){
-    const account = findAccount(state.admin.users, email);
-    if(!account || account.password!==password) return { key:'login_error_password' };
-    if(account.mustChangePassword){
-      setPendingLogin({ accountId:account.id, extra:{} });
+  async function handleLogin({ email, password }){
+    const { data, error } = await apiPost('/auth/login', { email, password });
+    if(error) return { text:errorText(t, error) };
+    if(data.mustChangePassword){
+      setPendingLogin(data);
       setScreen('first-login');
       return null;
     }
-    enterWithAccount(account, {});
+    enterWithSession(data);
     return null;
   }
 
-  function finishFirstLogin(newPassword){
-    const account = state.admin.users.find(u=>u.id===pendingLogin.accountId);
-    update(s=>{
-      const u = s.admin.users.find(x=>x.id===account.id);
-      u.password = newPassword;
-      u.mustChangePassword = false;
-    });
-    enterWithAccount(account, pendingLogin.extra);
+  // resolves to an error message, or nothing once the new password is saved
+  async function finishFirstLogin(newPassword){
+    const { data, error } = await apiPost('/auth/change-password', { newPassword }, pendingLogin.token);
+    if(error) return errorText(t, error);
+    enterWithSession(data);
     setPendingLogin(null);
   }
 
@@ -101,8 +116,7 @@ export default function App(){
   }
   const home = ()=>setScreen('landing');
   const toLogin = ()=>{ setPendingLogin(null); setScreen('login'); };
-  const pendingAccount = pendingLogin && state.admin.users.find(u=>u.id===pendingLogin.accountId);
-  if(screen==='first-login' && pendingAccount) return <FirstLoginPassword account={pendingAccount} onSave={finishFirstLogin} onCancel={toLogin}/>;
+  if(screen==='first-login' && pendingLogin) return <FirstLoginPassword account={pendingLogin.user} onSave={finishFirstLogin} onCancel={toLogin}/>;
   if(screen==='login') return <Login onSubmit={handleLogin} onForgot={()=>setScreen('forgot')} onHome={home}/>;
   if(screen==='reset' && resetToken) return <ResetPassword token={resetToken} onLogin={toLogin} onForgot={()=>setScreen('forgot')}/>;
   if(screen==='forgot') return <ForgotPassword onLogin={toLogin} onHome={home}/>;

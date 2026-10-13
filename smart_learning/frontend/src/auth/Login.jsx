@@ -11,10 +11,14 @@ export default function Login({ onSubmit, onForgot, onHome }){
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
 
-  function submit(e){
+  async function submit(e){
     e.preventDefault();
-    setError(onSubmit({ email:email.trim(), password }));
+    setBusy(true);
+    const err = await onSubmit({ email:email.trim(), password });
+    setBusy(false);
+    setError(err);
   }
 
   return (
@@ -36,9 +40,9 @@ export default function Login({ onSubmit, onForgot, onHome }){
             <label htmlFor="loginPassword">{t('login_password_label')}</label>
             <PasswordInput id="loginPassword" value={password} onChange={setPassword} autoComplete="current-password" required/>
           </div>
-          {error && <p className="field-error">{t(error.key, error.vars)}</p>}
+          {error && <p className="field-error">{error.text || t(error.key, error.vars)}</p>}
           <p className="forgot-pw-line"><LinkButton onClick={onForgot}>{t('forgot_password_link')}</LinkButton></p>
-          <button type="submit" className="btn btn-primary" style={{ padding:10, fontSize:13 }}>{t('login_button')}</button>
+          <button type="submit" className="btn btn-primary" style={{ padding:10, fontSize:13 }} disabled={busy}>{t('login_button')}</button>
           <p className="auth-toggle-line">{t('auth_no_account')}</p>
           <LinkButton className="back-home-link" onClick={onHome}>{t('back_to_home_link')}</LinkButton>
         </form>

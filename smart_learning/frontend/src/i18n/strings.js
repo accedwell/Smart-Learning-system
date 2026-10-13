@@ -314,6 +314,10 @@ export const UI = {
   hod_report_col_attendance:'Attendance',
   hod_report_col_performance:'Performance',
   hod_report_col_rating:'Rating',
+  hod_loading:'Loading your department…',
+  hod_no_ratings:'no learner ratings yet',
+  hod_report_last_sent:'Last report sent {time}.',
+  ai_unavailable:'The AI assistant is not available right now.',
 
   principal_reports_title:'Reports From HODs',
   principal_reports_empty:'No department reports submitted yet.',
