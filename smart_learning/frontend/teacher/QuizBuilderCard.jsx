@@ -1,33 +1,40 @@
 import { useStore } from '../src/store/AppStore.jsx'
 import { useI18n } from '../src/i18n/I18nContext.jsx'
 import { SectionHead, Icon } from '../src/components/ui.jsx'
-import GradeSubjectRow from './GradeSubjectRow.jsx'
+import { classesOfTeacher } from '../src/services/classes.js'
+import ClassPicker from './ClassPicker.jsx'
 import { makeEmptyQuizDraft } from './drafts.js'
 
-// build short-answer quizzes for learners to type their own answers to
+// build short-answer quizzes for learners to type their own answers to, for one or more of
+// the teacher's classes; only learners in those classes get the quiz
 export default function QuizBuilderCard(){
   const { state, update } = useStore();
   const { t } = useI18n();
   const s = state.teacher;
   const draft = s.quizDraft;
   const edit = (fn)=>update(st=>fn(st.teacher.quizDraft));
+  const myClasses = classesOfTeacher(state, state.auth.userId);
 
   function publish(){
     update(st=>{
       const tc = st.teacher;
       const d = tc.quizDraft;
       const cleanQuestions = d.questions.filter(q=>q.text.trim() && q.answer.trim());
-      if(!d.title.trim() || cleanQuestions.length===0){ tc.quizValidationError = true; return; }
+      const classes = st.admin.classes.filter(c=>d.classIds.includes(c.id) && c.teacherId===st.auth.userId);
+      tc.quizClassError = classes.length===0;
+      tc.quizValidationError = !d.title.trim() || cleanQuestions.length===0;
+      if(tc.quizClassError || tc.quizValidationError) return;
       tc.quizzes.push({
         id: tc.nextQuizId++,
+        teacherId: st.auth.userId,
+        classIds: classes.map(c=>c.id),
         title: d.title.trim(),
-        grade: d.grade,
-        subjectKey: d.subjectKey,
+        grade: classes[0].grade,
+        subjectKey: classes[0].subjectKey,
         timeLimitMin: d.timeLimitMin||0,
         questions: cleanQuestions.map(q=>({ text:q.text.trim(), answer:q.answer.trim() })),
       });
-      tc.quizDraft = makeEmptyQuizDraft(st.auth.grade);
-      tc.quizValidationError = false;
+      tc.quizDraft = makeEmptyQuizDraft(d.classIds);
       tc.ocrSuccessNote = null;
     });
   }
@@ -44,8 +51,7 @@ export default function QuizBuilderCard(){
           onChange={(e)=>{ const v = e.target.value; edit(d=>{ d.title = v; }); }}/>
       </div>
 
-      <GradeSubjectRow grade={draft.grade} subjectKey={draft.subjectKey}
-        onGrade={(v)=>edit(d=>{ d.grade = v; })} onSubject={(v)=>edit(d=>{ d.subjectKey = v; })}/>
+      <ClassPicker classes={myClasses} value={draft.classIds} onChange={(ids)=>edit(d=>{ d.classIds = ids; })}/>
 
       <div className="field" style={{ marginTop:10 }}>
         <label>{t('teacher_quiz_time_limit_label')}</label>
@@ -74,6 +80,7 @@ export default function QuizBuilderCard(){
       ))}
       <button className="btn" style={{ marginTop:10 }} onClick={()=>edit(d=>{ d.questions.push({ text:'', answer:'' }); })}>{t('teacher_quiz_add_question')}</button>
 
+      {s.quizClassError && <p className="ai-note" style={{ marginTop:10 }}>{t('teacher_class_pick_required')}</p>}
       {s.quizValidationError && <p className="ai-note" style={{ marginTop:10 }}>{t('teacher_quiz_validation_alert')}</p>}
       <div style={{ marginTop:14 }}>
         <button className="btn btn-primary" onClick={publish}>{t('teacher_quiz_publish_btn')}</button>

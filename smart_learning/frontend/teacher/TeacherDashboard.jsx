@@ -8,10 +8,11 @@ import PapersManager from './PapersManager.jsx'
 export default function TeacherDashboard(){
   const { state, update } = useStore();
   const s = state.teacher;
+  const mine = (item)=>item.teacherId===state.auth.userId;
   const tabs = [
     { id:'class', icon:'cap', labelKey:'nav_my_class' },
-    { id:'quiz', icon:'edit', labelKey:'nav_set_quiz', count:s.quizzes.length },
-    { id:'papers', icon:'paperclip', labelKey:'nav_papers', count:s.papers.length },
+    { id:'quiz', icon:'edit', labelKey:'nav_set_quiz', count:s.quizzes.filter(mine).length },
+    { id:'papers', icon:'paperclip', labelKey:'nav_papers', count:s.papers.filter(mine).length },
   ];
 
   return (

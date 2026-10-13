@@ -8,6 +8,7 @@ const { aiLimiter } = require('../lib/rateLimit');
 const { catalog } = require('../lib/catalog');
 const { childIdsOf } = require('../lib/users');
 const { filePath } = require('../lib/uploads');
+const { sentToLearners } = require('../lib/classes');
 const http = require('../lib/http');
 
 const router = express.Router();
@@ -17,11 +18,10 @@ router.get('/health', async (req, res) => {
   res.json({ ok: true });
 });
 
-// everything the sign-up form and dashboards need to render choices; the check-in quiz is sent without its answers
+// everything the dashboards need to render choices; the check-in quiz is sent without its answers
 router.get('/catalog', (req, res) => {
   res.json({
     roles: catalog.ROLES,
-    selfSignupRoles: ['learner', 'admin'],
     grades: catalog.GRADES,
     subjectGroups: catalog.SUBJECT_GROUPS,
     departments: catalog.DEPARTMENTS,
@@ -56,13 +56,20 @@ router.post('/notifications/:id/read', auth.requireAuth(), async (req, res) => {
 // ---- question-paper files ----
 
 // learners get their own grade's papers, parents their children's grades, staff every paper
+// Learners get the papers sent to their classes, parents their children's, teachers their
+// own and those sent to classes they teach; HODs, principals and administrators every paper.
 async function canReadPaper(user, paper) {
-  if (user.role === 'learner') return user.grade === paper.grade;
-  if (user.role === 'parent') {
-    const ids = await childIdsOf(user.id);
-    if (ids.length === 0) return false;
-    const match = await db.one("SELECT 1 FROM users WHERE id IN (?) AND role = 'learner' AND grade = ? LIMIT 1", [ids, paper.grade]);
-    return Boolean(match);
+  if (user.role === 'learner' || user.role === 'parent') {
+    const learnerIds = user.role === 'learner' ? [user.id] : await childIdsOf(user.id);
+    if (learnerIds.length === 0) return false;
+    return Boolean(await db.one(`SELECT 1 FROM papers p WHERE p.id = ? AND ${sentToLearners('paper', 'p')}`, [paper.id, learnerIds]));
+  }
+  if (user.role === 'teacher') {
+    if (paper.teacher_id === user.id) return true;
+    return Boolean(await db.one(
+      'SELECT 1 FROM paper_classes pc JOIN classes k ON k.id = pc.class_id WHERE pc.paper_id = ? AND k.teacher_id = ? LIMIT 1',
+      [paper.id, user.id],
+    ));
   }
   return true;
 }

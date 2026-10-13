@@ -1,6 +1,6 @@
 -- Smart Learning database schema (MySQL 8).
 -- The backend runs this on every start (lib/db.js), and it is safe to re-run:
--- every statement is CREATE ... IF NOT EXISTS. You can also run it yourself in
+-- every statement is CREATE ... IF NOT EXISTS, or adds only rows that are missing. You can also run it yourself in
 -- MySQL Workbench (File > Open SQL Script, then Execute).
 
 CREATE DATABASE IF NOT EXISTS smart_learning CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
@@ -84,7 +84,8 @@ CREATE TABLE IF NOT EXISTS quizzes (
   FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
--- one attempt per learner per quiz; a retake overwrites it
+-- the learner's current attempt at each quiz (a retake starts it over); every submitted
+-- attempt is also kept in quiz_submissions
 CREATE TABLE IF NOT EXISTS quiz_attempts (
   id INT AUTO_INCREMENT PRIMARY KEY,
   quiz_id INT NOT NULL,
@@ -101,6 +102,29 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
   FOREIGN KEY (learner_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- every submitted attempt, retakes included, so teachers see the first score and not only the latest
+CREATE TABLE IF NOT EXISTS quiz_submissions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  quiz_id INT NOT NULL,
+  learner_id INT NOT NULL,
+  answers JSON NOT NULL,
+  score INT NOT NULL,
+  total INT NOT NULL,
+  timed_out TINYINT(1) NOT NULL DEFAULT 0,
+  started_at DATETIME(3) NOT NULL,
+  submitted_at DATETIME(3) NOT NULL,
+  INDEX idx_submissions_quiz (quiz_id, learner_id, id),
+  FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
+  FOREIGN KEY (learner_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- copies in attempts submitted before quiz_submissions existed (adds nothing once they are there)
+INSERT INTO quiz_submissions (quiz_id, learner_id, answers, score, total, timed_out, started_at, submitted_at)
+SELECT a.quiz_id, a.learner_id, COALESCE(a.answers, JSON_ARRAY()), a.score, a.total, a.timed_out, a.started_at, a.submitted_at
+  FROM quiz_attempts a
+ WHERE a.submitted_at IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM quiz_submissions s WHERE s.quiz_id = a.quiz_id AND s.learner_id = a.learner_id);
+
 -- uploaded question papers; the file itself lives in UPLOAD_DIR under stored_name
 CREATE TABLE IF NOT EXISTS papers (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -115,6 +139,49 @@ CREATE TABLE IF NOT EXISTS papers (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_papers_grade (grade),
   FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- classes (subject groups): one subject taught by one teacher to a group of learners, e.g.
+-- 10A Mathematics, set up by the administrator. A teacher sees only their own classes, and a
+-- learner gets only the quizzes and papers sent to the classes they are in.
+CREATE TABLE IF NOT EXISTS classes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(10) NOT NULL,        -- e.g. 10A
+  grade VARCHAR(4) NOT NULL,
+  subject_key VARCHAR(60) NOT NULL,
+  teacher_id INT NULL,              -- NULL until the administrator assigns one
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_class (grade, name, subject_key),
+  INDEX idx_classes_teacher (teacher_id),
+  FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS class_learners (
+  class_id INT NOT NULL,
+  learner_id INT NOT NULL,
+  PRIMARY KEY (class_id, learner_id),
+  INDEX idx_class_learners_learner (learner_id),
+  FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  FOREIGN KEY (learner_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- the classes each quiz and question paper was sent to
+CREATE TABLE IF NOT EXISTS quiz_classes (
+  quiz_id INT NOT NULL,
+  class_id INT NOT NULL,
+  PRIMARY KEY (quiz_id, class_id),
+  INDEX idx_quiz_classes_class (class_id),
+  FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
+  FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS paper_classes (
+  paper_id INT NOT NULL,
+  class_id INT NOT NULL,
+  PRIMARY KEY (paper_id, class_id),
+  INDEX idx_paper_classes_class (class_id),
+  FOREIGN KEY (paper_id) REFERENCES papers(id) ON DELETE CASCADE,
+  FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- learner_id is NULL for anonymous (imported) ratings; NULLs never clash on the unique key

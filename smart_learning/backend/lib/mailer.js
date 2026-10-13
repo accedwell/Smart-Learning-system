@@ -60,4 +60,22 @@ To choose a new password, use this link within ${ttlMinutes} minutes:</p>
   return send({ to: user.email, subject: 'Reset your Smart Learning password', text, html });
 }
 
-module.exports = { send, verify, sendPasswordReset };
+// goes to the old address, so the owner hears about it even if someone else made the change
+function sendEmailChanged(user, oldEmail, newEmail) {
+  const text = [
+    `Hello ${user.name},`,
+    '',
+    `The email address on your Smart Learning account was changed from ${oldEmail} to ${newEmail}.`,
+    '',
+    'If you did not do this, contact your school administrator straight away.',
+    '',
+    'Smart Learning',
+  ].join('\n');
+  const html = `<p>Hello ${escapeHtml(user.name)},</p>
+<p>The email address on your Smart Learning account was changed from ${escapeHtml(oldEmail)} to ${escapeHtml(newEmail)}.</p>
+<p>If you did not do this, contact your school administrator straight away.</p>
+<p>Smart Learning</p>`;
+  return send({ to: oldEmail, subject: 'Your Smart Learning email address was changed', text, html });
+}
+
+module.exports = { send, verify, sendPasswordReset, sendEmailChanged };

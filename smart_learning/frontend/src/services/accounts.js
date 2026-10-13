@@ -1,10 +1,7 @@
 // Account helpers. Accounts live in the in-memory store (state.admin.users) until
 // the backend exists; passwords are kept as plain text only because this is a
 // prototype. The backend must hash them and send the invite emails itself.
-
-// only these roles may create their own account; everyone else is added by the school administrator
-export const SELF_SIGNUP_ROLES = ['learner','admin'];
-export const ADMIN_CREATED_ROLES = ['teacher','parent','hod','principal'];
+// Nobody signs up: the school administrator creates every account.
 
 export const MIN_PASSWORD_LENGTH = 8;
 

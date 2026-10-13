@@ -3,6 +3,7 @@ import { SectionNav } from '../src/components/ui.jsx'
 import AdminOverview from './AdminOverview.jsx'
 import UserListCard from './UserListCard.jsx'
 import AddUserCard from './AddUserCard.jsx'
+import ClassesCard from './ClassesCard.jsx'
 
 export default function AdminDashboard(){
   const { state, update } = useStore();
@@ -12,6 +13,7 @@ export default function AdminDashboard(){
     { id:'overview', icon:'building', labelKey:'nav_overview' },
     { id:'users', icon:'users', labelKey:'nav_users', count:s.users.length },
     { id:'add', icon:'edit', labelKey:'nav_add_user' },
+    { id:'classes', icon:'cap', labelKey:'nav_classes', count:s.classes.length },
   ];
 
   return (
@@ -20,6 +22,7 @@ export default function AdminDashboard(){
       {s.tab==='overview' && <AdminOverview onOpenUsers={()=>setTab('users')}/>}
       {s.tab==='users' && <UserListCard/>}
       {s.tab==='add' && <AddUserCard/>}
+      {s.tab==='classes' && <ClassesCard/>}
     </div>
   );
 }

@@ -3,10 +3,10 @@ import { useI18n } from '../i18n/I18nContext.jsx'
 import { HeroIllustration } from '../components/ui.jsx'
 import { AuthLangBar, LinkButton, PasswordInput } from './authParts.jsx'
 
-// LOG IN: returning-user screen, email + password only. The role (and a learner's
-// grade) come from the account itself, so there is nothing else to pick.
+// LOG IN: email + password only. The role (and a learner's grade) come from the account
+// itself, which the school administrator created, so there is nothing else to pick.
 // onSubmit returns an error ({ key, vars }) or null when the login went through.
-export default function Login({ onSubmit, onSignup, onForgot }){
+export default function Login({ onSubmit, onForgot, onHome }){
   const { t } = useI18n();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,7 +39,8 @@ export default function Login({ onSubmit, onSignup, onForgot }){
           {error && <p className="field-error">{t(error.key, error.vars)}</p>}
           <p className="forgot-pw-line"><LinkButton onClick={onForgot}>{t('forgot_password_link')}</LinkButton></p>
           <button type="submit" className="btn btn-primary" style={{ padding:10, fontSize:13 }}>{t('login_button')}</button>
-          <p className="auth-toggle-line"><span>{t('auth_toggle_to_signup')}</span><LinkButton onClick={onSignup}>{t('auth_toggle_to_signup_link')}</LinkButton></p>
+          <p className="auth-toggle-line">{t('auth_no_account')}</p>
+          <LinkButton className="back-home-link" onClick={onHome}>{t('back_to_home_link')}</LinkButton>
         </form>
       </div>
     </div>

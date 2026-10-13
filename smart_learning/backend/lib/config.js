@@ -18,6 +18,11 @@ if (!jwtSecret) {
   console.warn('[config] JWT_SECRET is not set: using a random one, so everyone is logged out when the server restarts.');
 }
 
+// every demo account (an administrator among them) shares a published password, so the
+// demo school is on by default only in development and refused in production
+const seedDemoData = env.SEED_DEMO_DATA ? env.SEED_DEMO_DATA === 'true' : !isProd;
+if (isProd && seedDemoData) throw new Error('SEED_DEMO_DATA must not be true in production: the demo accounts have a published password');
+
 const list = (value) => (value || '').split(',').map((s) => s.trim()).filter(Boolean);
 
 module.exports = {
@@ -37,10 +42,7 @@ module.exports = {
     password: env.DB_PASSWORD || '',
     database: env.DB_NAME || 'smart_learning',
   },
-  seedDemoData: env.SEED_DEMO_DATA !== 'false',
-  // learners can always sign up; a school administrator can only sign up while the
-  // school has no administrator yet, unless this is switched on
-  allowAdminSignup: env.ALLOW_ADMIN_SIGNUP === 'true',
+  seedDemoData,
 
   smtp: {
     host: env.SMTP_HOST || '',

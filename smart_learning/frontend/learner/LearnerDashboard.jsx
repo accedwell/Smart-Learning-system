@@ -1,5 +1,6 @@
 import { useStore } from '../src/store/AppStore.jsx'
 import { SectionNav } from '../src/components/ui.jsx'
+import { forLearner } from '../src/services/classes.js'
 import { isTeacherQuizActive } from './quizState.js'
 import LessonsCard from './LessonsCard.jsx'
 import TeacherQuizzesCard from './TeacherQuizzesCard.jsx'
@@ -10,11 +11,11 @@ import RateTeacherCard from './RateTeacherCard.jsx'
 export default function LearnerDashboard(){
   const { state, update } = useStore();
   const s = state.learner;
-  const grade = state.auth.grade;
+  const me = state.auth.userId;
   const tabs = [
     { id:'overview', icon:'book', labelKey:'nav_overview' },
-    { id:'quizzes', icon:'help', labelKey:'nav_quizzes', count:state.teacher.quizzes.filter(q=>q.grade===grade).length+1 },
-    { id:'papers', icon:'paperclip', labelKey:'nav_papers', count:state.teacher.papers.filter(p=>p.grade===grade).length },
+    { id:'quizzes', icon:'help', labelKey:'nav_quizzes', count:forLearner(state, state.teacher.quizzes, me).length+1 },
+    { id:'papers', icon:'paperclip', labelKey:'nav_papers', count:forLearner(state, state.teacher.papers, me).length },
     { id:'rate', icon:'star', labelKey:'nav_rate_teacher' },
   ];
 

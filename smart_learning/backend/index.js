@@ -1,6 +1,7 @@
 // Smart Learning API. Start with `npm run dev`; settings are in .env (see .env.example).
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const multer = require('multer');
 const config = require('./lib/config');
 const db = require('./lib/db');
@@ -11,6 +12,8 @@ const mailer = require('./lib/mailer');
 const app = express();
 app.set('trust proxy', 'loopback');
 app.disable('x-powered-by');
+// CSP, HSTS, no framing, nosniff and no Referer on every response
+app.use(helmet({ referrerPolicy: { policy: 'no-referrer' } }));
 app.use(cors({ origin: config.corsOrigins }));
 app.use(express.json({ limit: '1mb' }));
 
@@ -60,6 +63,9 @@ async function start() {
   await ensureLessonCatalog();
   if (config.seedDemoData && (await seedDemoData())) {
     console.log(`[db] Demo school added to "${config.db.database}" (every demo account's password is ${DEMO_PASSWORD})`);
+  }
+  if (!(await db.one("SELECT 1 FROM users WHERE role = 'admin' LIMIT 1"))) {
+    console.warn('[setup] There is no administrator yet. Create one with: npm run create-admin -- --name "Jane Doe" --email jane@school.org');
   }
   await mailer.verify();
   const server = app.listen(config.port, () => {

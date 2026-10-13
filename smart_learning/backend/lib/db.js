@@ -11,8 +11,8 @@ let pool = null;
 // database name comes from DB_NAME
 function schemaStatements() {
   const sql = fs.readFileSync(path.join(__dirname, '..', 'db', 'schema.sql'), 'utf8')
-    .split('\n')
-    .map((line) => line.replace(/(^|\s)--\s.*$/, '')) // drop "-- comments" (none contain a ';')
+    .split(/\r?\n/) // a Windows checkout has CRLF line endings
+    .map((line) => line.replace(/(^|\s)--\s.*$/, '')) // drop "-- comments", which may contain a ';'
     .join('\n');
   return sql.split(';').map((s) => s.trim()).filter((s) => s && !/^(CREATE DATABASE|USE)\b/i.test(s));
 }

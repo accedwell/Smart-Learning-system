@@ -1,6 +1,6 @@
-// /api/admin: the school administrator creates every account (teachers, parents, HODs and
-// principals can't sign up), links parents to learners, issues temporary passwords and
-// sees the school overview.
+// /api/admin: the school administrator creates every account (nobody signs up), links
+// parents to learners, sets up the classes, issues temporary passwords and sees the school
+// overview.
 const express = require('express');
 const config = require('../lib/config');
 const db = require('../lib/db');
@@ -8,6 +8,7 @@ const auth = require('../lib/auth');
 const { catalog, deptForSubject } = require('../lib/catalog');
 const { ensureLessons } = require('../lib/learners');
 const { publicUser, findByEmail, findById } = require('../lib/users');
+const { classView } = require('../lib/classes');
 const http = require('../lib/http');
 
 const router = express.Router();
@@ -113,6 +114,11 @@ router.patch('/users/:id', async (req, res) => {
     if (other && other.id !== user.id) throw http.conflict('admin_error_email_taken', 'Another account already uses this email');
   }
   if (Object.keys(updates).length) await db.query('UPDATE users SET ? WHERE id = ?', [updates, user.id]);
+  // a learner moved to another grade leaves the classes of their old grade
+  if (user.role === 'learner' && updates.grade && updates.grade !== user.grade) {
+    await db.query('DELETE cl FROM class_learners cl JOIN classes k ON k.id = cl.class_id WHERE cl.learner_id = ? AND k.grade <> ?',
+      [user.id, updates.grade]);
+  }
   const [out] = await withLinks([await findById(user.id)]);
   res.json({ user: out });
 });
@@ -150,6 +156,99 @@ router.delete('/parents/:id/children/:learnerId', async (req, res) => {
   await db.query('DELETE FROM parent_children WHERE parent_id = ? AND learner_id = ?', [parent.id, http.id(req.params.learnerId, 'learnerId')]);
   const [out] = await withLinks([parent]);
   res.json({ user: out });
+});
+
+// ---- classes (subject groups): a name like 10A, a grade, a subject, a teacher and learners ----
+
+const CLASS_SELECT = 'SELECT k.*, u.name AS teacher_name FROM classes k LEFT JOIN users u ON u.id = k.teacher_id';
+
+async function classViews(rows) {
+  const members = rows.length === 0 ? [] : await db.query(
+    'SELECT class_id, learner_id FROM class_learners WHERE class_id IN (?) ORDER BY learner_id', [rows.map((c) => c.id)],
+  );
+  return rows.map((c) => ({
+    ...classView(c), teacherName: c.teacher_name || null,
+    learnerIds: members.filter((m) => m.class_id === c.id).map((m) => m.learner_id),
+  }));
+}
+
+async function classById(id) {
+  const [out] = await classViews([await db.one(`${CLASS_SELECT} WHERE k.id = ?`, [id])]);
+  return out;
+}
+
+async function requireClass(id) {
+  const c = await db.one('SELECT * FROM classes WHERE id = ?', [id]);
+  if (!c) throw http.notFound('class_not_found', 'No such class');
+  return c;
+}
+
+// "10a " -> "10A"
+const className = (value) => http.text(value, 'name', { max: 10 }).toUpperCase();
+
+async function teacherIdFrom(value) {
+  if (value == null || value === '') return null;
+  return (await requireUser(http.id(value, 'teacherId'), 'teacher')).id;
+}
+
+// a second class with the same grade, name and subject is refused
+async function uniqueClass(write) {
+  try {
+    return await write();
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') throw http.conflict('admin_class_error_taken', 'That class already exists for this grade and subject');
+    throw err;
+  }
+}
+
+router.get('/classes', async (req, res) => {
+  res.json({ classes: await classViews(await db.query(`${CLASS_SELECT} ORDER BY k.grade, k.name, k.subject_key`)) });
+});
+
+// { name: '10A', grade, subjectKey, teacherId (optional) }
+router.post('/classes', async (req, res) => {
+  const b = http.body(req);
+  const fields = {
+    name: className(b.name),
+    grade: http.oneOf(String(b.grade), catalog.GRADES, 'grade'),
+    subject_key: http.oneOf(b.subjectKey, catalog.SUBJECT_OPTIONS, 'subjectKey'),
+    teacher_id: await teacherIdFrom(b.teacherId),
+  };
+  const result = await uniqueClass(() => db.query('INSERT INTO classes SET ?', [fields]));
+  res.status(201).json({ class: await classById(result.insertId) });
+});
+
+// renames the class or changes its teacher (null for none); its grade and subject stay
+router.patch('/classes/:id', async (req, res) => {
+  const c = await requireClass(http.id(req.params.id));
+  const b = http.body(req);
+  const updates = {};
+  if ('name' in b) updates.name = className(b.name);
+  if ('teacherId' in b) updates.teacher_id = await teacherIdFrom(b.teacherId);
+  if (Object.keys(updates).length) await uniqueClass(() => db.query('UPDATE classes SET ? WHERE id = ?', [updates, c.id]));
+  res.json({ class: await classById(c.id) });
+});
+
+// quizzes and papers sent to it stop going to it; any other classes keep them
+router.delete('/classes/:id', async (req, res) => {
+  const c = await requireClass(http.id(req.params.id));
+  await db.query('DELETE FROM classes WHERE id = ?', [c.id]);
+  res.status(204).end();
+});
+
+// a learner can only join a class of their own grade
+router.put('/classes/:id/learners/:learnerId', async (req, res) => {
+  const c = await requireClass(http.id(req.params.id));
+  const learner = await requireUser(http.id(req.params.learnerId, 'learnerId'), 'learner');
+  if (learner.grade !== c.grade) throw http.badRequest('admin_class_error_grade', 'This learner is in another grade', { field: 'learnerId' });
+  await db.query('INSERT IGNORE INTO class_learners (class_id, learner_id) VALUES (?, ?)', [c.id, learner.id]);
+  res.json({ class: await classById(c.id) });
+});
+
+router.delete('/classes/:id/learners/:learnerId', async (req, res) => {
+  const c = await requireClass(http.id(req.params.id));
+  await db.query('DELETE FROM class_learners WHERE class_id = ? AND learner_id = ?', [c.id, http.id(req.params.learnerId, 'learnerId')]);
+  res.json({ class: await classById(c.id) });
 });
 
 router.get('/overview', async (req, res) => {

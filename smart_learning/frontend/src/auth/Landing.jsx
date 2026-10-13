@@ -1,7 +1,7 @@
 import { useI18n } from '../i18n/I18nContext.jsx'
 import { BrandMark } from '../components/ui.jsx'
 
-export default function Landing({ onLogin, onSignup }){
+export default function Landing({ onLogin }){
   const { t } = useI18n();
   return (
     <div className="landing-wrap">
@@ -11,8 +11,7 @@ export default function Landing({ onLogin, onSignup }){
           <b>{t('app_title')}</b>
         </div>
         <div className="landing-topbar-actions">
-          <button className="btn landing-btn-outline" onClick={onLogin}>{t('landing_login_btn')}</button>
-          <button className="btn btn-primary" onClick={onSignup}>{t('landing_signup_btn')}</button>
+          <button className="btn landing-btn-outline" onClick={onLogin}>{t('landing_get_started_btn')}</button>
         </div>
       </div>
       <div className="landing-hero">
@@ -20,11 +19,8 @@ export default function Landing({ onLogin, onSignup }){
         <h1>{t('landing_headline_pre')}<span className="highlight">{t('landing_headline_highlight')}</span>{t('landing_headline_post')}</h1>
         <p>{t('landing_subtitle')}</p>
         <div className="landing-cta-row">
-          <button className="btn btn-primary landing-cta" onClick={onSignup}>{t('landing_get_started_btn')}</button>
-          <span className="landing-already">
-            <span>{t('landing_already_account')}</span>
-            <a href="#" onClick={(e)=>{ e.preventDefault(); onLogin(); }}>{t('landing_already_login_link')}</a>
-          </span>
+          <button className="btn btn-primary landing-cta" onClick={onLogin}>{t('landing_get_started_btn')}</button>
+          <span className="landing-already">{t('auth_no_account')}</span>
         </div>
         <div className="landing-features">
           <div className="landing-feature">

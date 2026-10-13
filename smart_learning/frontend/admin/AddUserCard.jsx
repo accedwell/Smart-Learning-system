@@ -6,9 +6,9 @@ import { RoleSelect, DeptSelect } from '../src/auth/authParts.jsx'
 import { findAccount, generateTempPassword, isValidEmail } from '../src/services/accounts.js'
 import InviteEmailCard from './InviteEmailCard.jsx'
 
-// the administrator creates accounts for every role (teachers, parents, HODs and
-// principals can't sign up themselves) and emails each new person a temporary
-// password they replace on first login
+// the administrator creates the account for every learner and staff member (nobody
+// signs up themselves) and emails each new person a temporary password they replace
+// on first login
 export default function AddUserCard(){
   const { state, update } = useStore();
   const { t } = useI18n();
@@ -28,7 +28,7 @@ export default function AddUserCard(){
     setError(null);
     const tempPassword = generateTempPassword();
     const role = draft.role;
-    const details = role==='learner' ? { grade:draft.grade }
+    const details = role==='learner' ? { grade:draft.grade, idNumber:draft.idNumber.trim() }
       : role==='teacher' ? { subjectKey:draft.subjectKey }
       : role==='hod' ? { dept:draft.dept }
       : role==='parent' ? { childIds: draft.childId ? [Number(draft.childId)] : [] } : {};
@@ -38,6 +38,7 @@ export default function AddUserCard(){
       a.lastInvite = { name, email, role, tempPassword };
       a.newUser.name = '';
       a.newUser.email = '';
+      a.newUser.idNumber = '';
       a.newUser.childId = '';
     });
   }
@@ -67,6 +68,13 @@ export default function AddUserCard(){
             <div className="field">
               <label>{t('login_grade_label')}</label>
               <GradeSelect value={draft.grade} onChange={(v)=>editDraft(d=>{ d.grade = v; })}/>
+            </div>
+          )}
+          {draft.role==='learner' && (
+            <div className="field">
+              <label htmlFor="newUserIdNumber">{t('login_id_label')}</label>
+              <input type="text" id="newUserIdNumber" placeholder={t('login_id_placeholder')} value={draft.idNumber}
+                onChange={(e)=>{ const v = e.target.value; editDraft(d=>{ d.idNumber = v; }); }}/>
             </div>
           )}
           {draft.role==='teacher' && (

@@ -3,7 +3,7 @@ import { useI18n } from '../src/i18n/I18nContext.jsx'
 import { QUIZ_BANK } from '../src/data/seed.js'
 import { SectionHead, Icon, AiNote, ResultRing } from '../src/components/ui.jsx'
 import { askOneLiner, langNote } from '../src/services/ai.js'
-import { isTeacherQuizActive, shortName } from './quizState.js'
+import { isTeacherQuizActive } from './quizState.js'
 
 const EMPTY_QUIZ = { started:false, submitted:false, index:0, answers:[], score:null, feedback:null };
 
@@ -25,8 +25,8 @@ export default function CheckinQuizCard(){
     update(s=>{
       s.learner.quiz.score = score;
       s.learner.quiz.submitted = true;
-      // reflect the result onto the matching demo learner on the teacher's dashboard
-      const entry = s.teacher.learners.find(l=>l.name===shortName(s.auth.name));
+      // reflect the result onto the learner's status on their teachers' class lists
+      const entry = s.admin.users.find(u=>u.id===s.auth.userId && u.role==='learner');
       if(entry){
         entry.status = pct>=0.8 ? 'on_track' : (pct>=0.5 ? 'watch' : 'at_risk');
         entry.noteKey = null;

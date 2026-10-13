@@ -1,12 +1,13 @@
 import { useStore } from '../src/store/AppStore.jsx'
 import { useI18n } from '../src/i18n/I18nContext.jsx'
 import { SectionHead, Icon } from '../src/components/ui.jsx'
+import { forLearner } from '../src/services/classes.js'
 
-// question papers the teacher uploaded for this learner's grade
+// question papers this learner's teachers uploaded for the learner's classes
 export default function PapersCard(){
   const { state } = useStore();
   const { t } = useI18n();
-  const myPapers = state.teacher.papers.filter(p=>p.grade===state.auth.grade);
+  const myPapers = forLearner(state, state.teacher.papers, state.auth.userId);
   return (
     <div className="card card-learner">
       <SectionHead icon="paperclip" title={t('learner_papers_title')}/>

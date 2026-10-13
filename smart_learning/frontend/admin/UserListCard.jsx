@@ -39,10 +39,19 @@ export default function UserListCard(){
   function removeUser(id){
     update(st=>{
       st.admin.users = st.admin.users.filter(x=>x.id!==id);
-      // a removed learner disappears from every parent it was linked to
+      // a removed learner disappears from every parent and class it was in, and a removed
+      // teacher's classes wait for a new teacher
       st.admin.users.forEach(u=>{ if(u.childIds) u.childIds = u.childIds.filter(c=>c!==id); });
+      st.admin.classes.forEach(c=>{
+        c.learnerIds = c.learnerIds.filter(l=>l!==id);
+        if(c.teacherId===id) c.teacherId = null;
+      });
     });
   }
+  // "10A, 11A": the classes a learner is in or a teacher teaches
+  const classNamesOf = (u)=>[...new Set(s.classes
+    .filter(c=>u.role==='teacher' ? c.teacherId===u.id : c.learnerIds.includes(u.id))
+    .map(c=>c.name))].join(', ');
   // issues a fresh temporary password and shows the login email again
   function resendLogin(user){
     const tempPassword = generateTempPassword();
@@ -83,7 +92,8 @@ export default function UserListCard(){
                   <RolePill role={u.role}/>
                   {u.mustChangePassword && <span className="pill pill-warn">{t('admin_awaiting_login_pill')}</span>}
                 </div>
-                <div className="meta">{u.email || '—'}{u.role==='learner' && u.grade ? ' · '+t('grade_'+u.grade) : ''}{u.role==='teacher' && u.subjectKey ? ' · '+t(u.subjectKey) : ''}</div>
+                <div className="meta">{u.email || '—'}{u.role==='learner' && u.grade ? ' · '+t('grade_'+u.grade) : ''}{u.role==='teacher' && u.subjectKey ? ' · '+t(u.subjectKey) : ''}
+                  {(u.role==='learner' || u.role==='teacher') && classNamesOf(u) ? ' · '+t('admin_user_classes',{ classes:classNamesOf(u) }) : ''}</div>
                 {u.role==='learner' && parentsOf(u.id).length>0 && (
                   <div className="meta">{t('admin_parents_label')+' '+parentsOf(u.id).map(p=>p.name).join(', ')}</div>
                 )}

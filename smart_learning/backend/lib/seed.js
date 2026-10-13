@@ -32,6 +32,21 @@ const STAFF = [
   { name: 'Ms. Pillay', email: 'pillay@school.demo', role: 'admin' },
 ];
 
+// classes (subject groups): Mrs. Dlamini teaches three Mathematics classes. Each quiz below
+// goes to its teacher's classes of that grade and subject.
+const CLASSES = [
+  { name: '10A', grade: '10', subjectKey: 'subject_1', teacher: 'dlamini@school.demo', learners: ['thabo@school.demo'] },
+  { name: '10B', grade: '10', subjectKey: 'subject_1', teacher: 'dlamini@school.demo', learners: ['sipho@school.demo'] },
+  { name: '11A', grade: '11', subjectKey: 'subject_1', teacher: 'dlamini@school.demo', learners: ['lindiwe@school.demo'] },
+  { name: '12A', grade: '12', subjectKey: 'subject_1', teacher: 'nkosi@school.demo', learners: [] },
+  { name: '10A', grade: '10', subjectKey: 'subject_2', teacher: 'khumalo@school.demo', learners: ['thabo@school.demo', 'sipho@school.demo'] },
+  { name: '11A', grade: '11', subjectKey: 'subject_2', teacher: 'khumalo@school.demo', learners: ['lindiwe@school.demo'] },
+  { name: '12A', grade: '12', subjectKey: 'subject_2', teacher: 'khumalo@school.demo', learners: [] },
+  { name: '10A', grade: '10', subjectKey: 'subject_3', teacher: 'naidoo@school.demo', learners: ['thabo@school.demo', 'sipho@school.demo'] },
+  { name: '11A', grade: '11', subjectKey: 'subject_3', teacher: 'zulu@school.demo', learners: ['lindiwe@school.demo'] },
+  { name: '12A', grade: '12', subjectKey: 'subject_3', teacher: 'naidoo@school.demo', learners: [] },
+];
+
 // one quiz per core subject for every grade, each set by that subject's teacher
 const QUIZZES = [
   { teacher: 'dlamini@school.demo', title: 'Quick Practice Quiz', grade: '10', subjectKey: 'subject_1', questions: [
@@ -138,6 +153,16 @@ async function seedDemoData() {
       }
     }
 
+    const classes = [];
+    for (const c of CLASSES) {
+      const res = await db.query('INSERT INTO classes (name, grade, subject_key, teacher_id) VALUES (?, ?, ?, ?)',
+        [c.name, c.grade, c.subjectKey, ids[c.teacher]], conn);
+      classes.push({ ...c, id: res.insertId });
+      for (const learner of c.learners) {
+        await db.query('INSERT INTO class_learners (class_id, learner_id) VALUES (?, ?)', [res.insertId, ids[learner]], conn);
+      }
+    }
+
     const quizIds = {};
     for (const q of QUIZZES) {
       const questions = q.questions.map(([text, answer]) => ({ text, answer }));
@@ -147,16 +172,21 @@ async function seedDemoData() {
         conn,
       );
       quizIds[q.title] = { id: res.insertId, total: questions.length };
+      for (const c of classes.filter((k) => k.teacher === q.teacher && k.grade === q.grade && k.subjectKey === q.subjectKey)) {
+        await db.query('INSERT INTO quiz_classes (quiz_id, class_id) VALUES (?, ?)', [res.insertId, c.id], conn);
+      }
     }
 
     for (const r of QUIZ_RESULTS) {
       const quiz = quizIds[r.quiz];
-      await db.query(
-        `INSERT INTO quiz_attempts (quiz_id, learner_id, answers, score, total, started_at, submitted_at)
-         VALUES (?, ?, '[]', ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))`,
-        [quiz.id, ids[r.learner], r.score, quiz.total],
-        conn,
-      );
+      for (const table of ['quiz_attempts', 'quiz_submissions']) {
+        await db.query(
+          `INSERT INTO ${table} (quiz_id, learner_id, answers, score, total, started_at, submitted_at)
+           VALUES (?, ?, '[]', ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))`,
+          [quiz.id, ids[r.learner], r.score, quiz.total],
+          conn,
+        );
+      }
     }
 
     for (const [key, attendance, performance] of SUBJECT_STATS) {

@@ -1,15 +1,16 @@
 import { useStore } from '../src/store/AppStore.jsx'
 import { useI18n } from '../src/i18n/I18nContext.jsx'
 import { SectionHead } from '../src/components/ui.jsx'
+import { forLearner } from '../src/services/classes.js'
 import { isCheckinQuizActive, newAttempt } from './quizState.js'
 import QuizTaking from './QuizTaking.jsx'
 
-// quizzes the teacher set (from the teacher's quiz builder) for this learner's grade
+// quizzes this learner's teachers set (from the teacher's quiz builder) for the learner's classes
 export default function TeacherQuizzesCard(){
   const { state, update } = useStore();
   const { t } = useI18n();
   const s = state.learner;
-  const allMyQuizzes = state.teacher.quizzes.filter(q=>q.grade===state.auth.grade);
+  const allMyQuizzes = forLearner(state, state.teacher.quizzes, state.auth.userId);
   const activeQuiz = s.activeQuizId!=null ? allMyQuizzes.find(q=>q.id===s.activeQuizId) : null;
 
   let body;

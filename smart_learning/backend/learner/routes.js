@@ -1,5 +1,5 @@
-// /api/learner: lessons, the check-in quiz, teachers' quizzes for the learner's grade,
-// question papers, and rating teachers.
+// /api/learner: lessons, the check-in quiz, the quizzes and question papers sent to the
+// learner's classes, and rating the teachers of those classes.
 const express = require('express');
 const db = require('../lib/db');
 const auth = require('../lib/auth');
@@ -9,6 +9,7 @@ const { catalog, t, langNote } = require('../lib/catalog');
 const { lessonsFor, refreshProgress, statusFor, latestCheckin } = require('../lib/learners');
 const { parentIdsOf, notify } = require('../lib/users');
 const { learnerView, mark } = require('../lib/quizzes');
+const { sentToLearners, teachesLearner } = require('../lib/classes');
 const http = require('../lib/http');
 
 const router = express.Router();
@@ -102,16 +103,17 @@ function attemptView(a) {
 
 async function quizForLearner(req) {
   const quiz = await db.one(
-    `SELECT z.*, u.name AS teacher_name FROM quizzes z LEFT JOIN users u ON u.id = z.teacher_id WHERE z.id = ? AND z.grade = ?`,
-    [http.id(req.params.id), req.user.grade],
+    `SELECT z.*, u.name AS teacher_name FROM quizzes z LEFT JOIN users u ON u.id = z.teacher_id
+      WHERE z.id = ? AND ${sentToLearners('quiz', 'z')}`,
+    [http.id(req.params.id), req.user.id],
   );
-  if (!quiz) throw http.notFound('quiz_not_found', 'No such quiz for your grade');
+  if (!quiz) throw http.notFound('quiz_not_found', 'No such quiz for your classes');
   return quiz;
 }
 
-// quizzes for the learner's grade (?subjectKey= narrows to one subject), each with their attempt
+// quizzes sent to the learner's classes (?subjectKey= narrows to one subject), each with their attempt
 router.get('/quizzes', async (req, res) => {
-  const params = [req.user.id, req.user.grade];
+  const params = [req.user.id, req.user.id];
   let filter = '';
   if (req.query.subjectKey && req.query.subjectKey !== 'all') {
     filter = 'AND z.subject_key = ?';
@@ -123,7 +125,7 @@ router.get('/quizzes', async (req, res) => {
        FROM quizzes z
        LEFT JOIN users u ON u.id = z.teacher_id
        LEFT JOIN quiz_attempts a ON a.quiz_id = z.id AND a.learner_id = ?
-      WHERE z.grade = ? ${filter}
+      WHERE ${sentToLearners('quiz', 'z')} ${filter}
       ORDER BY z.subject_key, z.created_at`,
     params,
   );
@@ -168,9 +170,17 @@ router.post('/quizzes/:id/submit', async (req, res) => {
   const score = late ? 0 : mark(quiz, answers);
 
   await db.tx(async (conn) => {
+    const answersJson = JSON.stringify(late ? [] : answers);
+    const { affectedRows } = await db.query(
+      'UPDATE quiz_attempts SET answers = ?, score = ?, total = ?, timed_out = ?, submitted_at = ? WHERE id = ? AND submitted_at IS NULL',
+      [answersJson, score, quiz.questions.length, timedOut, new Date(now), attempt.id], conn,
+    );
+    if (!affectedRows) throw http.conflict('quiz_already_submitted', 'This quiz has already been submitted; start a retake first');
+    // kept for the teacher even after a retake replaces the attempt above
     await db.query(
-      'UPDATE quiz_attempts SET answers = ?, score = ?, total = ?, timed_out = ?, submitted_at = ? WHERE id = ?',
-      [JSON.stringify(late ? [] : answers), score, quiz.questions.length, timedOut, new Date(now), attempt.id], conn,
+      `INSERT INTO quiz_submissions (quiz_id, learner_id, answers, score, total, timed_out, started_at, submitted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [quiz.id, req.user.id, answersJson, score, quiz.questions.length, timedOut, attempt.started_at, new Date(now)], conn,
     );
     // only the learner's linked parents hear about the mark
     await notify(await parentIdsOf(req.user.id, conn), {
@@ -193,8 +203,8 @@ router.post('/quizzes/:id/submit', async (req, res) => {
 router.get('/papers', async (req, res) => {
   const rows = await db.query(
     `SELECT p.*, u.name AS teacher_name FROM papers p LEFT JOIN users u ON u.id = p.teacher_id
-      WHERE p.grade = ? ORDER BY p.created_at DESC`,
-    [req.user.grade],
+      WHERE ${sentToLearners('paper', 'p')} ORDER BY p.created_at DESC`,
+    [req.user.id],
   );
   res.json({
     papers: rows.map((p) => ({
@@ -204,14 +214,16 @@ router.get('/papers', async (req, res) => {
   });
 });
 
-// ---- rating teachers ----
+// ---- rating teachers (only the teachers of the learner's own classes) ----
 
 router.get('/teachers', async (req, res) => {
   const rows = await db.query(
     `SELECT u.id, u.name, u.subject_key, u.teach_grade, r.rating AS my_rating
        FROM users u LEFT JOIN teacher_ratings r ON r.teacher_id = u.id AND r.learner_id = ?
-      WHERE u.role = 'teacher' ORDER BY (u.teach_grade = ?) DESC, u.name`,
-    [req.user.id, req.user.grade],
+      WHERE u.role = 'teacher' AND EXISTS (
+        SELECT 1 FROM classes k JOIN class_learners cl ON cl.class_id = k.id WHERE k.teacher_id = u.id AND cl.learner_id = ?)
+      ORDER BY u.name`,
+    [req.user.id, req.user.id],
   );
   res.json({
     teachers: rows.map((r) => ({
@@ -223,7 +235,7 @@ router.get('/teachers', async (req, res) => {
 // one rating per learner per teacher; rating again replaces it
 router.put('/teachers/:id/rating', async (req, res) => {
   const teacher = await db.one("SELECT id FROM users WHERE id = ? AND role = 'teacher'", [http.id(req.params.id)]);
-  if (!teacher) throw http.notFound('teacher_not_found', 'No such teacher');
+  if (!teacher || !(await teachesLearner(teacher.id, req.user.id))) throw http.notFound('teacher_not_found', 'No such teacher of your classes');
   const rating = http.int(http.body(req).rating, 'rating', { min: 1, max: 5 });
   await db.query(
     'INSERT INTO teacher_ratings (teacher_id, learner_id, rating) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE rating = VALUES(rating)',
