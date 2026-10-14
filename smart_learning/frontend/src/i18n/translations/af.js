@@ -560,4 +560,10 @@ export default {
   quizgen_need_answers: "Tik 'n antwoord vir elke gemerkte vraag uit die vraestel.",
   ai_busy: "Die assistent is nou besig. Probeer oor 'n rukkie weer.",
   chatbot_offline: "Die kletsassistent loop nie op die oomblik nie. Probeer asseblief later weer.",
+  admin_remove_class_confirm: "Verwyder die klas {name}? Sy leerders hou hul rekeninge, maar vasvrae, vraestelle en aanlyn klasse wat net na hierdie klas gestuur is, word nie meer aan hulle gewys nie.",
+  admin_class_error_grade: "Daardie leerder is in 'n ander graad.",
+  principal_teachers_empty: "Nog geen onderwysers nie — die administrateur voeg hulle by onder Gebruikers.",
+  parent_notifications_empty: "Nog geen kennisgewings nie.",
+  learner_rate_empty: "Jy kan die onderwysers van jou klasse gradeer sodra jy in 'n klas is.",
+  profile_email_password_hint: "Tik jou huidige wagwoord in om jou e-pos te verander.",
 };

@@ -6,10 +6,9 @@ import { SectionHead, Icon, AiNote } from '../src/components/ui.jsx'
 import { apiGet, apiPatch, apiPost, errorText } from '../src/services/api.js'
 
 // The HOD's teachers, escalations and reports all come from the backend (/api/hod), so they
-// are saved in the database. The Principal's dashboard still reads the in-browser demo data,
-// so each change is copied there too (matched by teacher name) until it is connected as well.
+// are saved in the database, where the principal's dashboard reads them too.
 export default function HodDashboard(){
-  const { state, update } = useStore();
+  const { state } = useStore();
   const { t, lang } = useI18n();
   const token = state.auth.token;
   const [dept, setDept] = useState(state.hod.dept);
@@ -46,10 +45,6 @@ export default function HodDashboard(){
     const { data } = await run(teacher.id, ()=>apiPatch(`/hod/teachers/${teacher.id}/work-done`, { workDone:value }, token));
     if(!data) return;
     setTeachers(list=>list.map(tc=>tc.id===teacher.id ? data.teacher : tc));
-    update(st=>{
-      const local = st.principal.teachers.find(tc=>tc.name===teacher.name);
-      if(local) local.workDone = value;
-    });
   }
 
   async function suggestIntervention(teacher){
@@ -68,17 +63,7 @@ export default function HodDashboard(){
   async function sendReport(){
     const { data } = await run('report', ()=>apiPost('/hod/reports', {}, token));
     if(!data) return;
-    const report = data.report;
-    setReports(list=>[report, ...list]);
-    update(st=>{
-      st.principal.reports.push({
-        id: st.nextReportId++,
-        dept: report.dept,
-        deptLabelKey: currentDept.labelKey,
-        sentAt: formatTime(report.sentAt),
-        rows: report.rows.map(r=>({ ...r, avgRating:r.avgRating ?? 0 })),
-      });
-    });
+    setReports(list=>[data.report, ...list]);
   }
 
   const ratingText = (tc)=>tc.ratings.average==null ? t('hod_no_ratings') : tc.ratings.average.toFixed(1);

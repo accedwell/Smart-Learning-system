@@ -561,4 +561,10 @@ export default {
   quizgen_need_answers: "Ṅwalani phindulo ya mbudziso iṅwe na iṅwe yo makiwaho i bvaho kha bammbiri.",
   ai_busy: "Mufarisi o farakanea zwino. Lingedzani hafhu nga murahu ha tshifhinganyana.",
   chatbot_offline: "Mufarisi wa nyambedzano ha khou shuma zwino. Ri humbela ni lingedze hafhu nga murahu.",
+  admin_remove_class_confirm: "Bviselani kilasi {name}? Vhagudi vhayo vha ḓo dzula na akhaunthu dzavho, fhedzi ndingo, maphephe na kilasi dza inthanethe zwo rumelwaho kha kilasi iyi fhedzi a zwi nga tsha sumbedzwa kha vhone.",
+  admin_class_error_grade: "Mugudi uyo u kha gireidi iṅwe.",
+  principal_teachers_empty: "A hu na vhadededzi zwazwino — mulanguli u a vha engedza fhasi ha Vhashumisi.",
+  parent_notifications_empty: "A hu na nzivhadzo zwazwino.",
+  learner_rate_empty: "Ni nga ela vhadededzi vha kilasi dzaṋu musi no no vha kha kilasi.",
+  profile_email_password_hint: "Dzhenisani phasiwede yaṋu ya zwino u itela u shandukisa imeiḽi yaṋu.",
 };

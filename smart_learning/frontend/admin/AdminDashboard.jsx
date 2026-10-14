@@ -13,7 +13,7 @@ export default function AdminDashboard(){
     { id:'overview', icon:'building', labelKey:'nav_overview' },
     { id:'users', icon:'users', labelKey:'nav_users' },
     { id:'add', icon:'edit', labelKey:'nav_add_user' },
-    { id:'classes', icon:'cap', labelKey:'nav_classes', count:s.classes.length },
+    { id:'classes', icon:'cap', labelKey:'nav_classes' },
   ];
 
   return (

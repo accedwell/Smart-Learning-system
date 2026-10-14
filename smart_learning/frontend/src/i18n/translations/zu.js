@@ -561,4 +561,10 @@ export default {
   quizgen_need_answers: "Bhala impendulo yawo wonke umbuzo omakiwe ovela ephepheni.",
   ai_busy: "Umsizi umatasa manje. Zama futhi emva kwesikhashana.",
   chatbot_offline: "Umsizi wengxoxo akasebenzi okwamanje. Sicela uzame futhi emuva kwesikhathi.",
+  admin_remove_class_confirm: "Susa ikilasi {name}? Abafundi balo bazohlala nama-akhawunti abo, kodwa izivivinyo, amaphepha namakilasi aku-inthanethi athunyelwe kuleli kilasi kuphela ngeke besawabona.",
+  admin_class_error_grade: "Lowo mfundi usebangeni elihlukile.",
+  principal_teachers_empty: "Abekho othisha okwamanje — umphathi uyabengeza ngaphansi kwaBasebenzisi.",
+  parent_notifications_empty: "Azikho izaziso okwamanje.",
+  learner_rate_empty: "Ungalinganisa othisha bamakilasi akho uma usukwikilasi.",
+  profile_email_password_hint: "Faka iphasiwedi yakho yamanje ukuze ushintshe i-imeyili yakho.",
 };

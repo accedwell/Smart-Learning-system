@@ -71,15 +71,8 @@ export function createInitialState(){
     auth: { loggedIn:false, name:'', role:'learner', grade:'10' },
     role: 'learner',
     learner: {
-      teacherName:'Mrs. Dlamini',
-      lessons: [
-        { id:1, key:'lesson_1', progress:100, done:true, assessmentViewed:true },
-        { id:2, key:'lesson_2', progress:60, done:false, assessmentViewed:false },
-        { id:3, key:'lesson_3', progress:0, done:false, assessmentViewed:false },
-      ],
       recommendation: null,
-      rating: 0,
-      quiz: { started:false, submitted:false, index:0, answers:[], score:null, feedback:null },
+      quiz: { started:false, submitted:false, index:0, answers:[], score:null, feedback:null, sending:false, error:null },
       expandedAssessment: null,
       quizAttempts: {}, // teacherQuizId -> { index, answers, submitted, score }
       activeQuizId: null,
@@ -139,25 +132,10 @@ export function createInitialState(){
     },
     parent: {
       selectedChildId: null, // which linked learner the parent is viewing (null = the first one)
-      notifications: [
-        { key:'notif_1', timeKey:'time_1', read:false },
-        { key:'notif_2', timeKey:'time_2', read:false },
-        { key:'notif_3', timeKey:'time_3', read:true },
-      ],
     },
     principal: {
-      teachers: [
-        { id:1, name:'Mrs. Dlamini', subjectKey:'subject_1', dept:'mathematics', gradeKey:'grade_10', workDone:null, ratings:[5,4,5,3,4,5,2,4], attendance:96, performance:71, feedback:'', feedbackSent:false },
-        { id:4, name:'Mr. Nkosi', subjectKey:'subject_1', dept:'mathematics', gradeKey:'grade_12', workDone:true, ratings:[5,5,4,5,5,4], attendance:92, performance:74, feedback:'', feedbackSent:false },
-        { id:2, name:'Mr. Khumalo', subjectKey:'subject_2', dept:'languages', gradeKey:'grade_11', workDone:true, ratings:[4,4,3,5,4,4], attendance:91, performance:78, feedback:'', feedbackSent:false },
-        { id:5, name:'Ms. van Wyk', subjectKey:'subject_afrikaans', dept:'languages', gradeKey:'grade_10', workDone:null, ratings:[4,3,4,4,5], attendance:89, performance:73, feedback:'', feedbackSent:false },
-        { id:7, name:'Ms. Mokoena', subjectKey:'subject_lo', dept:'languages', gradeKey:'grade_11', workDone:false, ratings:[4,5,4,3,4], attendance:85, performance:69, feedback:'', feedbackSent:false },
-        { id:3, name:'Ms. Naidoo', subjectKey:'subject_3', dept:'science', gradeKey:'grade_12', workDone:false, ratings:[5,5,4,5,3,4,4], attendance:88, performance:65, feedback:'', feedbackSent:false },
-        { id:6, name:'Mr. Zulu', subjectKey:'subject_3', dept:'science', gradeKey:'grade_11', workDone:true, ratings:[5,4,5,5,4,5,3], attendance:93, performance:70, feedback:'', feedbackSent:false },
-      ],
-      selectedTeacherId: 1,
+      selectedTeacherId: null, // which teacher is under review (null = the first one)
       showTeacherList: false,
-      reports: [], // HOD-submitted department reports: { id, dept, sentAt, rows:[{name,subjectKey,gradeKey,attendance,performance,avgRating}] }
     },
     hod: {
       dept: 'mathematics',
@@ -205,6 +183,5 @@ export function createInitialState(){
       userFilter: 'all',
       tab: 'overview', // 'overview' | 'users' | 'add'
     },
-    nextReportId: 1,
   };
 }

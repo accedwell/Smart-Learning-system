@@ -258,7 +258,8 @@ router.get('/overview', async (req, res) => {
   const quizzes = await db.one(
     `SELECT (SELECT COUNT(*) FROM quizzes) AS quizzes,
             (SELECT COUNT(*) FROM quiz_attempts WHERE submitted_at IS NOT NULL) AS quizAttempts,
-            (SELECT COUNT(*) FROM papers) AS papers`,
+            (SELECT COUNT(*) FROM papers) AS papers,
+            (SELECT COUNT(*) FROM users WHERE must_change_password = 1) AS awaitingFirstLogin`,
   );
   res.json({ counts, totalUsers: Object.values(counts).reduce((a, b) => a + b, 0), subjects, ...quizzes });
 });

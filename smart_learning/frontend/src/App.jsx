@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useStore } from './store/AppStore.jsx'
 import { findAccount } from './services/accounts.js'
-import { apiPost, errorText } from './services/api.js'
+import { apiGet, apiPost, errorText } from './services/api.js'
+import { savedToken, rememberToken, forgetToken } from './services/session.js'
 import { useI18n } from './i18n/I18nContext.jsx'
 import Landing from './auth/Landing.jsx'
 import Login from './auth/Login.jsx'
@@ -27,7 +28,27 @@ export default function App(){
   const [resetToken, setResetToken] = useState(initialResetToken);
   const [screen, setScreen] = useState(initialResetToken ? 'reset' : 'landing'); // 'landing' | 'login' | 'forgot' | 'reset' | 'first-login'
   const [pendingLogin, setPendingLogin] = useState(null); // the backend session ({ token, user }) while a temporary password is being replaced
+  // true while a sign-in remembered from before a page refresh is being checked
+  const [restoring, setRestoring] = useState(()=>Boolean(savedToken()));
   const loggedIn = state.auth.loggedIn;
+
+  // after a page refresh: the sign-in kept for this tab is checked with the backend and, if it
+  // is still valid, the person goes straight back to their dashboard
+  useEffect(()=>{
+    const token = savedToken();
+    if(!token) return;
+    let cancelled = false;
+    apiGet('/auth/me', token).then(({ data })=>{
+      if(cancelled) return;
+      if(!data) forgetToken(); // expired, or the password changed since
+      else if(data.user.mustChangePassword){ setPendingLogin({ token, user:data.user }); setScreen('first-login'); }
+      else enterWithSession({ token, user:data.user });
+      setRestoring(false);
+    });
+    return ()=>{ cancelled = true; };
+  // runs once, on page load
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // a reset link opened in a tab already showing the app changes only the #, without a reload
   useEffect(()=>{
@@ -78,6 +99,7 @@ export default function App(){
       dept: user.dept || (local && local.dept),
     };
     enterWithAccount(account, { token, apiUserId:user.id });
+    rememberToken(token);
   }
 
   // email + password only: the account decides the role (and a learner's grade)
@@ -102,10 +124,12 @@ export default function App(){
   }
 
   function logout(){
+    forgetToken();
     update(s=>{ s.auth = { loggedIn:false, name:'', role:'learner', grade:'10' }; });
     setScreen('landing');
   }
 
+  if(restoring) return null;
   if(loggedIn){
     return (
       <>

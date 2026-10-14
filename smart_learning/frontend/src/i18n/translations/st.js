@@ -561,4 +561,10 @@ export default {
   quizgen_need_answers: "Ngola karabo bakeng sa potso e nngwe le e nngwe e tshwailweng e tswang pampiring.",
   ai_busy: "Mothusi o phathahane hajwale. Leka hape kamora nakwana.",
   chatbot_offline: "Mothusi wa moqoqo ha a sebetse hajwale. Ka kopo leka hape hamorao.",
+  admin_remove_class_confirm: "Tlosa tlelase {name}? Baithuti ba yona ba tla boloka diakhaonto tsa bona, empa diteko, dipampiri le ditlelase tsa inthanete tse rometsweng tlelaseng ena feela di ke ke tsa hlola di bontshwa ho bona.",
+  admin_class_error_grade: "Moithuti eo o kereiting e nngwe.",
+  principal_teachers_empty: "Ha ho matitjhere hajwale — motsamaisi o a eketsa tlasa Basebedisi.",
+  parent_notifications_empty: "Ha ho ditsebiso hajwale.",
+  learner_rate_empty: "O ka lekanya matitjhere a ditlelase tsa hao hang ha o se o le tlelaseng.",
+  profile_email_password_hint: "Kenya phasewete ya hao ya hajwale ho fetola imeili ya hao.",
 };

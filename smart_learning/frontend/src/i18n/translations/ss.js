@@ -561,4 +561,10 @@ export default {
   quizgen_need_answers: "Bhala imphendvulo yawo onkhe umbuto lomakiwe lovela ephepheni.",
   ai_busy: "Umsiti umatasa nyalo. Phindza uzame emvakwesikhashana.",
   chatbot_offline: "Umsiti wengcogco akasebenti nyalo. Sicela uphindze uzame ngemuva.",
+  admin_remove_class_confirm: "Susa liklasi {name}? Bafundzi balo batawugcina ema-akhawunti abo, kodvwa tivivinyo, emaphepha nemaklasi e-inthanethi latfunyelwe kulelklasi kuphela angeke asakhonjiswa kubo.",
+  admin_class_error_grade: "Lomfundzi usebangeni lelihlukile.",
+  principal_teachers_empty: "Akukho bothishela kwanyalo — umlawuli uyabengeta ngaphansi kwaBasebentisi.",
+  parent_notifications_empty: "Akukho tatiso kwanyalo.",
+  learner_rate_empty: "Ungabalinganisa bothishela bemaklasi akho nawusese useklasini.",
+  profile_email_password_hint: "Faka liphasiwedi lakho lanyalo kute ushintje i-imeyili yakho.",
 };

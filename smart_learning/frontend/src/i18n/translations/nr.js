@@ -561,4 +561,10 @@ export default {
   quizgen_need_answers: "Tlola ipendulo yawo woke umbuzo ophawulweko ovela ephepheni.",
   ai_busy: "Umsizi umatasa nje. Linga godu ngemva kwesikhatjhana.",
   chatbot_offline: "Umsizi wekulumiswano akasebenzi nje. Sibawa ulinge godu ngemva kwesikhathi.",
+  admin_remove_class_confirm: "Susa ikilasi {name}? Abafundi balo bazokugcina ama-akhawunti wabo, kodwana iinhlahlubo, amaphepha namakilasi we-inthanethi athunyelwe kileli kilasi kwaphela angekhe asatjengiswa kibo.",
+  admin_class_error_grade: "Umfundi loyo usebangeni elihlukileko.",
+  principal_teachers_empty: "Akhakho abotitjhere okwanje — umlawuli uyabengeza ngaphasi kwaBasebenzisi.",
+  parent_notifications_empty: "Azikho iimbikiso okwanje.",
+  learner_rate_empty: "Ungalinganisa abotitjhere bamakilasi wakho nawusele ukilasini.",
+  profile_email_password_hint: "Faka iphasiwedi yakho yanje bona utjhugulule i-imeyili yakho.",
 };

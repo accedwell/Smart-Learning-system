@@ -2,10 +2,10 @@ import { useStore } from '../src/store/AppStore.jsx'
 import { useI18n } from '../src/i18n/I18nContext.jsx'
 import { QUIZ_BANK } from '../src/data/seed.js'
 import { SectionHead, Icon, AiNote, ResultRing } from '../src/components/ui.jsx'
-import { askOneLiner, langNote } from '../src/services/ai.js'
+import { apiPost, errorText } from '../src/services/api.js'
 import { isTeacherQuizActive } from './quizState.js'
 
-const EMPTY_QUIZ = { started:false, submitted:false, index:0, answers:[], score:null, feedback:null };
+const EMPTY_QUIZ = { started:false, submitted:false, index:0, answers:[], score:null, feedback:null, sending:false, error:null };
 
 // built-in multiple-choice check-in quiz across subjects
 export default function CheckinQuizCard(){
@@ -14,28 +14,19 @@ export default function CheckinQuizCard(){
   const q = state.learner.quiz;
   const total = QUIZ_BANK.length;
 
+  // the backend marks it and saves the attempt, which the teachers' class lists use for the
+  // learner's status until they have taken one of the teacher's tests
   async function submit(){
-    let score = 0;
-    const missedTopics = [];
-    QUIZ_BANK.forEach((item,i)=>{
-      if(q.answers[i]===item.correct) score++;
-      else missedTopics.push(t(item.qKey));
-    });
-    const pct = score/total;
+    update(s=>{ s.learner.quiz.sending = true; s.learner.quiz.error = null; });
+    const { data, error } = await apiPost('/learner/checkin', { answers:q.answers, lang }, state.auth.token);
     update(s=>{
-      s.learner.quiz.score = score;
-      s.learner.quiz.submitted = true;
-      // reflect the result onto the learner's status on their teachers' class lists
-      const entry = s.admin.users.find(u=>u.id===s.auth.userId && u.role==='learner');
-      if(entry){
-        entry.status = pct>=0.8 ? 'on_track' : (pct>=0.5 ? 'watch' : 'at_risk');
-        entry.noteKey = null;
-        entry.noteText = t('quiz_score_caption',{ correct:score, total });
-      }
+      const quiz = s.learner.quiz;
+      quiz.sending = false;
+      if(error){ quiz.error = errorText(t, error); return; }
+      quiz.score = data.score;
+      quiz.feedback = data.feedback;
+      quiz.submitted = true;
     });
-    if(missedTopics.length===0) return;
-    const feedback = await askOneLiner(`A Grade ${state.auth.grade||'10'} learner just took a short check-in quiz on a platform called Smart Learning and got ${score} out of ${total} correct. They struggled with questions about: ${missedTopics.join('; ')}. In ONE short, encouraging sentence (max 25 words), tell them what to focus on next.${langNote(lang)}`);
-    if(feedback) update(s=>{ s.learner.quiz.feedback = feedback; });
   }
 
   let body;
@@ -63,7 +54,8 @@ export default function CheckinQuizCard(){
             </div>
           ))}
         </div>
-        <button className="btn btn-primary" style={{ marginTop:14 }} disabled={q.answers[q.index]==null}
+        {q.error && <p className="field-error">{q.error}</p>}
+        <button className="btn btn-primary" style={{ marginTop:14 }} disabled={q.answers[q.index]==null || q.sending}
           onClick={isLast ? submit : ()=>update(s=>{ s.learner.quiz.index++; })}>
           {isLast ? t('quiz_submit_btn') : t('quiz_next_btn')}
         </button>

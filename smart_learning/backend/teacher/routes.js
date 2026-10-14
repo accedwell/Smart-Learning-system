@@ -6,7 +6,7 @@ const express = require('express');
 const db = require('../lib/db');
 const auth = require('../lib/auth');
 const ai = require('../lib/ai');
-const { aiLimiter } = require('../lib/rateLimit');
+const { aiLimiter, rateLimit } = require('../lib/rateLimit');
 const { catalog, t, langNote } = require('../lib/catalog');
 const { riskFrom } = require('../lib/learners');
 const { shortName, notify } = require('../lib/users');
@@ -16,6 +16,8 @@ const quizGen = require('../lib/quizGen');
 
 // how many questions are made from an uploaded paper for the teacher to choose from
 const GENERATED_QUESTIONS = 15;
+// reading a scanned paper is heavy work for the server, so each teacher gets a few a minute
+const quizFromPaperLimiter = rateLimit({ windowMs: 60 * 1000, max: 6, key: (req) => 'paper-quiz:' + req.user.id });
 const liveRooms = require('../lib/liveRooms');
 const { parseQuiz, teacherView } = require('../lib/quizzes');
 const { paperUpload, checkFileType, filePath, removeFile } = require('../lib/uploads');
@@ -291,7 +293,7 @@ async function paperText(paper) {
 // the document's text (OCR for photos and scans): a question paper's own questions (needsAnswer:
 // the teacher types the memo's answer) and fill-in-the-missing-word questions from its sentences.
 // Answers { source: 'ai' | 'text', questions: [{ text, answer, needsAnswer? }], classIds, title }.
-router.post('/papers/:id/generate-quiz', async (req, res) => {
+router.post('/papers/:id/generate-quiz', quizFromPaperLimiter, async (req, res) => {
   const paper = await ownPaper(req);
   let questions = [];
   let source = 'ai';

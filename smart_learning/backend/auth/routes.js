@@ -140,6 +140,17 @@ router.post('/reset-password', credentialLimiter, async (req, res) => {
 router.get('/me', auth.requireAuth({ allowPendingPassword: true }), async (req, res) => {
   const out = publicUser(req.user);
   if (req.user.role === 'parent') out.childIds = await childIdsOf(req.user.id);
+  // for the profile page: a parent's linked children, a learner's linked parents
+  if (req.user.role === 'parent') {
+    out.children = await db.query(
+      `SELECT u.name, u.grade FROM parent_children pc JOIN users u ON u.id = pc.learner_id
+        WHERE pc.parent_id = ? ORDER BY u.name`, [req.user.id]);
+  }
+  if (req.user.role === 'learner') {
+    out.parents = (await db.query(
+      `SELECT u.name FROM parent_children pc JOIN users u ON u.id = pc.parent_id
+        WHERE pc.learner_id = ? ORDER BY u.name`, [req.user.id])).map((p) => p.name);
+  }
   res.json({ user: out });
 });
 

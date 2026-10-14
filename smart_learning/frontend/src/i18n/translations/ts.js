@@ -561,4 +561,10 @@ export default {
   quizgen_need_answers: "Tsala nhlamulo ya xivutiso xin'wana na xin'wana lexi funghiweke lexi humaka ephepheni.",
   ai_busy: "Mupfuni u khomekile sweswi. Ringeta nakambe endzhaku ka nkarhinyana.",
   chatbot_offline: "Mupfuni wa mbulavurisano a tirhi sweswi. Hi kombela u ringeta nakambe endzhaku.",
+  admin_remove_class_confirm: "Susa kilasi {name}? Vadyondzi va yona va ta hlayisa tiakhawunti ta vona, kambe mavonelo, maphepha na tikilasi ta inthanete leswi rhumeriweke eka kilasi leyi ntsena a swi nge he kombisiwi vona.",
+  admin_class_error_grade: "Mudyondzi yoloye u le ka giredi yin'wana.",
+  principal_teachers_empty: "A ku na vadyondzisi sweswi — mufambisi u va engetela ehansi ka Vatirhisi.",
+  parent_notifications_empty: "A ku na switiviso sweswi.",
+  learner_rate_empty: "U nga pima vadyondzisi va tikilasi ta wena loko u ri eka kilasi.",
+  profile_email_password_hint: "Nghenisa phasiwede ya wena ya sweswi leswaku u cinca imeyili ya wena.",
 };

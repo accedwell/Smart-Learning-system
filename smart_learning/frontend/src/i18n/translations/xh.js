@@ -561,4 +561,10 @@ export default {
   quizgen_need_answers: "Bhala impendulo yawo wonke umbuzo ophawuliweyo ovela kwiphepha.",
   ai_busy: "Umncedisi uxakekile ngoku. Zama kwakhona kamva kancinci.",
   chatbot_offline: "Umncedisi wencoko akasebenzi okwangoku. Nceda uzame kwakhona kamva.",
+  admin_remove_class_confirm: "Susa iklasi {name}? Abafundi bayo baya kugcina iiakhawunti zabo, kodwa iimvavanyo, amaphepha neeklasi ze-intanethi ezithunyelwe kule klasi kuphela abasayi kuziphinda bazibone.",
+  admin_class_error_grade: "Loo mfundi ukwelinye ibakala.",
+  principal_teachers_empty: "Akukho titshala okwangoku — umlawuli uyabongeza phantsi kwaBasebenzisi.",
+  parent_notifications_empty: "Akukho zaziso okwangoku.",
+  learner_rate_empty: "Ungabakala ootitshala beeklasi zakho xa sele ukwiklasi.",
+  profile_email_password_hint: "Faka igama lokugqitha lakho langoku ukuze utshintshe i-imeyile yakho.",
 };

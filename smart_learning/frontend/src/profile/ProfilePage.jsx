@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../store/AppStore.jsx'
 import { useI18n } from '../i18n/I18nContext.jsx'
 import { DEPARTMENTS } from '../data/seed.js'
 import { SectionHead, Icon } from '../components/ui.jsx'
 import { Avatar, RolePill } from '../components/RoleBadges.jsx'
-import { findAccount, isValidEmail } from '../services/accounts.js'
+import { isValidEmail } from '../services/accounts.js'
+import { apiGet, apiPatch, apiPost, errorText } from '../services/api.js'
+import { rememberToken } from '../services/session.js'
+import { PasswordInput } from '../auth/authParts.jsx'
 import ChangePasswordForm from '../auth/ChangePasswordForm.jsx'
 
 function DetailRow({ label, children }){
@@ -17,51 +20,74 @@ function DetailRow({ label, children }){
 }
 
 // "My Profile", the same page for every role: who you are, your editable contact
-// details, the school details the administrator manages, and your password
+// details, the school details the administrator manages, and your password. All of it
+// comes from, and is saved to, the backend (/api/auth/me).
 export default function ProfilePage({ onBack }){
   const { state, update } = useStore();
   const { t } = useI18n();
-  const auth = state.auth;
-  const users = state.admin.users;
-  const account = auth.userId!=null ? users.find(u=>u.id===auth.userId) : null;
-  const person = account || { name:auth.name, email:'', role:auth.role, grade:auth.grade };
-
-  const [name, setName] = useState(person.name||'');
-  const [email, setEmail] = useState(person.email||'');
-  const [phone, setPhone] = useState(person.phone||'');
+  const token = state.auth.token;
+  const [person, setPerson] = useState(null); // null while loading
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [currentPassword, setCurrentPassword] = useState(''); // needed only to change the email
   const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [pwSaved, setPwSaved] = useState(false);
 
-  function saveDetails(e){
+  useEffect(()=>{
+    let cancelled = false;
+    apiGet('/auth/me', token).then(({ data, error: err })=>{
+      if(cancelled) return;
+      if(err){ setError(errorText(t, err)); return; }
+      setPerson(data.user);
+      setName(data.user.name || '');
+      setEmail(data.user.email || '');
+      setPhone(data.user.phone || '');
+    });
+    return ()=>{ cancelled = true; };
+  }, [token, t]);
+
+  if(!person){
+    return (
+      <div className="profile-page">
+        <button className="btn" style={{ marginBottom:14 }} onClick={onBack}>{t('profile_back')}</button>
+        {error ? <p className="field-error">{error}</p> : <p className="muted">{t('online_loading')}</p>}
+      </div>
+    );
+  }
+
+  const emailChanged = email.trim().toLowerCase()!==person.email;
+
+  async function saveDetails(e){
     e.preventDefault();
     const n = name.trim(), em = email.trim();
-    if(!n) return setError('admin_error_name');
-    if(!isValidEmail(em)) return setError('admin_error_email');
-    const other = findAccount(users, em);
-    if(other && other.id!==account.id) return setError('admin_error_email_taken');
+    if(!n) return setError(t('admin_error_name'));
+    if(!isValidEmail(em)) return setError(t('admin_error_email'));
     setError(null);
-    update(s=>{
-      const u = s.admin.users.find(x=>x.id===account.id);
-      u.name = n; u.email = em; u.phone = phone.trim();
-      s.auth.name = n; s.auth.email = em;
-    });
+    setSaving(true);
+    const body = { name:n, phone:phone.trim(), email:em, ...(emailChanged ? { currentPassword } : {}) };
+    const { data, error: err } = await apiPatch('/auth/me', body, token);
+    setSaving(false);
+    if(err) return setError(errorText(t, err));
+    setPerson(p=>({ ...p, ...data.user }));
+    setEmail(data.user.email);
+    setCurrentPassword('');
+    update(s=>{ s.auth.name = data.user.name; s.auth.email = data.user.email; });
     setSaved(true);
   }
 
-  function savePassword(newPassword){
-    update(s=>{
-      const u = s.admin.users.find(x=>x.id===account.id);
-      u.password = newPassword;
-      u.mustChangePassword = false;
-    });
+  // a new password signs out every other session, so this tab gets its new token
+  async function savePassword(newPassword, current){
+    const { data, error: err } = await apiPost('/auth/change-password', { currentPassword:current, newPassword }, token);
+    if(err) return errorText(t, err);
+    update(s=>{ s.auth.token = data.token; });
+    rememberToken(data.token);
     setPwSaved(true);
   }
 
   const dept = DEPARTMENTS.find(d=>d.id===person.dept);
-  const children = (person.childIds||[]).map(id=>users.find(u=>u.id===id)).filter(Boolean);
-  const idNumber = person.idNumber || auth.idNumber;
-  const staffNumber = auth.staffNumber;
 
   return (
     <div className="profile-page">
@@ -78,61 +104,62 @@ export default function ProfilePage({ onBack }){
         </div>
       </div>
 
-      {!account && <p className="ai-note" style={{ marginTop:14 }}>{t('profile_demo_note')}</p>}
-
       <div className="grid grid-2" style={{ marginTop:14 }}>
-        {account && (
-          <div className={'card card-'+person.role}>
-            <SectionHead icon="edit" title={t('profile_details_title')}/>
-            <form className="pw-form" onSubmit={saveDetails}>
+        <div className={'card card-'+person.role}>
+          <SectionHead icon="edit" title={t('profile_details_title')}/>
+          <form className="pw-form" onSubmit={saveDetails}>
+            <div className="field">
+              <label htmlFor="profileName">{t('signup_name_label')}</label>
+              <input type="text" id="profileName" maxLength={100} value={name} onChange={(e)=>{ setName(e.target.value); setSaved(false); }}/>
+            </div>
+            <div className="field">
+              <label htmlFor="profileEmail">{t('signup_email_label')}</label>
+              <input type="email" id="profileEmail" value={email} onChange={(e)=>{ setEmail(e.target.value); setSaved(false); }}/>
+            </div>
+            {emailChanged && (
               <div className="field">
-                <label htmlFor="profileName">{t('signup_name_label')}</label>
-                <input type="text" id="profileName" value={name} onChange={(e)=>{ setName(e.target.value); setSaved(false); }}/>
+                <label htmlFor="profileCurrentPw">{t('pw_current_label')}</label>
+                <PasswordInput id="profileCurrentPw" value={currentPassword} onChange={setCurrentPassword} autoComplete="current-password" required/>
+                <p className="muted" style={{ margin:'4px 0 0', fontSize:11.5 }}>{t('profile_email_password_hint')}</p>
               </div>
-              <div className="field">
-                <label htmlFor="profileEmail">{t('signup_email_label')}</label>
-                <input type="email" id="profileEmail" value={email} onChange={(e)=>{ setEmail(e.target.value); setSaved(false); }}/>
-              </div>
-              <div className="field">
-                <label htmlFor="profilePhone">{t('profile_phone_label')}</label>
-                <input type="text" id="profilePhone" value={phone} placeholder={t('profile_phone_placeholder')} onChange={(e)=>{ setPhone(e.target.value); setSaved(false); }}/>
-              </div>
-              {error && <p className="field-error" style={{ margin:0 }}>{t(error)}</p>}
-              {saved && <p className="ai-note" style={{ margin:0 }}><Icon name="check"/>{' '+t('profile_saved_note')}</p>}
-              <div><button type="submit" className="btn btn-primary">{t('profile_save_btn')}</button></div>
-            </form>
-          </div>
-        )}
+            )}
+            <div className="field">
+              <label htmlFor="profilePhone">{t('profile_phone_label')}</label>
+              <input type="text" id="profilePhone" maxLength={30} value={phone} placeholder={t('profile_phone_placeholder')} onChange={(e)=>{ setPhone(e.target.value); setSaved(false); }}/>
+            </div>
+            {error && <p className="field-error" style={{ margin:0 }}>{error}</p>}
+            {saved && <p className="ai-note" style={{ margin:0 }}><Icon name="check"/>{' '+t('profile_saved_note')}</p>}
+            <div><button type="submit" className="btn btn-primary" disabled={saving}>{t('profile_save_btn')}</button></div>
+          </form>
+        </div>
 
         <div className={'card card-'+person.role}>
           <SectionHead icon="building" title={t('profile_school_title')}/>
           <DetailRow label={t('admin_role_label')}>{t('tab_'+person.role)}</DetailRow>
           {person.role==='learner' && <DetailRow label={t('login_grade_label')}>{t('grade_'+(person.grade||'10'))}</DetailRow>}
-          {person.role==='learner' && idNumber && <DetailRow label={t('login_id_label')}>{idNumber}</DetailRow>}
-          {person.role==='learner' && <DetailRow label={t('profile_parents_label')}>{users.filter(u=>u.role==='parent' && (u.childIds||[]).includes(person.id)).map(p=>p.name).join(', ') || '—'}</DetailRow>}
+          {person.role==='learner' && person.idNumber && <DetailRow label={t('login_id_label')}>{person.idNumber}</DetailRow>}
+          {person.role==='learner' && <DetailRow label={t('profile_parents_label')}>{(person.parents||[]).join(', ') || '—'}</DetailRow>}
           {person.role==='teacher' && <DetailRow label={t('signup_subject_label')}>{person.subjectKey ? t(person.subjectKey) : '—'}</DetailRow>}
-          {person.role==='teacher' && staffNumber && <DetailRow label={t('login_staff_label')}>{staffNumber}</DetailRow>}
+          {person.role==='teacher' && person.staffNumber && <DetailRow label={t('login_staff_label')}>{person.staffNumber}</DetailRow>}
           {person.role==='hod' && <DetailRow label={t('hod_dept_select_label')}>{dept ? t(dept.labelKey) : '—'}</DetailRow>}
-          {person.role==='parent' && <DetailRow label={t('profile_children_label')}>{children.map(c=>c.name+(c.grade ? ' ('+t('grade_'+c.grade)+')' : '')).join(', ') || '—'}</DetailRow>}
+          {person.role==='parent' && <DetailRow label={t('profile_children_label')}>{(person.children||[]).map(c=>c.name+(c.grade ? ' ('+t('grade_'+c.grade)+')' : '')).join(', ') || '—'}</DetailRow>}
           <p className="muted" style={{ marginTop:10, fontSize:11.5 }}>{t('profile_managed_note')}</p>
         </div>
 
-        {account && (
-          <div className={'card card-'+person.role}>
-            <SectionHead icon="lock" title={t('profile_security_title')}/>
-            {pwSaved ? (
-              <>
-                <p className="ai-note" style={{ marginTop:0 }}><Icon name="check"/>{' '+t('pw_changed_note')}</p>
-                <button className="btn" onClick={()=>setPwSaved(false)}>{t('change_password_button')}</button>
-              </>
-            ) : (
-              <>
-                <p className="muted" style={{ marginTop:-6 }}>{t('pw_change_sub')}</p>
-                <ChangePasswordForm account={account} requireCurrent onSave={savePassword} className="pw-form"/>
-              </>
-            )}
-          </div>
-        )}
+        <div className={'card card-'+person.role}>
+          <SectionHead icon="lock" title={t('profile_security_title')}/>
+          {pwSaved ? (
+            <>
+              <p className="ai-note" style={{ marginTop:0 }}><Icon name="check"/>{' '+t('pw_changed_note')}</p>
+              <button className="btn" onClick={()=>setPwSaved(false)}>{t('change_password_button')}</button>
+            </>
+          ) : (
+            <>
+              <p className="muted" style={{ marginTop:-6 }}>{t('pw_change_sub')}</p>
+              <ChangePasswordForm account={person} requireCurrent onSave={savePassword} className="pw-form"/>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

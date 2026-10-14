@@ -15,12 +15,13 @@ export default function ChangePasswordForm({ account, requireCurrent, onSave, on
   // onSave may return (or resolve to) an error message, e.g. when the server rejects the password
   async function submit(e){
     e.preventDefault();
-    if(requireCurrent && current!==account.password) return setError(t('pw_error_current'));
+    // a demo account checks here; a backend account's current password is checked by the server
+    if(requireCurrent && account.password!=null && current!==account.password) return setError(t('pw_error_current'));
     if(next.length < MIN_PASSWORD_LENGTH) return setError(t('pw_error_short',{ n:MIN_PASSWORD_LENGTH }));
-    if(next===account.password) return setError(t('pw_error_same'));
+    if(account.password!=null && next===account.password) return setError(t('pw_error_same'));
     if(next!==confirm) return setError(t('signup_password_mismatch'));
     setError(null);
-    const err = await onSave(next);
+    const err = await onSave(next, current);
     if(err) setError(err);
   }
 

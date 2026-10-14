@@ -109,7 +109,12 @@ function OnlineClassesList({ onStart }){
 
   function downloadRegister(oc){
     const ended = phaseOf(oc, now)==='ended';
-    const cell = (v)=>'"'+String(v??'').replace(/"/g, '""')+'"';
+    // a cell starting with = + - @ (or a tab/return) is a formula to Excel: an apostrophe keeps it as text
+    const cell = (v)=>{
+      let s = String(v??'');
+      if(/^[=+\-@\t\r]/.test(s)) s = "'"+s;
+      return '"'+s.replace(/"/g, '""')+'"';
+    };
     const lines = [
       [t('online_topic_label'), oc.title], [t('online_class_label'), oc.className+' '+t(oc.subjectKey)], [t('online_start_label'), formatWhen(oc.startsAt)],
       [],

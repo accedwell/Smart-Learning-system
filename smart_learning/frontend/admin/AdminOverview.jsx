@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react'
 import { useStore } from '../src/store/AppStore.jsx'
 import { useI18n } from '../src/i18n/I18nContext.jsx'
 import { ROLES } from '../src/data/seed.js'
 import { SectionHead, Icon } from '../src/components/ui.jsx'
+import { apiGet, errorText } from '../src/services/api.js'
 
 const STAFF_ROLES = ['teacher','hod','principal','admin'];
 
@@ -17,22 +19,38 @@ function StatTile({ icon, value, label, accent }){
   );
 }
 
-// school at a glance: headline counts, users per role and subject trends
+// school at a glance, from the backend: headline counts, users per role and subject trends
 export default function AdminOverview({ onOpenUsers }){
   const { state } = useStore();
   const { t } = useI18n();
-  const s = state.admin;
-  const count = (fn)=>s.users.filter(fn).length;
-  const perRole = ROLES.map(r=>({ role:r, n:count(u=>u.role===r) }));
+  const token = state.auth.token;
+  const [data, setData] = useState(null); // null while loading
+  const [error, setError] = useState(null);
+
+  useEffect(()=>{
+    let cancelled = false;
+    apiGet('/admin/overview', token).then(({ data: d, error: err })=>{
+      if(cancelled) return;
+      if(err) setError(errorText(t, err));
+      else setData(d);
+    });
+    return ()=>{ cancelled = true; };
+  }, [token, t]);
+
+  if(error) return <div className="card card-admin"><p className="field-error">{error}</p></div>;
+  if(!data) return <div className="card card-admin"><p className="muted">{t('online_loading')}</p></div>;
+
+  const counts = data.counts;
+  const perRole = ROLES.map(r=>({ role:r, n:counts[r]||0 }));
   const maxRole = Math.max(1, ...perRole.map(r=>r.n));
-  const awaiting = count(u=>u.mustChangePassword);
+  const awaiting = data.awaitingFirstLogin || 0;
 
   return (
     <>
       <div className="stat-row admin-stats">
-        <StatTile icon="cap" value={count(u=>u.role==='learner')} label={t('admin_stat_learners')} accent="var(--learner)"/>
-        <StatTile icon="users" value={count(u=>STAFF_ROLES.includes(u.role))} label={t('admin_stat_staff')} accent="var(--teacher)"/>
-        <StatTile icon="bell" value={count(u=>u.role==='parent')} label={t('admin_stat_parents')} accent="var(--parent)"/>
+        <StatTile icon="cap" value={counts.learner||0} label={t('admin_stat_learners')} accent="var(--learner)"/>
+        <StatTile icon="users" value={STAFF_ROLES.reduce((n, r)=>n+(counts[r]||0), 0)} label={t('admin_stat_staff')} accent="var(--teacher)"/>
+        <StatTile icon="bell" value={counts.parent||0} label={t('admin_stat_parents')} accent="var(--parent)"/>
         <StatTile icon="lock" value={awaiting} label={t('admin_stat_awaiting')} accent={awaiting ? 'var(--warn)' : 'var(--good)'}/>
       </div>
 
@@ -52,7 +70,7 @@ export default function AdminOverview({ onOpenUsers }){
 
         <div className="card card-admin">
           <SectionHead icon="building" title={t('admin_title')}/>
-          {s.rows.map(row=>{
+          {data.subjects.map(row=>{
             const needsAttention = row.performance < 70;
             return (
               <div key={row.key} className="row" style={{ flexDirection:'column', alignItems:'stretch', gap:6 }}>

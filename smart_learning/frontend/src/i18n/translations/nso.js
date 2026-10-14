@@ -561,4 +561,10 @@ export default {
   quizgen_need_answers: "Ngwala karabo ya potšišo ye nngwe le ye nngwe ye e swailwego ye e tšwago pampiring.",
   ai_busy: "Mothuši o swaregile bjale. Leka gape ka morago ga nakwana.",
   chatbot_offline: "Mothuši wa poledišano ga a šome bjale. Hle leka gape ka morago.",
+  admin_remove_class_confirm: "Tloša klase {name}? Baithuti ba yona ba tla boloka diakhaonto tša bona, eupša diteko, dipampiri le diklase tša inthanete tšeo di rometšwego klaseng ye fela di ka se sa bontšhwa go bona.",
+  admin_class_error_grade: "Moithuti yoo o mphatong o mongwe.",
+  principal_teachers_empty: "Ga go na barutiši bjale — molaodi o ba oketša ka fase ga Badiriši.",
+  parent_notifications_empty: "Ga go na ditsebišo bjale.",
+  learner_rate_empty: "O ka lekanyetša barutiši ba diklase tša gago ge o šetše o le ka klaseng.",
+  profile_email_password_hint: "Tsenya phasewete ya gago ya bjale go fetoša imeile ya gago.",
 };

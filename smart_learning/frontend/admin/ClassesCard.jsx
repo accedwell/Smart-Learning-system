@@ -1,45 +1,75 @@
+import { useEffect, useState } from 'react'
 import { useStore } from '../src/store/AppStore.jsx'
 import { useI18n } from '../src/i18n/I18nContext.jsx'
 import { GRADES } from '../src/data/seed.js'
 import { SectionHead, GradeSelect, SubjectSelect } from '../src/components/ui.jsx'
+import { apiGet, apiPost, apiPatch, apiRequest, errorText } from '../src/services/api.js'
 import { classLabel } from '../src/services/classes.js'
 
 // The administrator sets up the classes (subject groups): a name like 10A, the grade, the
 // subject, the teacher and the learners. Teachers then see only their own classes, and
-// learners only get quizzes and papers sent to the classes they are in.
+// learners only get quizzes, papers and online classes sent to the classes they are in.
+// Everything is saved on the backend; the new-class form's draft stays in the store.
 export default function ClassesCard(){
   const { state, update } = useStore();
   const { t } = useI18n();
-  const s = state.admin;
-  const draft = s.newClass;
+  const token = state.auth.token;
+  const draft = state.admin.newClass;
   const editDraft = (fn)=>update(st=>fn(st.admin.newClass));
-  const teachers = s.users.filter(u=>u.role==='teacher');
-  const learners = s.users.filter(u=>u.role==='learner');
-  const nameOf = (id)=>(s.users.find(u=>u.id===id)||{}).name;
-  const sorted = [...s.classes].sort((a,b)=>GRADES.indexOf(a.grade)-GRADES.indexOf(b.grade)
+  const [classes, setClasses] = useState(null); // null while loading
+  const [users, setUsers] = useState([]);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(()=>{
+    let cancelled = false;
+    Promise.all([apiGet('/admin/classes', token), apiGet('/admin/users', token)]).then(([cr, ur])=>{
+      if(cancelled) return;
+      const failed = cr.error || ur.error;
+      if(failed){ setError(errorText(t, failed)); setClasses([]); return; }
+      setClasses(cr.data.classes);
+      setUsers(ur.data.users);
+    });
+    return ()=>{ cancelled = true; };
+  }, [token, t]);
+
+  const teachers = users.filter(u=>u.role==='teacher');
+  const learners = users.filter(u=>u.role==='learner');
+  const nameOf = (id)=>(users.find(u=>u.id===id)||{}).name;
+  const sorted = [...(classes||[])].sort((a,b)=>GRADES.indexOf(a.grade)-GRADES.indexOf(b.grade)
     || a.name.localeCompare(b.name) || t(a.subjectKey).localeCompare(t(b.subjectKey)));
+
+  // puts a class as the backend now has it into the list
+  const replace = (c)=>setClasses(list=>list.map(x=>x.id===c.id ? c : x));
+
+  async function run(request, onDone){
+    setError(null);
+    setBusy(true);
+    const { data, error: err } = await request();
+    setBusy(false);
+    if(err) return setError(errorText(t, err));
+    onDone(data);
+  }
 
   function addClass(e){
     e.preventDefault();
     const name = draft.name.trim().toUpperCase();
-    update(st=>{
-      const a = st.admin;
-      if(!name){ a.classError = 'admin_class_error_name'; return; }
-      if(a.classes.some(c=>c.name===name && c.grade===draft.grade && c.subjectKey===draft.subjectKey)){ a.classError = 'admin_class_error_taken'; return; }
-      a.classError = null;
-      a.classes.push({ id:a.nextClassId++, name, grade:draft.grade, subjectKey:draft.subjectKey, teacherId:draft.teacherId ? Number(draft.teacherId) : null, learnerIds:[] });
-      a.newClass.name = '';
+    if(!name) return setError(t('admin_class_error_name'));
+    run(()=>apiPost('/admin/classes', {
+      name, grade:draft.grade, subjectKey:draft.subjectKey, teacherId: draft.teacherId ? Number(draft.teacherId) : null,
+    }, token), (data)=>{
+      setClasses(list=>[...list, data.class]);
+      update(st=>{ st.admin.newClass.name = ''; });
     });
   }
-  const editClass = (id, fn)=>update(st=>fn(st.admin.classes.find(c=>c.id===id)));
-  const removeClass = (id)=>update(st=>{
-    st.admin.classes = st.admin.classes.filter(c=>c.id!==id);
-    // its quizzes and papers stop going to it; ones left with no class at all go too
-    for(const key of ['quizzes','papers']){
-      st.teacher[key].forEach(item=>{ item.classIds = item.classIds.filter(c=>c!==id); });
-      st.teacher[key] = st.teacher[key].filter(item=>item.classIds.length>0);
-    }
-  });
+
+  const setTeacher = (c, teacherId)=>run(()=>apiPatch(`/admin/classes/${c.id}`, { teacherId: teacherId ? Number(teacherId) : null }, token), (data)=>replace(data.class));
+  const addLearner = (c, learnerId)=>run(()=>apiRequest('PUT', `/admin/classes/${c.id}/learners/${learnerId}`, { body:{}, token }), (data)=>replace(data.class));
+  const removeLearner = (c, learnerId)=>run(()=>apiRequest('DELETE', `/admin/classes/${c.id}/learners/${learnerId}`, { token }), (data)=>replace(data.class));
+  function removeClass(c){
+    if(!window.confirm(t('admin_remove_class_confirm',{ name:classLabel(c, t) }))) return;
+    run(()=>apiRequest('DELETE', `/admin/classes/${c.id}`, { token }), ()=>setClasses(list=>list.filter(x=>x.id!==c.id)));
+  }
 
   return (
     <>
@@ -69,16 +99,18 @@ export default function ClassesCard(){
               </select>
             </div>
           </div>
-          {s.classError && <p className="field-error" style={{ margin:0 }}>{t(s.classError)}</p>}
-          <div><button type="submit" className="btn btn-primary">{'+ '+t('admin_add_class_btn')}</button></div>
+          {error && <p className="field-error" style={{ margin:0 }}>{error}</p>}
+          <div><button type="submit" className="btn btn-primary" disabled={busy}>{'+ '+t('admin_add_class_btn')}</button></div>
         </form>
       </div>
 
       <div className="card card-admin" style={{ marginTop:14 }}>
-        <SectionHead icon="users" title={t('admin_class_list_title')} aside={t('admin_class_count',{ n:s.classes.length })}/>
-        {sorted.length===0 && <p className="muted">{t('admin_classes_empty')}</p>}
+        <SectionHead icon="users" title={t('admin_class_list_title')} aside={classes ? t('admin_class_count',{ n:classes.length }) : null}/>
+        {classes===null && <p className="muted">{t('online_loading')}</p>}
+        {classes && sorted.length===0 && <p className="muted">{t('admin_classes_empty')}</p>}
         <div className="user-list">
           {sorted.map(c=>{
+            // only learners of the class's grade can join it
             const addable = learners.filter(l=>l.grade===c.grade && !c.learnerIds.includes(l.id));
             return (
               <div key={c.id} className="user-row">
@@ -86,7 +118,7 @@ export default function ClassesCard(){
                   <div className="user-name"><b>{classLabel(c, t)}</b><span className="meta">{t('grade_'+c.grade)}</span></div>
                   <div className="child-links">
                     <span className="meta">{t('admin_class_teacher_label')+':'}</span>
-                    <select value={c.teacherId ?? ''} onChange={(e)=>{ const v = e.target.value; editClass(c.id, x=>{ x.teacherId = v ? Number(v) : null; }); }}>
+                    <select value={c.teacherId ?? ''} disabled={busy} onChange={(e)=>setTeacher(c, e.target.value)}>
                       <option value=''>{t('admin_class_no_teacher')}</option>
                       {teachers.map(tc=><option key={tc.id} value={tc.id}>{tc.name}</option>)}
                     </select>
@@ -98,11 +130,11 @@ export default function ClassesCard(){
                       <span key={id} className="child-chip">
                         {nameOf(id)}
                         <button title={t('admin_class_remove_learner_title')} aria-label={t('admin_class_remove_learner_title')+' '+nameOf(id)}
-                          onClick={()=>editClass(c.id, x=>{ x.learnerIds = x.learnerIds.filter(l=>l!==id); })}>×</button>
+                          disabled={busy} onClick={()=>removeLearner(c, id)}>×</button>
                       </span>
                     ))}
                     {addable.length>0 && (
-                      <select value='' onChange={(e)=>{ const v = Number(e.target.value); if(v) editClass(c.id, x=>{ x.learnerIds.push(v); }); }}>
+                      <select value='' disabled={busy} onChange={(e)=>{ const v = Number(e.target.value); if(v) addLearner(c, v); }}>
                         <option value=''>{t('admin_class_add_learner')}</option>
                         {addable.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}
                       </select>
@@ -110,7 +142,7 @@ export default function ClassesCard(){
                   </div>
                 </div>
                 <div className="user-actions">
-                  <button className="btn btn-danger" onClick={()=>removeClass(c.id)}>{t('admin_remove_class_btn')}</button>
+                  <button className="btn btn-danger" disabled={busy} onClick={()=>removeClass(c)}>{t('admin_remove_class_btn')}</button>
                 </div>
               </div>
             );

@@ -561,4 +561,10 @@ export default {
   quizgen_need_answers: "Kwala karabo ya potso nngwe le nngwe e e tshwailweng e e tswang mo pampiring.",
   ai_busy: "Mothusi o tshwaregile jaanong. Leka gape morago ga nakwana.",
   chatbot_offline: "Mothusi wa puisano ga a dire jaanong. Tswee-tswee leka gape moragonyana.",
+  admin_remove_class_confirm: "Tlosa tlelase {name}? Baithuti ba yone ba tla boloka diakhaonto tsa bone, mme diteko, dipampiri le ditlelase tsa inthanete tse di rometsweng kwa tlelaseng e fela ga di kitla di bontshiwa bone gape.",
+  admin_class_error_grade: "Moithuti yoo o mo mophatong o mongwe.",
+  principal_teachers_empty: "Ga go na barutabana ga jaana — motsamaisi o ba oketsa kwa tlase ga Badirisi.",
+  parent_notifications_empty: "Ga go na dikitsiso ga jaana.",
+  learner_rate_empty: "O ka lekanyetsa barutabana ba ditlelase tsa gago fa o setse o le mo tlelaseng.",
+  profile_email_password_hint: "Tsenya lefoko-sephiri la gago la ga jaana go fetola imeile ya gago.",
 };
