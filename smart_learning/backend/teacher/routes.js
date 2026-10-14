@@ -8,8 +8,10 @@ const auth = require('../lib/auth');
 const ai = require('../lib/ai');
 const { aiLimiter } = require('../lib/rateLimit');
 const { catalog, t, langNote } = require('../lib/catalog');
-const { statusFor } = require('../lib/learners');
-const { shortName } = require('../lib/users');
+const { riskFrom } = require('../lib/learners');
+const { shortName, notify } = require('../lib/users');
+const onlineClasses = require('../lib/onlineClasses');
+const liveRooms = require('../lib/liveRooms');
 const { parseQuiz, teacherView } = require('../lib/quizzes');
 const { paperUpload, checkFileType, filePath, removeFile } = require('../lib/uploads');
 const { classView, teacherClassesFor, sendToClasses, classIdsOf, teachesLearner } = require('../lib/classes');
@@ -19,9 +21,10 @@ const router = express.Router();
 router.use(auth.requireAuth(), auth.requireRole('teacher'));
 
 // The teacher's classes, and the learners in them (or in one class, ?classId=, or one
-// grade, ?grade=10) with their latest check-in quiz and their average on this teacher's
-// quizzes, from each quiz's first attempt so retakes don't inflate it. Status follows the
-// check-in, as on the dashboard.
+// grade, ?grade=10) with their latest check-in quiz, their average on this teacher's tests
+// (from each test's first try, so practice retakes don't inflate it), how many of those tests
+// they have taken out of those set for their classes, and their status: at risk, watch or on
+// track, from the tests (or the check-in until they have taken one; see riskFrom).
 router.get('/class', async (req, res) => {
   const grade = req.query.grade ? http.oneOf(String(req.query.grade), catalog.GRADES, 'grade') : null;
   const classId = req.query.classId ? http.id(req.query.classId, 'classId') : null;
@@ -49,6 +52,17 @@ router.get('/class', async (req, res) => {
       ORDER BY u.grade, u.name`,
     grade ? [req.user.id, learnerIds, grade] : [req.user.id, learnerIds],
   );
+  const testsSet = new Map();
+  if (learnerIds.length) {
+    for (const r of await db.query(
+      `SELECT cl.learner_id, COUNT(DISTINCT qc.quiz_id) AS n
+         FROM class_learners cl
+         JOIN quiz_classes qc ON qc.class_id = cl.class_id
+         JOIN quizzes z ON z.id = qc.quiz_id AND z.teacher_id = ?
+        WHERE cl.learner_id IN (?) GROUP BY cl.learner_id`,
+      [req.user.id, learnerIds],
+    )) testsSet.set(r.learner_id, Number(r.n));
+  }
   res.json({
     classes: classes.map((c) => ({
       ...classView(c), learnerIds: members.filter((m) => m.class_id === c.id).map((m) => m.learner_id),
@@ -56,13 +70,16 @@ router.get('/class', async (req, res) => {
     learners: learners.map((l) => {
       const checkinPct = l.checkin_total ? l.checkin_score / l.checkin_total : null;
       const quizAverage = l.avg_pct == null ? null : Number(l.avg_pct);
+      const risk = riskFrom({ testAverage: quizAverage, checkinPct });
       return {
         id: l.id, name: l.name, shortName: shortName(l.name), grade: l.grade, progress: l.progress,
         classIds: shown.filter((m) => m.learner_id === l.id).map((m) => m.class_id),
-        status: statusFor(checkinPct ?? quizAverage),
+        status: risk.status,
+        statusBasis: risk.basis,
         checkin: l.checkin_total ? { score: l.checkin_score, total: l.checkin_total, takenAt: l.checkin_at } : null,
         quizAverage: quizAverage == null ? null : Math.round(quizAverage * 100),
-        quizAttempts: l.attempts,
+        quizAttempts: Number(l.attempts),
+        testsSet: testsSet.get(l.id) || 0,
       };
     }),
   });
@@ -73,9 +90,21 @@ router.post('/class/:learnerId/suggestion', aiLimiter, async (req, res) => {
   const learner = await db.one("SELECT * FROM users WHERE id = ? AND role = 'learner'", [http.id(req.params.learnerId, 'learnerId')]);
   if (!learner || !(await teachesLearner(req.user.id, learner.id))) throw http.notFound('learner_not_found', 'No such learner in your classes');
   const checkin = await db.one('SELECT score, total FROM checkin_attempts WHERE learner_id = ? ORDER BY created_at DESC, id DESC LIMIT 1', [learner.id]);
-  const status = checkin ? statusFor(checkin.score / checkin.total) : null;
+  // the learner's first try at each of this teacher's tests, weakest first
+  const tests = await db.query(
+    `SELECT z.title, s.score, s.total FROM quiz_submissions s JOIN quizzes z ON z.id = s.quiz_id
+      WHERE z.teacher_id = ? AND s.learner_id = ? AND NOT EXISTS (
+        SELECT 1 FROM quiz_submissions e WHERE e.quiz_id = s.quiz_id AND e.learner_id = s.learner_id AND e.id < s.id)
+      ORDER BY s.score / s.total, s.id`,
+    [req.user.id, learner.id],
+  );
+  const testAverage = tests.length ? tests.reduce((a, r) => a + r.score / r.total, 0) / tests.length : null;
+  const { status } = riskFrom({ testAverage, checkinPct: checkin ? checkin.score / checkin.total : null });
   const context = [
     `${t('grade_' + learner.grade)} learner, overall progress ${learner.progress}%`,
+    tests.length
+      ? `first-try results on the teacher's tests: ${tests.slice(0, 5).map((r) => `"${r.title}" ${r.score}/${r.total}`).join(', ')}`
+      : 'has not taken any of the teacher\'s tests yet',
     checkin ? `scored ${checkin.score}/${checkin.total} on the latest check-in quiz` : 'has not taken the check-in quiz yet',
   ].join('; ');
   const suggestion = await ai.askOneLiner(
@@ -271,6 +300,121 @@ router.get('/feedback', async (req, res) => {
     [req.user.id],
   );
   res.json({ feedback: rows.map((r) => ({ id: r.id, message: r.message, from: r.from_name, sentAt: r.created_at })) });
+});
+
+// ---- online classes and their register ----
+
+async function ownOnlineClass(req) {
+  const oc = await db.one(`${onlineClasses.SELECT} WHERE oc.id = ? AND oc.teacher_id = ?`, [http.id(req.params.id), req.user.id]);
+  if (!oc) throw http.notFound('online_class_not_found', 'No such online class');
+  return oc;
+}
+
+// Every learner now in the class, with their register entry (status null: has not come in),
+// the minutes they have spent in the classroom, and whether they are in it right now.
+async function registerOf(oc) {
+  const rows = await db.query(
+    `SELECT u.id, u.name, a.status, a.joined_at, a.last_joined_at, a.seconds_attended, a.marked_by
+       FROM class_learners cl JOIN users u ON u.id = cl.learner_id
+       LEFT JOIN online_attendance a ON a.online_class_id = ? AND a.learner_id = u.id
+      WHERE cl.class_id = ? ORDER BY u.name`,
+    [oc.id, oc.class_id],
+  );
+  const here = new Set(liveRooms.presentIds(oc.id));
+  return rows.map((r) => ({
+    learnerId: r.id, name: r.name, status: r.status, joinedAt: r.joined_at, markedBy: r.marked_by,
+    minutes: onlineClasses.minutesAttended(r), inRoom: here.has(r.id),
+  }));
+}
+
+function teacherOnlineView(oc, counts) {
+  const c = counts.get(oc.id) || { present: 0, late: 0 };
+  return { ...onlineClasses.view(oc), present: c.present, late: c.late, learners: c.learners || 0 };
+}
+
+router.get('/online-classes', async (req, res) => {
+  const rows = await db.query(`${onlineClasses.SELECT} WHERE oc.teacher_id = ? ORDER BY oc.starts_at DESC, oc.id DESC LIMIT 100`, [req.user.id]);
+  const counts = new Map();
+  if (rows.length) {
+    const ids = rows.map((r) => r.id);
+    for (const r of await db.query(
+      `SELECT online_class_id AS id, SUM(status = 'present') AS present, SUM(status = 'late') AS late
+         FROM online_attendance WHERE online_class_id IN (?) GROUP BY online_class_id`, [ids])) {
+      counts.set(r.id, { present: Number(r.present), late: Number(r.late) });
+    }
+    for (const r of await db.query(
+      `SELECT oc.id, COUNT(cl.learner_id) AS n FROM online_classes oc
+         LEFT JOIN class_learners cl ON cl.class_id = oc.class_id WHERE oc.id IN (?) GROUP BY oc.id`, [ids])) {
+      counts.set(r.id, { present: 0, late: 0, ...counts.get(r.id), learners: Number(r.n) });
+    }
+  }
+  res.json({ onlineClasses: rows.map((oc) => teacherOnlineView(oc, counts)) });
+});
+
+// Body: { classId, title, startsAt (ISO date-time), durationMin }. The learners in the class
+// are told about it.
+router.post('/online-classes', async (req, res) => {
+  const b = http.body(req);
+  const klass = await db.one('SELECT * FROM classes WHERE id = ? AND teacher_id = ?', [http.id(b.classId, 'classId'), req.user.id]);
+  if (!klass) throw http.notFound('class_not_found', 'No such class among yours');
+  const fields = {
+    class_id: klass.id,
+    teacher_id: req.user.id,
+    title: http.text(b.title, 'title', { max: 150 }),
+    starts_at: onlineClasses.startsAt(b.startsAt),
+    duration_min: onlineClasses.duration(b.durationMin),
+  };
+  const id = await db.tx(async (conn) => {
+    const result = await db.query('INSERT INTO online_classes SET ?', [fields], conn);
+    const learners = await db.query('SELECT learner_id FROM class_learners WHERE class_id = ?', [klass.id], conn);
+    await notify(learners.map((l) => l.learner_id), {
+      message: `${req.user.name} scheduled an online class for ${klass.name} ${t(klass.subject_key)}: "${fields.title}".`,
+    }, conn);
+    return result.insertId;
+  });
+  const oc = await onlineClasses.find(id);
+  res.status(201).json({ onlineClass: teacherOnlineView(oc, new Map()) });
+});
+
+router.get('/online-classes/:id/register', async (req, res) => {
+  const oc = await ownOnlineClass(req);
+  res.json({ onlineClass: teacherOnlineView(oc, new Map()), register: await registerOf(oc) });
+});
+
+// the teacher marks a learner present, late or absent, or (status null) clears their mark
+router.put('/online-classes/:id/register/:learnerId', async (req, res) => {
+  const oc = await ownOnlineClass(req);
+  const learnerId = http.id(req.params.learnerId, 'learnerId');
+  if (!(await db.one('SELECT 1 FROM class_learners WHERE class_id = ? AND learner_id = ?', [oc.class_id, learnerId]))) {
+    throw http.notFound('learner_not_found', 'No such learner in this class');
+  }
+  const status = http.body(req).status;
+  if (status === null) {
+    await db.query('DELETE FROM online_attendance WHERE online_class_id = ? AND learner_id = ?', [oc.id, learnerId]);
+  } else {
+    await db.query(
+      `INSERT INTO online_attendance (online_class_id, learner_id, status, marked_by) VALUES (?, ?, ?, 'teacher')
+       ON DUPLICATE KEY UPDATE status = VALUES(status), marked_by = 'teacher'`,
+      [oc.id, learnerId, http.oneOf(status, onlineClasses.ATTENDANCE, 'status')],
+    );
+  }
+  res.json({ register: await registerOf(oc) });
+});
+
+// ends the class now: the classroom closes for everyone in it
+router.post('/online-classes/:id/end', async (req, res) => {
+  const oc = await ownOnlineClass(req);
+  if (onlineClasses.phase(oc) !== 'ended') await db.query('UPDATE online_classes SET ended_at = UTC_TIMESTAMP() WHERE id = ?', [oc.id]);
+  liveRooms.end(oc.id);
+  res.json({ onlineClass: teacherOnlineView(await onlineClasses.find(oc.id), new Map()) });
+});
+
+// cancels the class, and its register with it
+router.delete('/online-classes/:id', async (req, res) => {
+  const oc = await ownOnlineClass(req);
+  liveRooms.end(oc.id);
+  await db.query('DELETE FROM online_classes WHERE id = ?', [oc.id]);
+  res.status(204).end();
 });
 
 module.exports = router;

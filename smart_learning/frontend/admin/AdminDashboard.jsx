@@ -11,7 +11,7 @@ export default function AdminDashboard(){
   const setTab = (id)=>update(st=>{ st.admin.tab = id; });
   const tabs = [
     { id:'overview', icon:'building', labelKey:'nav_overview' },
-    { id:'users', icon:'users', labelKey:'nav_users', count:s.users.length },
+    { id:'users', icon:'users', labelKey:'nav_users' },
     { id:'add', icon:'edit', labelKey:'nav_add_user' },
     { id:'classes', icon:'cap', labelKey:'nav_classes', count:s.classes.length },
   ];

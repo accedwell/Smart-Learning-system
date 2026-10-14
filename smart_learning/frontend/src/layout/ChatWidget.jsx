@@ -59,7 +59,7 @@ export default function ChatWidget(){
 
   return (
     <>
-      <button className="chat-fab" title="Open assistant" onClick={toggle}>&#128172;</button>
+      <button className="chat-fab" title={t('chat_title')} onClick={toggle}>&#128172;</button>
       {open && (
         <div className="chat-panel">
           <div className="chat-head">

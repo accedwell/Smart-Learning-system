@@ -1,4 +1,4 @@
-// /api/learner: lessons, the check-in quiz, the quizzes and question papers sent to the
+   // /api/learner: lessons, the check-in quiz, the quizzes and question papers sent to the
 // learner's classes, and rating the teachers of those classes.
 const express = require('express');
 const db = require('../lib/db');
@@ -10,6 +10,7 @@ const { lessonsFor, refreshProgress, statusFor, latestCheckin } = require('../li
 const { parentIdsOf, notify } = require('../lib/users');
 const { learnerView, mark } = require('../lib/quizzes');
 const { sentToLearners, teachesLearner } = require('../lib/classes');
+const onlineClasses = require('../lib/onlineClasses');
 const http = require('../lib/http');
 
 const router = express.Router();
@@ -113,7 +114,7 @@ async function quizForLearner(req) {
 
 // quizzes sent to the learner's classes (?subjectKey= narrows to one subject), each with their attempt
 router.get('/quizzes', async (req, res) => {
-  const params = [req.user.id, req.user.id];
+  const params = [req.user.id, req.user.id, req.user.id];
   let filter = '';
   if (req.query.subjectKey && req.query.subjectKey !== 'all') {
     filter = 'AND z.subject_key = ?';
@@ -121,15 +122,26 @@ router.get('/quizzes', async (req, res) => {
   }
   const rows = await db.query(
     `SELECT z.*, u.name AS teacher_name, a.started_at, a.deadline, a.submitted_at, a.score, a.total, a.timed_out,
-            a.id AS attempt_id
+            a.id AS attempt_id, f.score AS first_score, f.total AS first_total,
+            (SELECT COUNT(*) FROM quiz_submissions c WHERE c.quiz_id = z.id AND c.learner_id = a.learner_id) AS tries
        FROM quizzes z
        LEFT JOIN users u ON u.id = z.teacher_id
        LEFT JOIN quiz_attempts a ON a.quiz_id = z.id AND a.learner_id = ?
+       LEFT JOIN quiz_submissions f ON f.id = (
+         SELECT MIN(id) FROM quiz_submissions WHERE quiz_id = z.id AND learner_id = ?)
       WHERE ${sentToLearners('quiz', 'z')} ${filter}
       ORDER BY z.subject_key, z.created_at`,
     params,
   );
-  res.json({ quizzes: rows.map((q) => ({ ...learnerView(q), attempt: q.attempt_id ? attemptView(q) : null })) });
+  res.json({
+    quizzes: rows.map((q) => ({
+      ...learnerView(q),
+      attempt: q.attempt_id ? attemptView(q) : null,
+      // the try that counts towards the learner's status; the rest are practice
+      firstTry: q.first_total ? { score: q.first_score, total: q.first_total } : null,
+      tries: Number(q.tries || 0),
+    })),
+  });
 });
 
 // starts the quiz (or resumes the attempt in progress); { retake: true } starts over after a submission
@@ -169,7 +181,9 @@ router.post('/quizzes/:id/submit', async (req, res) => {
   const late = deadline != null && now > deadline + DEADLINE_GRACE_MS;
   const score = late ? 0 : mark(quiz, answers);
 
+  let firstTry = false;
   await db.tx(async (conn) => {
+    firstTry = !(await db.one('SELECT 1 FROM quiz_submissions WHERE quiz_id = ? AND learner_id = ? LIMIT 1', [quiz.id, req.user.id], conn));
     const answersJson = JSON.stringify(late ? [] : answers);
     const { affectedRows } = await db.query(
       'UPDATE quiz_attempts SET answers = ?, score = ?, total = ?, timed_out = ?, submitted_at = ? WHERE id = ? AND submitted_at IS NULL',
@@ -186,10 +200,18 @@ router.post('/quizzes/:id/submit', async (req, res) => {
     await notify(await parentIdsOf(req.user.id, conn), {
       message: `${req.user.name} scored ${score}/${quiz.questions.length} on "${quiz.title}" (${t(quiz.subject_key)}).`,
     }, conn);
+    // the first try is the one that counts towards being at risk: the teacher hears at once
+    if (firstTry && quiz.teacher_id && statusFor(score / quiz.questions.length) === 'at_risk') {
+      await notify([quiz.teacher_id], {
+        message: `${req.user.name} scored ${score}/${quiz.questions.length} on "${quiz.title}" and may be at risk.`,
+      }, conn);
+    }
   });
   const saved = await db.one('SELECT * FROM quiz_attempts WHERE id = ?', [attempt.id]);
   res.json({
     attempt: attemptView(saved),
+    // only the first try counts towards the learner's status; later ones are practice
+    firstTry,
     // the marked questions, now that the attempt is over
     review: quiz.questions.map((q, i) => ({
       text: q.text, answer: q.answer, given: answers[i] || '',
@@ -242,6 +264,32 @@ router.put('/teachers/:id/rating', async (req, res) => {
     [teacher.id, req.user.id, rating],
   );
   res.json({ teacherId: teacher.id, rating });
+});
+
+// ---- online classes ----
+
+// The online classes of the learner's classes from the last week on, with the learner's own
+// register entry. The class itself happens in the live classroom (/api/live), and entering it
+// is what marks the learner in the register.
+router.get('/online-classes', async (req, res) => {
+  const rows = await db.query(
+    `SELECT oc.*, k.name AS class_name, k.grade, k.subject_key, u.name AS teacher_name,
+            a.status AS my_status, a.joined_at, a.last_joined_at, a.seconds_attended
+       FROM online_classes oc
+       JOIN classes k ON k.id = oc.class_id
+       JOIN class_learners cl ON cl.class_id = oc.class_id AND cl.learner_id = ?
+       LEFT JOIN users u ON u.id = oc.teacher_id
+       LEFT JOIN online_attendance a ON a.online_class_id = oc.id AND a.learner_id = ?
+      WHERE oc.starts_at >= UTC_TIMESTAMP() - INTERVAL 7 DAY
+      ORDER BY oc.starts_at, oc.id`,
+    [req.user.id, req.user.id],
+  );
+  res.json({
+    onlineClasses: rows.map((oc) => ({
+      ...onlineClasses.view(oc), teacherName: oc.teacher_name, myStatus: oc.my_status,
+      myMinutes: oc.joined_at ? onlineClasses.minutesAttended(oc) : null,
+    })),
+  });
 });
 
 module.exports = router;

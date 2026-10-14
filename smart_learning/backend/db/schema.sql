@@ -244,3 +244,36 @@ CREATE TABLE IF NOT EXISTS password_resets (
   expires_at DATETIME NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- online lessons a teacher schedules for one of their classes, held in the app's own live
+-- classroom (video, audio and chat)
+CREATE TABLE IF NOT EXISTS online_classes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  class_id INT NOT NULL,
+  teacher_id INT NULL,
+  title VARCHAR(150) NOT NULL,
+  starts_at DATETIME NOT NULL,      -- UTC
+  duration_min INT NOT NULL,
+  ended_at DATETIME NULL,           -- set when the teacher ends the class early
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_online_classes_class (class_id, starts_at),
+  INDEX idx_online_classes_teacher (teacher_id, starts_at),
+  FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+  FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- the class register: a row once a learner enters the live classroom, or once the teacher
+-- marks them. A learner with no row did not attend.
+CREATE TABLE IF NOT EXISTS online_attendance (
+  online_class_id INT NOT NULL,
+  learner_id INT NOT NULL,
+  status ENUM('present','late','absent') NOT NULL,
+  joined_at DATETIME NULL,          -- when the learner first entered the classroom
+  last_joined_at DATETIME NULL,     -- start of the learner's current visit, NULL while they are out
+  seconds_attended INT NOT NULL DEFAULT 0,  -- time in the classroom over all visits
+  marked_by ENUM('join','teacher') NOT NULL,
+  PRIMARY KEY (online_class_id, learner_id),
+  INDEX idx_online_attendance_learner (learner_id),
+  FOREIGN KEY (online_class_id) REFERENCES online_classes(id) ON DELETE CASCADE,
+  FOREIGN KEY (learner_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;

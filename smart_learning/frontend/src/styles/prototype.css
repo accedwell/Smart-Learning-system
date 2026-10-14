@@ -80,6 +80,13 @@ img{max-width:100%}
       url('/img/bg-teacher.jpg');
     background-position:center;
   }
+  /* HOD dashboard: a rose-and-lavender sunrise over layered hills (drawn in SVG), kept clear the same way */
+  body.in-app[data-role="hod"]::before{
+    background-image:
+      linear-gradient(180deg, color-mix(in srgb, var(--bg) 10%, transparent), color-mix(in srgb, var(--bg) 25%, transparent)),
+      url('/img/bg-hod.svg');
+    background-position:center bottom;
+  }
   /* administrator dashboard: school building photo, kept clear the same way */
   body.in-app[data-role="admin"]::before{
     background-image:
@@ -505,3 +512,32 @@ img{max-width:100%}
   .chat-input input{ flex:1; }
   .chat-input button{ flex:none; }
   [hidden]{ display:none !important; }
+
+/* ---- live classroom (src/live/LiveClassroom.jsx) ---- */
+.live-room{ background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:var(--shadow); }
+.live-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.live-head .meta{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+.live-body{ display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:14px; }
+@media (max-width:820px){ .live-body{ grid-template-columns:minmax(0,1fr); } }
+.live-stage{ position:relative; aspect-ratio:16/9; background:#0b0f0c; border-radius:12px; overflow:hidden; }
+.live-video{ width:100%; height:100%; object-fit:contain; background:#0b0f0c; display:block; }
+.live-self{ position:absolute; right:10px; bottom:10px; width:28%; max-width:200px; aspect-ratio:16/9; object-fit:cover; border-radius:8px; border:2px solid rgba(255,255,255,.7); background:#0b0f0c; }
+.live-hidden{ position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+.live-placeholder{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:#c9d4cb; font-size:14px; text-align:center; padding:16px; }
+.live-placeholder .icon-inline svg{ width:34px; height:34px; }
+.live-controls{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.live-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px; margin-top:12px; }
+.live-tile{ position:relative; aspect-ratio:4/3; background:#0b0f0c; border-radius:10px; overflow:hidden; }
+.live-tile .live-video{ object-fit:cover; }
+.live-tile-name{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#c9d4cb; font-size:13px; font-weight:700; padding:8px; text-align:center; }
+.live-tile-label{ position:absolute; left:0; right:0; bottom:0; padding:4px 8px; font-size:11px; color:#fff; background:linear-gradient(transparent, rgba(0,0,0,.65)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.live-side{ display:flex; flex-direction:column; gap:12px; min-width:0; }
+.live-people{ border:1px solid var(--border); border-radius:12px; padding:10px 12px; }
+.live-people .meta{ font-size:12px; color:var(--ink-soft); margin-top:3px; }
+.live-chat{ border:1px solid var(--border); border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; flex:1; min-height:260px; }
+.live-chat-list{ flex:1; overflow-y:auto; max-height:340px; display:flex; flex-direction:column; gap:6px; font-size:12.5px; }
+.live-chat-msg{ overflow-wrap:anywhere; }
+.live-chat-msg.from-teacher b{ color:var(--teacher); }
+.live-chat-form{ display:flex; gap:6px; margin-top:8px; }
+.live-chat-form input{ flex:1; min-width:0; }
+.live-closed{ text-align:center; padding:28px 16px; }

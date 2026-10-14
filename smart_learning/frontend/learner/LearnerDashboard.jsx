@@ -7,6 +7,7 @@ import TeacherQuizzesCard from './TeacherQuizzesCard.jsx'
 import CheckinQuizCard from './CheckinQuizCard.jsx'
 import PapersCard from './PapersCard.jsx'
 import RateTeacherCard from './RateTeacherCard.jsx'
+import OnlineClassesCard from './OnlineClassesCard.jsx'
 
 export default function LearnerDashboard(){
   const { state, update } = useStore();
@@ -14,8 +15,9 @@ export default function LearnerDashboard(){
   const me = state.auth.userId;
   const tabs = [
     { id:'overview', icon:'book', labelKey:'nav_overview' },
-    { id:'quizzes', icon:'help', labelKey:'nav_quizzes', count:forLearner(state, state.teacher.quizzes, me).length+1 },
+    { id:'quizzes', icon:'help', labelKey:'nav_quizzes' },
     { id:'papers', icon:'paperclip', labelKey:'nav_papers', count:forLearner(state, state.teacher.papers, me).length },
+    { id:'online', icon:'users', labelKey:'nav_online_classes' },
     { id:'rate', icon:'star', labelKey:'nav_rate_teacher' },
   ];
 
@@ -27,6 +29,7 @@ export default function LearnerDashboard(){
       {/* while a teacher's quiz is in progress the check-in quiz is hidden entirely */}
       {s.tab==='quizzes' && !isTeacherQuizActive(s) && <CheckinQuizCard/>}
       {s.tab==='papers' && <PapersCard/>}
+      {s.tab==='online' && <OnlineClassesCard/>}
       {s.tab==='rate' && <RateTeacherCard/>}
     </div>
   );

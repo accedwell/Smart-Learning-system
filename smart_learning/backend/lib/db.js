@@ -29,6 +29,25 @@ async function init() {
   pool = mysql.createPool({ ...config.db, connectionLimit: 10, timezone: 'Z', supportBigNumbers: true });
   pool.pool.on('connection', (conn) => conn.query("SET time_zone = '+00:00'"));
   for (const statement of schemaStatements()) await pool.query(statement);
+  await migrate();
+}
+
+// Changes to tables an older version already created (CREATE TABLE IF NOT EXISTS leaves
+// those as they were). Each runs only while it is still needed.
+const MIGRATIONS = [
+  { table: 'online_classes', column: 'meeting_url', exists: true, sql: 'DROP COLUMN meeting_url' },
+  { table: 'online_attendance', column: 'last_joined_at', exists: false, sql: 'ADD COLUMN last_joined_at DATETIME NULL AFTER joined_at' },
+  { table: 'online_attendance', column: 'seconds_attended', exists: false, sql: 'ADD COLUMN seconds_attended INT NOT NULL DEFAULT 0 AFTER last_joined_at' },
+];
+
+async function migrate() {
+  for (const m of MIGRATIONS) {
+    const [rows] = await pool.query(
+      'SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+      [m.table, m.column],
+    );
+    if ((rows.length > 0) === m.exists) await pool.query(`ALTER TABLE \`${m.table}\` ${m.sql}`);
+  }
 }
 
 // rows for a SELECT, or the result header ({ insertId, affectedRows }) for a write

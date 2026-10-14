@@ -1,46 +1,60 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../src/store/AppStore.jsx'
 import { useI18n } from '../src/i18n/I18nContext.jsx'
 import { SectionHead, GradeSelect, SubjectSelect } from '../src/components/ui.jsx'
 import { RoleSelect, DeptSelect } from '../src/auth/authParts.jsx'
-import { findAccount, generateTempPassword, isValidEmail } from '../src/services/accounts.js'
+import { isValidEmail } from '../src/services/accounts.js'
+import { apiGet, apiPost, errorText } from '../src/services/api.js'
 import InviteEmailCard from './InviteEmailCard.jsx'
 
 // the administrator creates the account for every learner and staff member (nobody
-// signs up themselves) and emails each new person a temporary password they replace
-// on first login
+// signs up themselves). The backend saves it with a temporary password and hands back the
+// invite, which the administrator emails to the new person; they replace the password on
+// first login.
 export default function AddUserCard(){
   const { state, update } = useStore();
   const { t } = useI18n();
   const s = state.admin;
+  const token = state.auth.token;
   const draft = s.newUser;
   const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [learners, setLearners] = useState([]); // for linking a new parent to their child
   const editDraft = (fn)=>update(st=>fn(st.admin.newUser));
-  const learners = s.users.filter(u=>u.role==='learner');
 
-  function addUser(e){
+  useEffect(()=>{
+    let cancelled = false;
+    apiGet('/admin/users?role=learner', token).then(({ data })=>{
+      if(!cancelled && data) setLearners(data.users);
+    });
+    return ()=>{ cancelled = true; };
+  }, [token]);
+
+  async function addUser(e){
     e.preventDefault();
     const name = draft.name.trim();
     const email = draft.email.trim();
-    if(!name) return setError('admin_error_name');
-    if(!isValidEmail(email)) return setError('admin_error_email');
-    if(findAccount(s.users, email)) return setError('admin_error_email_taken');
+    if(!name) return setError(t('admin_error_name'));
+    if(!isValidEmail(email)) return setError(t('admin_error_email'));
     setError(null);
-    const tempPassword = generateTempPassword();
     const role = draft.role;
     const details = role==='learner' ? { grade:draft.grade, idNumber:draft.idNumber.trim() }
       : role==='teacher' ? { subjectKey:draft.subjectKey }
       : role==='hod' ? { dept:draft.dept }
-      : role==='parent' ? { childIds: draft.childId ? [Number(draft.childId)] : [] } : {};
+      : role==='parent' && draft.childId ? { childId:Number(draft.childId) } : {};
+    setBusy(true);
+    const { data, error: err } = await apiPost('/admin/users', { name, email, role, ...details }, token);
+    setBusy(false);
+    if(err) return setError(errorText(t, err));
     update(st=>{
       const a = st.admin;
-      a.users.push({ id:a.nextUserId++, name, email, role, password:tempPassword, mustChangePassword:true, ...details });
-      a.lastInvite = { name, email, role, tempPassword };
+      a.lastInvite = data.invite;
       a.newUser.name = '';
       a.newUser.email = '';
       a.newUser.idNumber = '';
       a.newUser.childId = '';
     });
+    if(role==='learner') setLearners(list=>[...list, data.user]);
   }
 
   return (
@@ -99,8 +113,8 @@ export default function AddUserCard(){
             </div>
           )}
         </div>
-        {error && <p className="field-error" style={{ margin:0 }}>{t(error)}</p>}
-        <div><button type="submit" className="btn btn-primary">{'+ '+t('admin_add_user_btn')}</button></div>
+        {error && <p className="field-error" style={{ margin:0 }}>{error}</p>}
+        <div><button type="submit" className="btn btn-primary" disabled={busy}>{'+ '+t('admin_add_user_btn')}</button></div>
       </form>
 
       {s.lastInvite && (

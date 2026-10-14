@@ -1,9 +1,9 @@
 import { useStore } from '../src/store/AppStore.jsx'
 import { SectionNav } from '../src/components/ui.jsx'
 import ClassCard from './ClassCard.jsx'
-import QuizBuilderCard from './QuizBuilderCard.jsx'
-import QuizListCard from './QuizListCard.jsx'
+import QuizTab from './QuizTab.jsx'
 import PapersManager from './PapersManager.jsx'
+import OnlineClassesCard from './OnlineClassesCard.jsx'
 
 export default function TeacherDashboard(){
   const { state, update } = useStore();
@@ -11,17 +11,18 @@ export default function TeacherDashboard(){
   const mine = (item)=>item.teacherId===state.auth.userId;
   const tabs = [
     { id:'class', icon:'cap', labelKey:'nav_my_class' },
-    { id:'quiz', icon:'edit', labelKey:'nav_set_quiz', count:s.quizzes.filter(mine).length },
+    { id:'quiz', icon:'edit', labelKey:'nav_set_quiz' },
     { id:'papers', icon:'paperclip', labelKey:'nav_papers', count:s.papers.filter(mine).length },
+    { id:'online', icon:'users', labelKey:'nav_online_classes' },
   ];
 
   return (
     <div className="card-teacher role-scope">
       <SectionNav tabs={tabs} active={s.tab} onSelect={(id)=>update(st=>{ st.teacher.tab = id; })}/>
       {s.tab==='class' && <ClassCard/>}
-      {s.tab==='quiz' && <QuizBuilderCard/>}
-      {s.tab==='quiz' && <QuizListCard/>}
+      {s.tab==='quiz' && <QuizTab/>}
       {s.tab==='papers' && <PapersManager/>}
+      {s.tab==='online' && <OnlineClassesCard/>}
     </div>
   );
 }

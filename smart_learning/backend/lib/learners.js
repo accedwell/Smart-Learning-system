@@ -41,9 +41,19 @@ async function refreshProgress(learnerId, conn) {
   );
 }
 
+// a score (0 to 1) as a status: 80% and up on track, 50% and up watch, below that at risk
 function statusFor(pct) {
   if (pct == null) return null;
   return pct >= 0.8 ? 'on_track' : pct >= 0.5 ? 'watch' : 'at_risk';
+}
+
+// Whether a learner is at risk, and what that rests on. The teacher's tests decide (the
+// average of the learner's FIRST try at each: later tries are practice, after the answers
+// were shown); with no test taken yet, the latest check-in quiz does.
+function riskFrom({ testAverage, checkinPct }) {
+  if (testAverage != null) return { status: statusFor(testAverage), basis: 'tests' };
+  if (checkinPct != null) return { status: statusFor(checkinPct), basis: 'checkin' };
+  return { status: null, basis: null };
 }
 
 async function latestCheckin(learnerId) {
@@ -54,4 +64,4 @@ async function latestCheckin(learnerId) {
   return row && { score: row.score, total: row.total, feedback: row.feedback, takenAt: row.created_at };
 }
 
-module.exports = { ensureLessons, lessonsFor, refreshProgress, statusFor, latestCheckin };
+module.exports = { ensureLessons, lessonsFor, refreshProgress, statusFor, riskFrom, latestCheckin };

@@ -1,13 +1,40 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { UI } from './strings.js'
-import { getSampler } from '../services/ai.js'
 
 const I18nContext = createContext(null);
 
+// The translations of UI (strings.js), one file per language in ./translations, loaded the
+// first time someone picks that language. A string missing from a translation shows in English.
+const LOADERS = {
+  Afrikaans: ()=>import('./translations/af.js'),
+  Zulu: ()=>import('./translations/zu.js'),
+  Xhosa: ()=>import('./translations/xh.js'),
+  Ndebele: ()=>import('./translations/nr.js'),
+  Sepedi: ()=>import('./translations/nso.js'),
+  Sesotho: ()=>import('./translations/st.js'),
+  Setswana: ()=>import('./translations/tn.js'),
+  Swati: ()=>import('./translations/ss.js'),
+  Tshivenda: ()=>import('./translations/ve.js'),
+  Xitsonga: ()=>import('./translations/ts.js'),
+};
+// for <html lang>, so screen readers and the browser know the page's language
+const HTML_LANG = { English:'en', Afrikaans:'af', Zulu:'zu', Xhosa:'xh', Ndebele:'nr', Sepedi:'nso', Sesotho:'st', Setswana:'tn', Swati:'ss', Tshivenda:'ve', Xitsonga:'ts' };
+const STORAGE_KEY = 'smart-learning-language';
+
+function savedLanguage(){
+  try{
+    const v = localStorage.getItem(STORAGE_KEY);
+    return v && (v==='English' || LOADERS[v]) ? v : 'English';
+  } catch{
+    return 'English';
+  }
+}
+
 export function I18nProvider({ children }){
-  const [lang, setLang] = useState('English');
+  const [lang, setLang] = useState(savedLanguage);
   const [translations, setTranslations] = useState({}); // lang -> {key: text}
-  const [translating, setTranslating] = useState(false);
+  // while the chosen language's file is still on its way
+  const translating = lang!=='English' && Boolean(LOADERS[lang]) && !translations[lang];
 
   const t = useCallback((key, vars)=>{
     let text;
@@ -22,29 +49,25 @@ export function I18nProvider({ children }){
     return text;
   }, [lang, translations]);
 
-  // switches the whole app's language; non-English strings are machine
-  // translated once and cached (falls back to English when AI is unavailable)
-  const setLanguage = useCallback(async (next)=>{
+  // switches the whole app's language, and remembers it for next time on this browser
+  const setLanguage = useCallback((next)=>{
     setLang(next);
-    if(next==='English' || translations[next]) return;
-    setTranslating(true);
-    const map = {};
-    try{
-      const sample = await getSampler();
-      if(sample){
-        const items = Object.keys(UI).map(k=>({ key:k, text:UI[k] }));
-        const prompt = 'Translate the "text" field of every item below into '+next+' (a South African language). '+
-          'Return ONLY a JSON array, same length and order, each item {"key": same key, "text": translated text}. '+
-          'Keep any {placeholder} tokens (like {n}, {teacher}, {pct}) unchanged and in the same relative position. '+
-          'Keep it natural and concise, matching a simple app UI tone.\n\n'+JSON.stringify(items);
-        const res = await sample.json(prompt, { modelTier:'default' });
-        const arr = Array.isArray(res) ? res : (res && res.items) || [];
-        arr.forEach(it=>{ if(it && it.key) map[it.key] = it.text; });
-      }
-    } catch{ /* keep the empty map: English fallback */ }
-    setTranslations(prev=>({ ...prev, [next]:map }));
-    setTranslating(false);
-  }, [translations]);
+    try{ localStorage.setItem(STORAGE_KEY, next); } catch{ /* private window: not remembered */ }
+  }, []);
+
+  // loads the chosen language's translation file once; if it can't load, that language shows in English
+  useEffect(()=>{
+    if(lang==='English' || translations[lang] || !LOADERS[lang]) return;
+    let cancelled = false;
+    LOADERS[lang]().then((mod)=>mod.default, ()=>({})).then((map)=>{
+      if(!cancelled) setTranslations(prev=>({ ...prev, [lang]:map }));
+    });
+    return ()=>{ cancelled = true; };
+  }, [lang, translations]);
+
+  useEffect(()=>{
+    document.documentElement.lang = HTML_LANG[lang] || 'en';
+  }, [lang]);
 
   const value = useMemo(()=>({ lang, t, setLanguage, translating }), [lang, t, setLanguage, translating]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

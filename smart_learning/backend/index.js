@@ -24,6 +24,7 @@ app.use('/api/learner', require('./learner/routes'));
 app.use('/api/parent', require('./parent/routes'));
 app.use('/api/hod', require('./hod/routes'));
 app.use('/api/principal', require('./principal/routes'));
+app.use('/api/live', require('./live/routes'));
 app.use('/api', require('./common/routes'));
 
 app.use('/api', (req, res) => {
