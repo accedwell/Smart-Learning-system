@@ -1,14 +1,16 @@
-// Question-paper uploads: images or PDFs up to 5 MB, stored under UPLOAD_DIR with a random
-// name (the original name is kept in the database for downloads).
+// Question-paper and study-guide uploads: images, PDFs or Word (.docx) files up to 5 MB, stored
+// under UPLOAD_DIR with a random name (the original name is kept in the database for downloads).
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const multer = require('multer');
 const config = require('./config');
 const http = require('./http');
+const { DOCX } = require('./documentText');
 
 const EXTENSIONS = {
   'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif', 'image/webp': '.webp', 'application/pdf': '.pdf',
+  [DOCX]: '.docx',
 };
 
 // how each type's files begin; the type the uploader claims is only trusted when the bytes agree
@@ -18,9 +20,11 @@ const SIGNATURES = {
   'image/gif': (b) => ['GIF87a', 'GIF89a'].includes(b.toString('latin1', 0, 6)),
   'image/webp': (b) => b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WEBP',
   'application/pdf': (b) => b.toString('latin1', 0, 5) === '%PDF-',
+  // a .docx is a ZIP archive
+  [DOCX]: (b) => b[0] === 0x50 && b[1] === 0x4b && b[2] === 0x03 && b[3] === 0x04,
 };
 
-const badType = () => http.badRequest('paper_bad_type', 'Upload a PNG, JPEG, GIF or WebP image, or a PDF');
+const badType = () => http.badRequest('paper_bad_type', 'Upload a photo (PNG, JPEG, GIF or WebP), a PDF or a Word (.docx) file');
 
 fs.mkdirSync(config.uploadDir, { recursive: true });
 

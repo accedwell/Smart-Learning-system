@@ -61,4 +61,10 @@ module.exports = {
     enabled: env.AI_ENABLED !== 'false',
     model: env.CLAUDE_MODEL || 'claude-opus-5-5',
   },
+
+  // the support chat runs in the Python chatbot service (smart_learning/chatbot)
+  chatbot: {
+    url: (env.CHATBOT_URL || 'http://127.0.0.1:8000').replace(/\/+$/, ''),
+    secret: env.CHATBOT_SECRET || '',
+  },
 };

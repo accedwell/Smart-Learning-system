@@ -3,7 +3,7 @@
 const express = require('express');
 const db = require('../lib/db');
 const auth = require('../lib/auth');
-const ai = require('../lib/ai');
+const config = require('../lib/config');
 const { aiLimiter } = require('../lib/rateLimit');
 const { catalog } = require('../lib/catalog');
 const { childIdsOf } = require('../lib/users');
@@ -85,18 +85,10 @@ router.get('/papers/:id/file', auth.requireAuth(), async (req, res) => {
 });
 
 // ---- AI support chat ----
-
-const LANGUAGE_LIST = "South Africa's official languages (English, Afrikaans, isiZulu, isiXhosa, isiNdebele, Sepedi, Sesotho, Setswana, siSwati, Tshivenda, Xitsonga)";
-
-function chatSystem(replyLanguage) {
-  return 'You are the Smart Learning support assistant, helping learners, teachers, parents and school staff. ' +
-    `You understand and can translate to and from ${LANGUAGE_LIST}. ` +
-    `Always reply in ${replyLanguage} — this is the person's own chosen language for this chat, chosen independently of the ` +
-    'rest of the app, so use it regardless of what language they type in, translating their message naturally. ' +
-    'If they explicitly paste text and ask you to translate it into a different one-off South African language, do that ' +
-    `translation in your answer, but still write the rest of your reply (any explanation) in ${replyLanguage}. ` +
-    'Keep replies concise (2-4 sentences unless a longer translation is requested) and friendly.';
-}
+//
+// The chat itself runs in the Python chatbot service (smart_learning/chatbot). This backend checks
+// who is logged in, rate-limits and checks the messages, then forwards the chat there with the
+// shared CHATBOT_SECRET and passes its streamed reply straight through.
 
 function chatMessages(value) {
   const messages = Array.isArray(value) ? value.slice(-20) : [];
@@ -109,34 +101,68 @@ function chatMessages(value) {
   return messages.map((m) => ({ role: m.role, content: m.content }));
 }
 
+// Opens the chat with the Python service; its errors (AI not set up, busy…) come back as
+// HttpErrors, and an unreachable service as 503 chatbot_offline.
+async function askChatbot(payload, signal) {
+  let upstream;
+  try {
+    upstream = await fetch(`${config.chatbot.url}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Chatbot-Secret': config.chatbot.secret },
+      body: JSON.stringify(payload),
+      signal,
+    });
+  } catch (err) {
+    if (signal && signal.aborted) throw err;
+    throw new http.HttpError(503, 'chatbot_offline', 'The chat assistant is not running right now');
+  }
+  if (!upstream.ok) {
+    const data = await upstream.json().catch(() => null);
+    const e = data && data.error;
+    if (upstream.status === 403) console.error('[ai/chat] the chatbot refused the secret: check CHATBOT_SECRET in backend/.env');
+    throw new http.HttpError(e ? upstream.status : 502, (e && e.code) || 'upstream_error', (e && e.message) || 'The chat assistant had a problem, try again');
+  }
+  return upstream;
+}
+
 // Body: { messages: [{ role, content }], lang } where lang is a language value from the
 // catalog, or omitted to answer in the language the person writes in. Send
-// `Accept: text/event-stream` to stream the reply as `text` events, then one `done` event.
+// `Accept: text/event-stream` to stream the reply as `text` events, then one `done` event
+// (or an `error` event); otherwise the answer is { reply }.
 router.post('/ai/chat', auth.requireAuth(), aiLimiter, async (req, res) => {
   const b = http.body(req);
-  const messages = chatMessages(b.messages);
   const known = catalog.LANGUAGES.find((l) => l.value === b.lang);
-  const system = chatSystem(known && known.value !== 'English' ? known.label : 'the same language the user writes in');
-
-  if (!(req.get('accept') || '').includes('text/event-stream')) {
-    return res.json({ reply: await ai.chat({ system, messages }) });
-  }
-  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
-  res.flushHeaders();
-  const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  const payload = {
+    messages: chatMessages(b.messages),
+    reply_language: known && known.value !== 'English' ? known.label : 'the same language the user writes in',
+    user_name: req.user.name,
+    user_role: req.user.role,
+  };
   const abort = new AbortController();
   res.on('close', () => abort.abort());
-  try {
-    const reply = await ai.chat({ system, messages, signal: abort.signal, onText: (text) => send('text', { text }) });
-    send('done', { reply });
-  } catch (err) {
-    if (!abort.signal.aborted) {
-      const known = err instanceof http.HttpError;
-      if (!known) console.error('[ai/chat]', err);
-      send('error', { code: known ? err.code : 'server_error', message: known ? err.message : 'Something went wrong' });
+  // asked before anything is sent, so a failure here is still a normal error answer
+  const upstream = await askChatbot(payload, abort.signal);
+
+  if ((req.get('accept') || '').includes('text/event-stream')) {
+    res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+    res.flushHeaders();
+    try {
+      for await (const chunk of upstream.body) res.write(chunk);
+    } catch (err) {
+      if (!abort.signal.aborted) console.error('[ai/chat] stream from the chatbot broke:', err.message);
     }
+    return res.end();
   }
-  res.end();
+
+  // no streaming wanted: wait for the whole reply
+  const text = await upstream.text();
+  const event = (name) => {
+    const m = text.match(new RegExp(`event: ${name}\\ndata: (.*)\\n`));
+    return m ? JSON.parse(m[1]) : null;
+  };
+  const failed = event('error');
+  if (failed) throw new http.HttpError(502, failed.code, failed.message);
+  res.json({ reply: (event('done') || {}).reply || '' });
 });
 
 module.exports = router;

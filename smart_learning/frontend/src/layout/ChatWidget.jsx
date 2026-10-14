@@ -1,14 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
+import { useStore } from '../store/AppStore.jsx'
 import { useI18n } from '../i18n/I18nContext.jsx'
 import { LanguageSelect } from '../components/ui.jsx'
-import { getSampler } from '../services/ai.js'
+import { errorText } from '../services/api.js'
+import { readEvents } from '../live/liveClient.js'
 
-// floating assistant, with its own reply language independent of the app's
-// ('__system' = follow the app-wide language)
+// The most recent turns sent with each question, so the assistant can follow the conversation
+const HISTORY = 20;
+
+// Floating assistant, with its own reply language independent of the app's ('__system' =
+// follow the app-wide language). The reply comes from the Python chatbot through the backend
+// (/api/ai/chat), streamed in as it is written.
 export default function ChatWidget(){
+  const { state } = useStore();
   const { t, lang } = useI18n();
+  const token = state.auth.token;
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState([]); // { id, role:'user'|'bot'|'sys', text }
+  const [messages, setMessages] = useState([]); // { id, role:'user'|'bot'|'sys', text, failed? }
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [chatLang, setChatLang] = useState('__system');
@@ -24,8 +32,8 @@ export default function ChatWidget(){
     setMessages(prev=>[...prev, { id, role, text }]);
     return id;
   }
-  function setMsg(id, text){
-    setMessages(prev=>prev.map(m=>m.id===id ? { ...m, text } : m));
+  function setMsg(id, text, failed=false){
+    setMessages(prev=>prev.map(m=>m.id===id ? { ...m, text, failed } : m));
   }
 
   function toggle(){
@@ -37,22 +45,41 @@ export default function ChatWidget(){
     const text = input.trim();
     if(!text || sending) return;
     setInput('');
+    // the conversation so far: replies that worked, alternating with what the person wrote
+    const history = [];
+    for(const m of messages){
+      if(m.role==='user') history.push({ role:'user', content:m.text });
+      else if(m.role==='bot' && !m.failed && history.length && history[history.length-1].role==='user') history.push({ role:'assistant', content:m.text });
+    }
+    while(history.length && history[history.length-1].role==='user') history.pop();
+    const turns = [...history, { role:'user', content:text }].slice(-HISTORY);
+    while(turns[0].role!=='user') turns.shift();
+
     addMsg('user', text);
     setSending(true);
     const botId = addMsg('bot', t('chat_thinking'));
     try{
-      const sample = await getSampler();
-      if(!sample){ setMsg(botId, t('chat_unavailable')); setSending(false); return; }
-      const target = chatLang==='__system' ? (lang==='English' ? 'the same language the user writes in' : lang) : chatLang;
-      const prompt = `You are the Smart Learning support assistant, helping learners, teachers, parents and school staff. `+
-        `You understand and can translate to and from South Africa's official languages (English, Afrikaans, isiZulu, isiXhosa, isiNdebele, Sepedi, Sesotho, Setswana, siSwati, Tshivenda, Xitsonga). `+
-        `Always reply in ${target} — this is the person's own chosen language for this chat, chosen independently of the rest of the app, so use it regardless of what language they type in, translating their message naturally. `+
-        `If they explicitly paste text and ask you to translate it into a different one-off South African language, do that translation in your answer, but still write the rest of your reply (any explanation) in ${target}. `+
-        `Keep replies concise (2-4 sentences unless a longer translation is requested) and friendly.\n\nUser: ${text}`;
-      const res = await sample(prompt, { modelTier:'quick', cache:false, onText:({ text:partial })=>setMsg(botId, partial) });
-      setMsg(botId, res.text.trim());
+      const res = await fetch('/api/ai/chat', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', Accept:'text/event-stream', Authorization:'Bearer '+token },
+        body: JSON.stringify({ messages:turns, lang: chatLang==='__system' ? lang : chatLang }),
+      });
+      if(!res.ok){
+        const data = await res.json().catch(()=>null);
+        setMsg(botId, errorText(t, (data && data.error) || { code:'chat_error' }), true);
+      } else {
+        let reply = '';
+        let failed = null;
+        await readEvents(res.body, (name, data)=>{
+          if(name==='text'){ reply += data.text; setMsg(botId, reply); }
+          else if(name==='done') reply = data.reply || reply;
+          else if(name==='error') failed = data;
+        });
+        if(failed) setMsg(botId, errorText(t, failed), true);
+        else setMsg(botId, reply.trim() || t('chat_error'), !reply.trim());
+      }
     } catch{
-      setMsg(botId, t('chat_error'));
+      setMsg(botId, t('chat_error'), true);
     }
     setSending(false);
   }
@@ -73,8 +100,8 @@ export default function ChatWidget(){
             {messages.map(m=><div key={m.id} className={'msg '+m.role}>{m.text}</div>)}
           </div>
           <div className="chat-input">
-            <input type="text" value={input} onChange={(e)=>setInput(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter') send(); }} placeholder={t('chat_placeholder')}/>
-            <button className="btn btn-primary" onClick={send}>{t('chat_send')}</button>
+            <input type="text" value={input} maxLength={4000} onChange={(e)=>setInput(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter') send(); }} placeholder={t('chat_placeholder')}/>
+            <button className="btn btn-primary" disabled={sending} onClick={send}>{t('chat_send')}</button>
           </div>
         </div>
       )}

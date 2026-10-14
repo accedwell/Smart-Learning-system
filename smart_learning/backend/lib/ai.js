@@ -1,5 +1,6 @@
 // Claude, for the AI features the prototype ran through its artifact runtime: one-line
-// recommendations, the support chat, and turning a question paper into a quiz.
+// recommendations and turning a question paper into a quiz. (The support chat runs in the
+// Python chatbot, smart_learning/chatbot.)
 // Credentials come from ANTHROPIC_API_KEY (or an `ant auth login` profile). If there are
 // none, or AI_ENABLED=false, the routes answer 503 `ai_unavailable` and the UI carries on without AI.
 const Anthropic = require('@anthropic-ai/sdk');
@@ -63,20 +64,6 @@ async function askOneLiner(prompt) {
   return textOf(message);
 }
 
-// streams a chat reply; onText receives each text delta, the full reply is returned
-async function chat({ system, messages, onText, signal }) {
-  try {
-    const stream = getClient().beta.messages.stream(
-      { ...baseParams({ maxTokens: 8000, effort: 'low', system }), messages },
-      { signal },
-    );
-    if (onText) stream.on('text', onText);
-    return textOf(await stream.finalMessage());
-  } catch (err) {
-    throw toHttpError(err);
-  }
-}
-
 const QUIZ_SCHEMA = {
   type: 'object',
   properties: {
@@ -94,14 +81,20 @@ const QUIZ_SCHEMA = {
   additionalProperties: false,
 };
 
-// reads a question paper (image or PDF) and drafts up to `max` short-answer questions
-async function quizFromPaper({ fileBase64, mimeType, prompt, max = 6 }) {
-  const source = { type: 'base64', media_type: mimeType, data: fileBase64 };
-  const fileBlock = mimeType === 'application/pdf' ? { type: 'document', source } : { type: 'image', source };
+// reads a question paper or study guide and drafts up to `max` short-answer questions: from the
+// file itself (image or PDF, `fileBase64` + `mimeType`), or from its text (`text`, e.g. a Word file's)
+async function quizFromPaper({ fileBase64, mimeType, text, prompt, max = 6 }) {
+  let docBlock;
+  if (text != null) {
+    docBlock = { type: 'text', text: `<document>\n${text}\n</document>` };
+  } else {
+    const source = { type: 'base64', media_type: mimeType, data: fileBase64 };
+    docBlock = mimeType === 'application/pdf' ? { type: 'document', source } : { type: 'image', source };
+  }
   const message = await create({
     ...baseParams({ maxTokens: 16000, effort: 'medium' }),
     output_config: { effort: 'medium', format: { type: 'json_schema', schema: QUIZ_SCHEMA } },
-    messages: [{ role: 'user', content: [fileBlock, { type: 'text', text: prompt }] }],
+    messages: [{ role: 'user', content: [docBlock, { type: 'text', text: prompt }] }],
   });
   let data;
   try {
@@ -116,4 +109,4 @@ async function quizFromPaper({ fileBase64, mimeType, prompt, max = 6 }) {
     .slice(0, max);
 }
 
-module.exports = { askOneLiner, chat, quizFromPaper };
+module.exports = { askOneLiner, quizFromPaper };

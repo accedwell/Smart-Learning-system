@@ -38,6 +38,7 @@ const MIGRATIONS = [
   { table: 'online_classes', column: 'meeting_url', exists: true, sql: 'DROP COLUMN meeting_url' },
   { table: 'online_attendance', column: 'last_joined_at', exists: false, sql: 'ADD COLUMN last_joined_at DATETIME NULL AFTER joined_at' },
   { table: 'online_attendance', column: 'seconds_attended', exists: false, sql: 'ADD COLUMN seconds_attended INT NOT NULL DEFAULT 0 AFTER last_joined_at' },
+  { table: 'papers', column: 'extracted_text', exists: false, sql: 'ADD COLUMN extracted_text MEDIUMTEXT NULL AFTER size_bytes' },
 ];
 
 async function migrate() {

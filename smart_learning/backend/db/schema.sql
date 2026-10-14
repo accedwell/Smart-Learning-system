@@ -136,6 +136,7 @@ CREATE TABLE IF NOT EXISTS papers (
   stored_name VARCHAR(100) NOT NULL,
   mime_type VARCHAR(100) NOT NULL,
   size_bytes INT NOT NULL,
+  extracted_text MEDIUMTEXT NULL,   -- the file's text (OCR for photos and scans), read when a quiz is first made from it
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_papers_grade (grade),
   FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE SET NULL

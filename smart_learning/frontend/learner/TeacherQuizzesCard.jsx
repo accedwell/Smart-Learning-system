@@ -16,6 +16,7 @@ export default function TeacherQuizzesCard(){
   const s = state.learner;
   const token = state.auth.token;
   const [quizzes, setQuizzes] = useState(null); // null while loading
+  const [subjects, setSubjects] = useState([]); // the subjects of the learner's classes
   const [error, setError] = useState(null);
   const [reload, setReload] = useState(0);
 
@@ -25,6 +26,7 @@ export default function TeacherQuizzesCard(){
       if(cancelled) return;
       if(err){ setError(errorText(t, err)); setQuizzes([]); return; }
       setQuizzes(data.quizzes);
+      setSubjects(data.subjects || []);
     });
     return ()=>{ cancelled = true; };
   }, [token, t, reload]);
@@ -40,11 +42,12 @@ export default function TeacherQuizzesCard(){
     body = <QuizTaking quiz={activeQuiz} onBack={close}/>;
   } else if(quizzes===null){
     body = <p className="muted">{t('online_loading')}</p>;
-  } else if(quizzes.length===0){
+  } else if(quizzes.length===0 && subjects.length===0){
     body = error ? null : <p className="muted">{t('learner_quizzes_empty')}</p>;
   } else {
-    // one chip per subject that has a test
-    const subjectsPresent = [...new Set(quizzes.map(q=>q.subjectKey))];
+    // one chip per subject the learner takes (from their classes), with or without a test yet;
+    // a test of a subject they have since left still gets its chip
+    const subjectsPresent = [...subjects, ...new Set(quizzes.map(q=>q.subjectKey).filter(k=>!subjects.includes(k)))];
     const filter = subjectsPresent.includes(s.quizSubjectFilter) ? s.quizSubjectFilter : 'all';
     const setFilter = (f)=>update(st=>{ st.learner.quizSubjectFilter = f; });
     const shown = filter==='all' ? quizzes : quizzes.filter(q=>q.subjectKey===filter);
@@ -57,13 +60,16 @@ export default function TeacherQuizzesCard(){
     body = (
       <>
         <p className="muted" style={{ marginTop:-4 }}>{t('learner_quiz_practice_note')}</p>
-        {subjectsPresent.length>1 && (
+        {subjectsPresent.length>0 && (
           <div className="subject-filter">
             <button className={filter==='all'?'active':''} onClick={()=>setFilter('all')}>{t('learner_quiz_filter_all')}</button>
             {subjectsPresent.map(sk=><button key={sk} className={filter===sk?'active':''} onClick={()=>setFilter(sk)}>{t(sk)}</button>)}
           </div>
         )}
         {checkinActive && <p className="muted" style={{ marginBottom:4 }}>{t('learner_quiz_locked_note')}</p>}
+        {shown.length===0 && (
+          <p className="muted">{filter==='all' ? t('learner_quizzes_empty') : t('learner_quiz_filter_empty',{ subject:t(filter) })}</p>
+        )}
         {shown.map(quiz=>{
           const attempt = quiz.attempt;
           const inProgress = attempt && !attempt.submitted;

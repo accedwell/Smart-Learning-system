@@ -8,11 +8,10 @@ import OnlineClassesCard from './OnlineClassesCard.jsx'
 export default function TeacherDashboard(){
   const { state, update } = useStore();
   const s = state.teacher;
-  const mine = (item)=>item.teacherId===state.auth.userId;
   const tabs = [
     { id:'class', icon:'cap', labelKey:'nav_my_class' },
     { id:'quiz', icon:'edit', labelKey:'nav_set_quiz' },
-    { id:'papers', icon:'paperclip', labelKey:'nav_papers', count:s.papers.filter(mine).length },
+    { id:'papers', icon:'paperclip', labelKey:'nav_papers' },
     { id:'online', icon:'users', labelKey:'nav_online_classes' },
   ];
 

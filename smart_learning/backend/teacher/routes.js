@@ -11,6 +11,11 @@ const { catalog, t, langNote } = require('../lib/catalog');
 const { riskFrom } = require('../lib/learners');
 const { shortName, notify } = require('../lib/users');
 const onlineClasses = require('../lib/onlineClasses');
+const { documentText } = require('../lib/documentText');
+const quizGen = require('../lib/quizGen');
+
+// how many questions are made from an uploaded paper for the teacher to choose from
+const GENERATED_QUESTIONS = 15;
 const liveRooms = require('../lib/liveRooms');
 const { parseQuiz, teacherView } = require('../lib/quizzes');
 const { paperUpload, checkFileType, filePath, removeFile } = require('../lib/uploads');
@@ -272,22 +277,53 @@ router.delete('/papers/:id', async (req, res) => {
   res.status(204).end();
 });
 
-// AI reads the paper and returns a quiz draft for the teacher to review and publish (not saved yet)
-router.post('/papers/:id/generate-quiz', aiLimiter, async (req, res) => {
+// the paper's text, read once (OCR for photos and scans) and kept on the paper
+async function paperText(paper) {
+  if (paper.extracted_text != null) return paper.extracted_text;
+  const text = (await documentText(filePath(paper.stored_name), paper.mime_type)).slice(0, 200000);
+  await db.query('UPDATE papers SET extracted_text = ? WHERE id = ?', [text, paper.id]);
+  return text;
+}
+
+// Makes quiz questions from an uploaded question paper or study guide, for the teacher to tick the
+// ones they want (nothing is saved here; publishing goes through POST /quizzes). Claude writes them,
+// answers included, when AI is set up (ANTHROPIC_API_KEY). Otherwise, or if AI fails, they come from
+// the document's text (OCR for photos and scans): a question paper's own questions (needsAnswer:
+// the teacher types the memo's answer) and fill-in-the-missing-word questions from its sentences.
+// Answers { source: 'ai' | 'text', questions: [{ text, answer, needsAnswer? }], classIds, title }.
+router.post('/papers/:id/generate-quiz', async (req, res) => {
   const paper = await ownPaper(req);
-  const kind = paper.mime_type === 'application/pdf' ? 'PDF' : 'image';
-  const questions = await ai.quizFromPaper({
-    fileBase64: (await fs.readFile(filePath(paper.stored_name))).toString('base64'),
-    mimeType: paper.mime_type,
-    prompt: `This ${kind} is a photo or scan of a ${t('grade_' + paper.grade)} ${t(paper.subject_key)} question paper titled ` +
-      `"${paper.title}". Read the questions in it and write up to 6 short-answer quiz questions based on its content, ` +
-      'each with a concise correct answer a learner would type themselves.',
-  });
-  if (questions.length === 0) throw new http.HttpError(422, 'invalid_json', 'No quiz questions could be read from this paper');
+  let questions = [];
+  let source = 'ai';
+  if (aiLimiter.allows(req)) {
+    try {
+      const isFile = paper.mime_type === 'application/pdf' || paper.mime_type.startsWith('image/');
+      questions = await ai.quizFromPaper({
+        ...(isFile
+          ? { fileBase64: (await fs.readFile(filePath(paper.stored_name))).toString('base64'), mimeType: paper.mime_type }
+          : { text: (await paperText(paper)).slice(0, 60000) }),
+        max: GENERATED_QUESTIONS,
+        prompt: `This is a ${t('grade_' + paper.grade)} ${t(paper.subject_key)} question paper or study guide titled ` +
+          `"${paper.title}". Write up to ${GENERATED_QUESTIONS} short-answer quiz questions from it for learners to ` +
+          'practise with. If it is a question paper, base them on its questions; if it is study material, ask about its ' +
+          'key facts, terms and definitions. Each answer must be short (one to four words, or a number), because ' +
+          'learners type it and it is marked by exact match. Write in the language the document is written in.',
+      });
+    } catch (err) {
+      if (!(err instanceof http.HttpError)) throw err;
+      questions = []; // AI not set up, busy or failed: write them from the text instead
+    }
+  }
+  if (questions.length === 0) {
+    source = 'text';
+    const text = await paperText(paper);
+    questions = [...quizGen.paperQuestions(text), ...quizGen.fromText(text, { max: GENERATED_QUESTIONS })];
+  }
+  if (questions.length === 0) {
+    throw new http.HttpError(422, 'paper_ocr_empty', 'No quiz questions could be made from this file');
+  }
   const classIds = (await classIdsOf('paper', [paper.id])).get(paper.id);
-  res.json({
-    draft: { title: 'AI Quiz — ' + paper.title, classIds, grade: paper.grade, subjectKey: paper.subject_key, timeLimitMin: 0, questions },
-  });
+  res.json({ source, title: paper.title, classIds, questions });
 });
 
 // ---- feedback from the principal ----

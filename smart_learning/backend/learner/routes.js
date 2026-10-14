@@ -112,7 +112,9 @@ async function quizForLearner(req) {
   return quiz;
 }
 
-// quizzes sent to the learner's classes (?subjectKey= narrows to one subject), each with their attempt
+// quizzes sent to the learner's classes (?subjectKey= narrows to one subject), each with their attempt,
+// and `subjects`: the subjects of the classes the learner is in (in catalog order), so the
+// subject filter shows what the learner takes, with or without a quiz yet
 router.get('/quizzes', async (req, res) => {
   const params = [req.user.id, req.user.id, req.user.id];
   let filter = '';
@@ -133,7 +135,13 @@ router.get('/quizzes', async (req, res) => {
       ORDER BY z.subject_key, z.created_at`,
     params,
   );
+  const mine = await db.query(
+    'SELECT DISTINCT k.subject_key FROM class_learners cl JOIN classes k ON k.id = cl.class_id WHERE cl.learner_id = ?',
+    [req.user.id],
+  );
+  const taken = new Set(mine.map((r) => r.subject_key));
   res.json({
+    subjects: catalog.SUBJECT_OPTIONS.filter((k) => taken.has(k)),
     quizzes: rows.map((q) => ({
       ...learnerView(q),
       attempt: q.attempt_id ? attemptView(q) : null,

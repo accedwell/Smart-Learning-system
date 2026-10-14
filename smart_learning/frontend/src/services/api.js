@@ -34,6 +34,22 @@ export function apiPatch(path, body, token){
   return apiRequest('PATCH', path, { body: body||{}, token });
 }
 
+// multipart/form-data upload (the browser sets the boundary); same answer shape as apiRequest
+export async function apiUpload(path, formData, token){
+  try{
+    const res = await fetch('/api'+path, {
+      method:'POST',
+      headers: token ? { Authorization:'Bearer '+token } : {},
+      body: formData,
+    });
+    const data = await res.json().catch(()=>null);
+    if(!res.ok) return { error:(data && data.error) || { code:'api_error_server' } };
+    return { data };
+  } catch{
+    return { error:{ code:'api_error_network' } };
+  }
+}
+
 // the text to show for an API error: the translated string when the code is an i18n key,
 // otherwise the server's own message
 export function errorText(t, error){

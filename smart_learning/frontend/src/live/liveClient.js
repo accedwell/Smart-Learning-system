@@ -45,8 +45,8 @@ export function openStream(ocId, token, handlers){
   return { close(){ finished = true; abort.abort(); } };
 }
 
-// calls onEvent(name, data) for each server-sent event until the stream ends
-async function readEvents(body, onEvent){
+// calls onEvent(name, data) for each server-sent event until the stream ends (also used by the chat)
+export async function readEvents(body, onEvent){
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
