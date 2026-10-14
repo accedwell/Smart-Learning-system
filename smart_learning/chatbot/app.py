@@ -2,11 +2,16 @@
 
 The Node backend (smart_learning/backend) checks who is logged in and rate-limits, then forwards
 each chat here with the shared CHATBOT_SECRET. This service writes the assistant's instructions and
-asks Claude for the reply, streaming it back as server-sent events: `text` (a piece of the reply),
+asks an AI for the reply, streaming it back as server-sent events: `text` (a piece of the reply),
 then `done` (the whole reply) or `error` ({code, message}).
 
+Which AI answers: Claude when ANTHROPIC_API_KEY is set, otherwise Google Gemini when
+GEMINI_API_KEY is set (Gemini has a free tier, see gemini.py). With neither key, or with
+AI_ENABLED=false, the free built-in helper in helper.py answers, at no cost. It also steps in when
+Gemini fails before replying, e.g. once the free tier's daily limit is used up.
+
 Settings come from the environment, then from ../backend/.env, so there is one place to set them:
-ANTHROPIC_API_KEY, CLAUDE_MODEL, AI_ENABLED, CHATBOT_SECRET, CHATBOT_PORT.
+ANTHROPIC_API_KEY, CLAUDE_MODEL, GEMINI_API_KEY, GEMINI_MODEL, AI_ENABLED, CHATBOT_SECRET, CHATBOT_PORT.
 
 Run:  .venv\\Scripts\\python app.py
 """
@@ -18,8 +23,11 @@ from pathlib import Path
 import anthropic
 import uvicorn
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+
+import gemini
+import helper
 
 BACKEND_ENV = Path(__file__).resolve().parent.parent / "backend" / ".env"
 
@@ -44,6 +52,8 @@ AI_ENABLED = os.environ.get("AI_ENABLED", "true") != "false"
 SECRET = os.environ.get("CHATBOT_SECRET", "")
 PORT = int(os.environ.get("CHATBOT_PORT", "8000"))
 MAX_TOKENS = 4000
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
 
 LANGUAGES = (
     "South Africa's official languages (English, Afrikaans, isiZulu, isiXhosa, isiNdebele, Sepedi, "
@@ -112,9 +122,46 @@ def error_for(exc: Exception) -> dict:
     return {"code": "upstream_error", "message": "The AI assistant had a problem, try again"}
 
 
+def helper_events(body: ChatRequest):
+    """The free helper's answer to the last message, sent a few words at a time like the AI's."""
+    reply = helper.answer(body.messages[-1].content, body.user_role, body.user_name)
+    words = reply.split(" ")
+    for i in range(0, len(words), 6):
+        yield sse("text", {"text": " ".join(words[i:i + 6]) + (" " if i + 6 < len(words) else "")})
+    yield sse("done", {"reply": reply})
+
+
+def gemini_events(body: ChatRequest, system: str, messages: list[dict]):
+    reply = []
+    try:
+        for text in gemini.stream_reply(GEMINI_KEY, GEMINI_MODEL, system, messages, MAX_TOKENS):
+            reply.append(text)
+            yield sse("text", {"text": text})
+    except (gemini.GeminiError, ValueError) as exc:
+        print(f"[chat] Gemini failed: {exc}", flush=True)
+        if not reply:
+            # nothing sent yet: the free helper answers instead of an error
+            yield from helper_events(body)
+            return
+        yield sse("error", {"code": getattr(exc, "code", "upstream_error"), "message": "The AI assistant had a problem, try again"})
+        return
+    if not reply:
+        yield from helper_events(body)
+        return
+    yield sse("done", {"reply": "".join(reply).strip()})
+
+
 @app.get("/health")
 def health():
-    return {"ok": True, "ai": bool(client and AI_ENABLED), "model": MODEL}
+    return {"ok": True, "ai": provider() != "helper", "model": {"claude": MODEL, "gemini": GEMINI_MODEL}.get(provider(), "free helper")}
+
+
+def provider() -> str:
+    if AI_ENABLED and client:
+        return "claude"
+    if AI_ENABLED and GEMINI_KEY:
+        return "gemini"
+    return "helper"
 
 
 @app.post("/chat")
@@ -122,12 +169,14 @@ def chat(body: ChatRequest, x_chatbot_secret: str = Header(default="")):
     # only the Node backend, which knows the shared secret, may use this service
     if not SECRET or not hmac.compare_digest(x_chatbot_secret, SECRET):
         raise HTTPException(status_code=403, detail="forbidden")
-    if not (client and AI_ENABLED):
-        return JSONResponse(status_code=503, content={"error": {
-            "code": "ai_unavailable", "message": "The AI assistant is not available right now"}})
+    headers = {"Cache-Control": "no-cache"}
+    if provider() == "helper":
+        return StreamingResponse(helper_events(body), media_type="text/event-stream", headers=headers)
 
     system = system_prompt(body.reply_language, body.user_name, body.user_role)
     messages = [{"role": m.role, "content": m.content} for m in body.messages]
+    if provider() == "gemini":
+        return StreamingResponse(gemini_events(body, system, messages), media_type="text/event-stream", headers=headers)
 
     def events():
         reply = []

@@ -127,6 +127,10 @@ The AI features need an Anthropic API key. Add `ANTHROPIC_API_KEY=...` to `backe
 
 Without a key, everything else works, and quizzes from uploaded papers are still made from the document's text without AI.
 
+**Free option for the chat assistant:** Google Gemini has a free tier. Get a key (no card needed) at [aistudio.google.com/apikey](https://aistudio.google.com/apikey), put it in `backend/.env` as `GEMINI_API_KEY=...`, and restart the chatbot. The chat uses Claude when `ANTHROPIC_API_KEY` is set, otherwise Gemini. Google may use free-tier chats to improve its products, so learners shouldn't type personal details into the chat.
+
+With no key at all, a built-in helper answers in the chat. It explains how to use the app and teaches counting, sums, times tables and even/odd numbers. It also answers if Gemini fails, for example once the free daily limit is used up.
+
 ## Demo accounts
 
 In development the backend adds a demo school. Every demo account's password is `Demo@1234`.
