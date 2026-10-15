@@ -28,10 +28,14 @@ router.get('/children/:id', async (req, res) => {
   const child = (await linkedChildren(req.user.id)).find((c) => c.id === childId);
   if (!child) throw http.notFound('child_not_found', 'This learner is not linked to your account');
   const checkin = await latestCheckin(child.id);
+  // the first try at each quiz: the mark the teacher sees (later tries are practice, and a
+  // retake in progress must not hide the mark)
   const marks = await db.query(
-    `SELECT z.id AS quiz_id, z.title, z.subject_key, a.score, a.total, a.timed_out, a.submitted_at
-       FROM quiz_attempts a JOIN quizzes z ON z.id = a.quiz_id
-      WHERE a.learner_id = ? AND a.submitted_at IS NOT NULL ORDER BY a.submitted_at DESC`,
+    `SELECT z.id AS quiz_id, z.title, z.subject_key, s.score, s.total, s.timed_out, s.submitted_at
+       FROM quiz_submissions s JOIN quizzes z ON z.id = s.quiz_id
+      WHERE s.learner_id = ? AND s.id = (
+        SELECT MIN(s2.id) FROM quiz_submissions s2 WHERE s2.quiz_id = s.quiz_id AND s2.learner_id = s.learner_id)
+      ORDER BY s.submitted_at DESC`,
     [child.id],
   );
   res.json({

@@ -58,7 +58,8 @@ Smart-Learning-system/
 │   │                principal/, admin/) and shared code in src/
 │   ├── backend/     Express API: a route folder per role, lib/ for shared logic,
 │   │                db/schema.sql for the database
-│   └── chatbot/     The Python support assistant behind the chat bubble
+│   ├── chatbot/     The Python support assistant behind the chat bubble
+│   └── mobile/      The phone app (Expo / React Native), for every role
 └── proact_prototype.html   The original single-page prototype
 ```
 
@@ -114,6 +115,20 @@ python -m venv .venv
 ```
 
 The chatbot reads its settings from `backend/.env` and listens only on this computer, on port 8000. Only the backend can use it, with the shared `CHATBOT_SECRET`.
+
+### 4. Mobile app (optional)
+
+The phone app has every role's dashboard and uses the same backend, accounts and translations as the website.
+
+```bash
+cd smart_learning/mobile
+npm install
+npx expo start
+```
+
+Install **Expo Go** on an Android phone or iPhone, connect it to the same Wi-Fi as the computer, and scan the QR code. The app finds the backend on that computer, on port 4001. To use another address, create `mobile/.env` with `EXPO_PUBLIC_API_URL=http://<address>:4001/api`. If the phone can't connect, allow Node.js through the Windows firewall.
+
+Joining a live online class opens the website's classroom in the phone's browser. For that, start the frontend with `npm run dev -- --host` so the phone can reach it.
 
 ### AI features
 
