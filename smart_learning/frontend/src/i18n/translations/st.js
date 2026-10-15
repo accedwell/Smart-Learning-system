@@ -11,7 +11,7 @@ export default {
   landing_headline_highlight: "o a rutwa, o a latelwa",
   landing_headline_post: " mme o a tshehetswa sebakeng se le seng.",
   landing_subtitle: "Rea o amohela ho Smart Learning! Re thabile ha o le teng. Kena ho ruta, ho ithuta le ho tsamaisa sekolo sa hao sebakeng se le seng.",
-  landing_get_started_btn: "Qala →",
+  landing_get_started_btn: "Qala",
   landing_feat2_title: "Thuso ya AI mohato ka mong",
   landing_feat2_sub: "Diteko tse bohlale tse itshwayang, malebela a ho ithuta bakeng sa baithuti, le ditlhahiso tsa AI tsa ho kenella le ho kwetlisa bakeng sa matitjhere, dihlooho tsa mafapha le basuwehlooho.",
   landing_feat3_title: "Ka nnete ka dipuo tse ngata",

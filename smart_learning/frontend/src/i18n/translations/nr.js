@@ -11,7 +11,7 @@ export default {
   landing_headline_highlight: "uyafundiswa, uyalandelelwa",
   landing_headline_post: " begodu usekelwa endaweni yinye.",
   landing_subtitle: "Siyakwamukela ku-Smart Learning! Siyathaba ukuthi ulapha. Ngena ukuze ufundise, ufunde begodu ulawule isikolo sakho endaweni yinye.",
-  landing_get_started_btn: "Thoma →",
+  landing_get_started_btn: "Thoma",
   landing_feat2_title: "Isizo le-AI kiwo woke amagadango",
   landing_feat2_sub: "Iinhlahlubo ezihlakaniphileko eziziphawulako, amathiphu wokufunda wabafundi, neenphakamiso ze-AI zokungenelela nokubandula zabotitjhere, iinhloko zeminyango nabothishanhloko.",
   landing_feat3_title: "Ngamambala ngamalimi amanengi",

@@ -11,7 +11,7 @@ export default {
   landing_headline_highlight: "onderrig, gevolg",
   landing_headline_post: " en ondersteun op een plek.",
   landing_subtitle: "Welkom by Smart Learning! Ons is bly jy is hier. Teken in om te onderrig, te leer en jou skool op een plek te bestuur.",
-  landing_get_started_btn: "Begin →",
+  landing_get_started_btn: "Begin",
   landing_feat2_title: "KI-hulp by elke stap",
   landing_feat2_sub: "Slim vasvrae wat hulself nasien, persoonlike studiewenke vir leerders, en KI-voorstelle vir ingrypings en afrigting vir onderwysers, departementshoofde en skoolhoofde.",
   landing_feat3_title: "Werklik veeltalig",

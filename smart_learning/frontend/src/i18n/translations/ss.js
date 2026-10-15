@@ -11,7 +11,7 @@ export default {
   landing_headline_highlight: "uyafundziswa, uyalandzelelwa",
   landing_headline_post: " futsi uyasekelwa endzaweni yinye.",
   landing_subtitle: "Siyakwemukela ku-Smart Learning! Siyajabula kutsi ulapha. Ngena kute ufundzise, ufundze futsi uphatse sikolwa sakho endzaweni yinye.",
-  landing_get_started_btn: "Cala →",
+  landing_get_started_btn: "Cala",
   landing_feat2_title: "Lusito lwe-AI kuto tonkhe tinyatselo",
   landing_feat2_sub: "Tivivinyo letihlakaniphile letitimakisako, emathiphu ekufundza ebafundzi, netiphakamiso te-AI tekungenelela nekucecesha bothishela, tinhloko tetiphiko nabothishela labakhulu.",
   landing_feat3_title: "Ngempela ngetilwimi letinyenti",

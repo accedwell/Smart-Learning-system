@@ -124,7 +124,8 @@ def error_for(exc: Exception) -> dict:
 
 def helper_events(body: ChatRequest):
     """The free helper's answer to the last message, sent a few words at a time like the AI's."""
-    reply = helper.answer(body.messages[-1].content, body.user_role, body.user_name)
+    earlier = [m.content for m in body.messages[:-1] if m.role == "assistant"]
+    reply = helper.answer(body.messages[-1].content, body.user_role, body.user_name, earlier)
     words = reply.split(" ")
     for i in range(0, len(words), 6):
         yield sse("text", {"text": " ".join(words[i:i + 6]) + (" " if i + 6 < len(words) else "")})

@@ -11,7 +11,7 @@ export default {
   landing_headline_highlight: "o a rutwa, o a latelwa",
   landing_headline_post: " gomme o a thekgwa lefelong le tee.",
   landing_subtitle: "Re a go amogela go Smart Learning! Re thabile ge o le mo. Tsena go ruta, go ithuta le go laola sekolo sa gago lefelong le tee.",
-  landing_get_started_btn: "Thoma →",
+  landing_get_started_btn: "Thoma",
   landing_feat2_title: "Thušo ya AI kgatong ye nngwe le ye nngwe",
   landing_feat2_sub: "Diteko tše bohlale tšeo di itshwayago, maele a go ithuta a baithuti, le ditšhišinyo tša AI tša go tsenela le go hlahla barutiši, dihlogo tša dikgoro le dihlogo tša dikolo.",
   landing_feat3_title: "Ka nnete ka maleme a mantši",

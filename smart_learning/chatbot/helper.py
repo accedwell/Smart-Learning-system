@@ -1,12 +1,14 @@
 """The free built-in helper: answers without an AI key, at no cost.
 
-It knows how Smart Learning works for each role, and can teach a few things it can work out
-exactly: counting, sums, times tables, and even/odd numbers. Anything else gets a friendly
-list of what it can help with. Replies are in English.
+It knows how Smart Learning works for each role, has short lesson notes on common school topics
+(topics.py), and works some things out exactly: counting, sums, simple equations, times tables
+and even/odd numbers. Replies are in English.
 """
 import ast
 import operator
 import re
+
+import topics
 
 MAX_COUNT = 1000  # the highest number it will count to
 MAX_RESULT = 10**12  # sums with bigger answers are refused, so nobody can make it work forever
@@ -221,6 +223,61 @@ def times_table(text: str) -> str | None:
     return f"The {n} times table:\n{rows}\n\nTip: each answer is {n} more than the one before."
 
 
+# ---- simple equations ----
+
+def evaluate_x(node, x):
+    """Like evaluate(), but the letter x is allowed."""
+    if isinstance(node, ast.Expression):
+        return evaluate_x(node.body, x)
+    if isinstance(node, ast.Name) and node.id == "x":
+        return x
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+        v = evaluate_x(node.operand, x)
+        return -v if isinstance(node.op, ast.USub) else v
+    if isinstance(node, ast.BinOp) and type(node.op) in (ast.Add, ast.Sub, ast.Mult, ast.Div):
+        return OPS[type(node.op)](evaluate_x(node.left, x), evaluate_x(node.right, x))
+    return evaluate(node)
+
+
+def nice(v: float) -> str:
+    v = round(v, 6)
+    return str(int(v)) if float(v).is_integer() else str(v)
+
+
+EQ_SIDE = r"[\dx.\s()+\-*/]"
+
+
+def equation_answer(text: str) -> str | None:
+    """Linear equations in x, e.g. 'solve 3x + 2 = 11', worked out step by step."""
+    m = re.search(rf"({EQ_SIDE}+)=({EQ_SIDE}+)", text)
+    if not m or "x" not in m.group(0):
+        return None
+    sides = []
+    for raw in (m.group(1), m.group(2)):
+        expr = re.sub(r"(\d|\))\s*(x|\()", r"\1*\2", raw.strip())  # 3x -> 3*x, 2(x+1) -> 2*(x+1)
+        try:
+            tree = ast.parse(expr, mode="eval")
+            f0, f1, f2 = (evaluate_x(tree, v) for v in (0, 1, 2))
+        except (SyntaxError, ValueError, ZeroDivisionError, TypeError):
+            return None
+        if abs((f2 - f1) - (f1 - f0)) > 1e-9:
+            return "That equation isn't linear (it has x² or x in a fraction's bottom), so I can't solve it step by step yet."
+        sides.append((f1 - f0, f0))  # (how many x, the number on its own)
+    (a, b), (c, d) = sides
+    if abs(a - c) < 1e-12:
+        return "Every x cancels out, so " + ("any value of x works." if abs(b - d) < 1e-12 else "there is no solution.")
+    x = (d - b) / (a - c)
+    left, right = " ".join(m.group(1).split()), " ".join(m.group(2).split())
+    coef = nice(a - c)
+    x_terms = {"1": "x", "-1": "-x"}.get(coef, coef + "x")
+    steps = [f"Solve {left} = {right}",
+             f"Get the x terms on one side and the numbers on the other: {x_terms} = {nice(d - b)}"]
+    if coef != "1":
+        steps.append(f"Divide both sides by {coef}: x = {nice(x)}")
+    steps.append(f"Check: put x = {nice(x)} back in – both sides give {nice(a * x + b)} ✓")
+    return "\n".join([steps[0]] + [f"{i}. {s}" for i, s in enumerate(steps[1:], 1)])
+
+
 def even_odd(text: str) -> str | None:
     m = re.search(r"\bis\s+(\d+)\s+(?:an?\s+)?(even|odd)\b", text)
     if not m:
@@ -244,20 +301,39 @@ def small_talk(text: str, name: str) -> str | None:
     return None
 
 
+SUBJECTS = ("grammar, tenses, parts of speech, concord, passive voice, direct and indirect speech, punctuation, "
+            "figures of speech, essays, fractions, percentages, algebra, equations, area, Pythagoras, "
+            "trigonometry, photosynthesis, respiration, cells, DNA, Newton's laws, states of matter, atoms, "
+            "electricity, the water cycle and study tips")
+
 MENU = ("I'm the Smart Learning helper. I can:\n"
+        f"• explain school topics – {SUBJECTS} (try \"explain tenses\")\n"
         "• explain how to use the app (quizzes, papers, online classes, passwords, your profile…)\n"
         "• teach counting – try \"teach me how to count\", \"count in 5s\" or \"count backwards from 20\"\n"
         "• work out sums – try \"what is 12 x 7\" or \"(15 + 5) / 4\"\n"
+        "• solve equations step by step – try \"solve 3x + 2 = 11\"\n"
         "• show times tables – try \"7 times table\"\n"
         "• tell you if a number is even or odd – try \"is 37 even\"")
 
 
-def answer(message: str, role: str = "", name: str = "") -> str:
+def answer(message: str, role: str = "", name: str = "", earlier: list[str] | None = None) -> str:
+    """earlier: the helper's previous replies in this chat, so it doesn't repeat its long menu."""
     text = " ".join(message.lower().split())
-    for skill in (counting_lesson, times_table, even_odd, sum_answer):
+    for skill in (counting_lesson, times_table, even_odd, equation_answer, sum_answer):
         reply = skill(text)
         if reply:
             return reply
-    return (small_talk(text, name) or app_answer(text, role) or
-            "I'm not sure about that one – I'm the free helper, so I know about Smart Learning and some maths "
-            "basics, but I can't answer everything. " + MENU)
+    talk = small_talk(text, name)
+    if talk:
+        return talk
+    # school topics before app help, so "how do I study for a test" gets study tips
+    topic = topics.best_topic(text)
+    if topic:
+        return topic["notes"]
+    reply = app_answer(text, role)
+    if reply:
+        return reply
+    if any("I'm the Smart Learning helper" in r for r in (earlier or [])):
+        return ("Sorry, I don't have notes on that yet. Topics I can explain: " + SUBJECTS + ". For any other "
+                "question, the school can switch on the full AI assistant with a free Gemini key.")
+    return "I'm not sure about that one. " + MENU

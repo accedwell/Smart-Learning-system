@@ -11,7 +11,7 @@ export default {
   landing_headline_highlight: "uyafundiswa, ulandelwa",
   landing_headline_post: " kwaye uxhaswa kwindawo enye.",
   landing_subtitle: "Wamkelekile kwi-Smart Learning! Siyavuya ukuba ulapha. Ngena ukuze ufundise, ufunde kwaye ulawule isikolo sakho kwindawo enye.",
-  landing_get_started_btn: "Qalisa →",
+  landing_get_started_btn: "Qalisa",
   landing_feat2_title: "Uncedo lwe-AI kuwo onke amanyathelo",
   landing_feat2_sub: "Iimvavanyo ezikrelekrele eziziphawulayo, iingcebiso zokufunda zabafundi, kunye neengcebiso ze-AI zongenelelo noqeqesho lootitshala, iintloko zamasebe neenqununu.",
   landing_feat3_title: "Ngokwenene ngeelwimi ezininzi",

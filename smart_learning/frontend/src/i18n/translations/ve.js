@@ -11,7 +11,7 @@ export default {
   landing_headline_highlight: "u a funzwa, u a tevhelwa",
   landing_headline_post: " nahone u a tikedzwa fhethu huthihi.",
   landing_subtitle: "Ri a ni ṱanganedza kha Smart Learning! Ri a takala ngauri ni fhano. Dzhenani u itela u funza, u guda na u langula tshikolo tshaṋu fhethu huthihi.",
-  landing_get_started_btn: "Thomani →",
+  landing_get_started_btn: "Thomani",
   landing_feat2_title: "Thuso ya AI kha mukumbo muṅwe na muṅwe",
   landing_feat2_sub: "Ndingo dzo ṱalifaho dzine dza ḓi maka, nyeletshedzo dza u guda dza vhagudi, na themendelo dza AI dza u dzhenelela na u gudisa vhadededzi, ṱhoho dza mihasho na ṱhoho dza zwikolo.",
   landing_feat3_title: "Nga vhukuma nga nyambo nnzhi",

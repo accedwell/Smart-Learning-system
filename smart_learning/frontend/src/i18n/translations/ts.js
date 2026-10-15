@@ -11,7 +11,7 @@ export default {
   landing_headline_highlight: "wa dyondzisiwa, wa landzeleriwa",
   landing_headline_post: " naswona wa seketeriwa endhawini yin'we.",
   landing_subtitle: "Hi ku amukela eka Smart Learning! Hi tsakile leswi u nga laha. Nghena leswaku u dyondzisa, u dyondza no fambisa xikolo xa wena endhawini yin'we.",
-  landing_get_started_btn: "Sungula →",
+  landing_get_started_btn: "Sungula",
   landing_feat2_title: "Mpfuno wa AI eka goza rin'wana na rin'wana",
   landing_feat2_sub: "Mavonelo yo tlhariha lama tifungaka, switsundzuxo swo dyondza swa vadyondzi, na swibumabumelo swa AI swa ku nghenelela na ku leteriwa ka vadyondzisi, tinhloko ta tindzawulo na tinhloko ta swikolo.",
   landing_feat3_title: "Hakunene hi tindzimi to tala",

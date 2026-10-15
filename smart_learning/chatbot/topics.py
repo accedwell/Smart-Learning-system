@@ -194,7 +194,7 @@ TOPICS = [
               "• Mass number = protons + neutrons.\n"
               "• A neutral atom has as many electrons as protons.\n"
               "• The periodic table orders elements by atomic number; elements in the same group (column) react similarly."},
-    {"words": ["electricity", "current", "voltage", "resistance", "ohm", "ohm's law", "circuit"],
+    {"words": ["electricity", "current", "voltage", "resistance", "ohm", "ohm's law", "ohms law", "ohms", "circuit", "circuits"],
      "notes": "• Current (I, amperes) – the flow of charge.\n"
               "• Potential difference / voltage (V, volts) – the energy pushing the charge.\n"
               "• Resistance (R, ohms Ω) – how much a component opposes the current.\n"

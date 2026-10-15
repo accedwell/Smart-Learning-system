@@ -10,7 +10,7 @@ export const UI = {
   landing_headline_highlight:'taught, tracked',
   landing_headline_post:' and supported in one place.',
   landing_subtitle:'Welcome to Smart Learning! We’re glad you’re here. Log in to teach, learn and manage your school in one place.',
-  landing_get_started_btn:'Get Started →',
+  landing_get_started_btn:'Get Started',
   landing_feat2_title:'AI-assisted, every step',
   landing_feat2_sub:'Smart quizzes that mark themselves, personalised study tips for learners, and AI-drafted intervention and coaching suggestions for teachers, HODs and principals.',
   landing_feat3_title:'Truly multilingual',
