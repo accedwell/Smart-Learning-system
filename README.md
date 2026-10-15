@@ -58,8 +58,7 @@ Smart-Learning-system/
 │   │                principal/, admin/) and shared code in src/
 │   ├── backend/     Express API: a route folder per role, lib/ for shared logic,
 │   │                db/schema.sql for the database
-│   ├── chatbot/     The Python support assistant behind the chat bubble
-│   └── mobile/      Placeholder for a future mobile app
+│   └── chatbot/     The Python support assistant behind the chat bubble
 └── proact_prototype.html   The original single-page prototype
 ```
 

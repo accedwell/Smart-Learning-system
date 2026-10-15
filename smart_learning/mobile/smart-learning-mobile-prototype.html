@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Smart Learning Mobile</title>
+<meta name="description" content="Clickable mobile prototype of Smart Learning: learner, teacher, parent, HOD, principal and admin screens.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --bg:#f6f5ee; --surface:#fffdf6; --ink:#182219; --ink-soft:#5c6b5c; --border:#e4ddc7;
+  --brand:#b8791f; --brand-ink:#0f1a38; --accent:#f2a63c; --chip-bg:#f2efdf;
+  --learner:#2563eb; --learner-tint:#eaf1fd; --teacher:#7c3aed; --teacher-tint:#f2edfc;
+  --parent:#0f766e; --parent-tint:#e7faf7; --principal:#c8871a; --principal-tint:#fbf1de;
+  --hod:#b23a63; --hod-tint:#fbe9f0; --admin:#155c3a; --admin-tint:#e9f3ec;
+  --good:#2f9159; --warn:#c8871a; --bad:#c0392b;
+  --page:#e9e5d6; --frame:#11161f; --shadow:0 10px 30px rgba(28,42,32,.10);
+  --font-display:'Outfit','Inter',system-ui,-apple-system,sans-serif;
+  --font-body:'Inter',system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1712; --surface:#16211a; --ink:#eaf3ec; --ink-soft:#9db3a4; --border:#28362c;
+    --brand:#d9a13c; --accent:#f2b25a; --chip-bg:#1c2a20;
+    --learner:#6d95ec; --learner-tint:#182238; --teacher:#a688ee; --teacher-tint:#221c37;
+    --parent:#3fc2af; --parent-tint:#0f2823; --principal:#e3b23c; --principal-tint:#2c2210;
+    --hod:#e08bab; --hod-tint:#2c1620; --admin:#5fbd8b; --admin-tint:#14261c;
+    --good:#4cb579; --warn:#e3b23c; --bad:#f0776a; --page:#090d0b; --frame:#000;
+    --shadow:0 10px 30px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1712; --surface:#16211a; --ink:#eaf3ec; --ink-soft:#9db3a4; --border:#28362c;
+  --brand:#d9a13c; --accent:#f2b25a; --chip-bg:#1c2a20;
+  --learner:#6d95ec; --learner-tint:#182238; --teacher:#a688ee; --teacher-tint:#221c37;
+  --parent:#3fc2af; --parent-tint:#0f2823; --principal:#e3b23c; --principal-tint:#2c2210;
+  --hod:#e08bab; --hod-tint:#2c1620; --admin:#5fbd8b; --admin-tint:#14261c;
+  --good:#4cb579; --warn:#e3b23c; --bad:#f0776a; --page:#090d0b; --frame:#000;
+  --shadow:0 10px 30px rgba(0,0,0,.45);
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; }
+body{ background:var(--page); color:var(--ink); font-family:var(--font-body); font-size:14px; min-height:100vh; }
+button{ font:inherit; color:inherit; cursor:pointer; }
+input,select,textarea{ font:inherit; color:inherit; }
+h1,h2,h3{ font-family:var(--font-display); margin:0; letter-spacing:-.015em; }
+
+/* ---------- page around the phone ---------- */
+.stage{ display:flex; gap:28px; justify-content:center; align-items:flex-start; padding:28px 16px 40px; flex-wrap:wrap; }
+.side{ width:280px; max-width:100%; }
+.side h1{ font-size:22px; margin-bottom:4px; }
+.side p{ color:var(--ink-soft); line-height:1.5; margin:0 0 16px; font-size:13px; }
+.side h3{ font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); margin:18px 0 8px; font-family:var(--font-body); }
+.jump{ display:flex; flex-wrap:wrap; gap:6px; }
+.jump button{ border:1px solid var(--border); background:var(--surface); border-radius:999px; padding:6px 12px; font-size:12.5px; font-weight:600; }
+.jump button:hover{ border-color:var(--brand); }
+.jump button.on{ background:var(--brand); border-color:var(--brand); color:#fff; }
+.legend{ font-size:12px; color:var(--ink-soft); line-height:1.55; }
+
+.phone{ width:390px; height:844px; border-radius:54px; background:var(--frame); padding:12px; box-shadow:0 30px 80px rgba(0,0,0,.28); position:relative; flex:none; }
+.screen{ width:100%; height:100%; border-radius:43px; overflow:hidden; background:var(--bg); position:relative; display:flex; flex-direction:column; }
+.notch{ position:absolute; top:10px; left:50%; transform:translateX(-50%); width:118px; height:32px; background:#000; border-radius:20px; z-index:30; }
+
+/* on a real phone: no frame, the app fills the screen */
+@media (max-width:480px){
+  .stage{ padding:0; gap:0; }
+  .side{ display:none; }
+  .phone{ width:100%; height:100dvh; border-radius:0; padding:0; box-shadow:none; background:var(--bg); }
+  .screen{ border-radius:0; }
+  .notch{ display:none; }
+}
+
+/* ---------- inside the app ---------- */
+.status{ height:50px; flex:none; display:flex; align-items:flex-end; justify-content:space-between; padding:0 30px 6px; font-weight:600; font-size:14px; }
+.status .icons{ display:flex; gap:5px; align-items:center; }
+.status svg{ width:17px; height:12px; }
+@media (max-width:480px){ .status{ display:none; } }
+.view{ flex:1; overflow-y:auto; overflow-x:hidden; padding:4px 16px 84px; scrollbar-width:none; }
+.view::-webkit-scrollbar{ display:none; }
+.topbar{ display:flex; align-items:center; justify-content:space-between; padding:6px 0 14px; gap:10px; }
+.topbar h2{ font-size:22px; }
+.topbar .sub{ color:var(--ink-soft); font-size:12.5px; margin-top:2px; }
+.iconbtn{ width:40px; height:40px; border-radius:14px; border:1px solid var(--border); background:var(--surface); display:grid; place-items:center; position:relative; flex:none; }
+.iconbtn svg{ width:19px; height:19px; }
+.dot{ position:absolute; top:7px; right:8px; width:8px; height:8px; border-radius:50%; background:var(--bad); border:2px solid var(--surface); }
+.back{ display:inline-flex; align-items:center; gap:4px; border:none; background:none; color:var(--brand); font-weight:600; padding:6px 0 10px; }
+.back svg{ width:16px; height:16px; }
+
+.card{ background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:16px; margin-bottom:12px; box-shadow:var(--shadow); }
+.card h3{ font-size:16px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.card h3 small{ font-family:var(--font-body); font-weight:500; font-size:12px; color:var(--ink-soft); }
+.hero{ border-radius:22px; padding:18px; color:#fff; margin-bottom:12px; position:relative; overflow:hidden; }
+.hero h2{ font-size:21px; margin-bottom:4px; }
+.hero p{ margin:0; opacity:.9; font-size:13px; }
+.hero .big{ font-family:var(--font-display); font-size:38px; font-weight:800; }
+.hero::after{ content:""; position:absolute; right:-40px; top:-40px; width:150px; height:150px; border-radius:50%; background:rgba(255,255,255,.12); }
+
+.row{ display:flex; align-items:center; gap:12px; padding:11px 0; border-top:1px solid var(--border); }
+.row:first-of-type{ border-top:none; }
+.row .grow{ flex:1; min-width:0; }
+.row b{ display:block; font-weight:600; }
+.meta{ color:var(--ink-soft); font-size:12px; }
+.avatar{ width:38px; height:38px; border-radius:13px; display:grid; place-items:center; font-weight:700; font-size:13px; flex:none; color:#fff; }
+.bar{ height:7px; border-radius:99px; background:var(--chip-bg); overflow:hidden; margin-top:6px; }
+.bar span{ display:block; height:100%; border-radius:99px; }
+.pill{ display:inline-block; padding:3px 9px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap; }
+.pill.good{ background:color-mix(in srgb, var(--good) 15%, transparent); color:var(--good); }
+.pill.warn{ background:color-mix(in srgb, var(--warn) 17%, transparent); color:var(--warn); }
+.pill.bad{ background:color-mix(in srgb, var(--bad) 14%, transparent); color:var(--bad); }
+.pill.onair{ background:var(--bad); color:#fff; }
+.pill.soft{ background:var(--chip-bg); color:var(--ink-soft); }
+.btn{ border:none; border-radius:14px; padding:12px 16px; font-weight:700; background:var(--chip-bg); }
+.btn.primary{ background:var(--brand); color:#fff; }
+.btn.block{ width:100%; }
+.btn.small{ padding:7px 12px; font-size:12.5px; border-radius:11px; }
+.btn:disabled{ opacity:.45; cursor:default; }
+.chips{ display:flex; gap:7px; overflow-x:auto; padding-bottom:4px; margin-bottom:12px; scrollbar-width:none; }
+.chips::-webkit-scrollbar{ display:none; }
+.chip{ border:1px solid var(--border); background:var(--surface); border-radius:999px; padding:7px 13px; font-size:12.5px; font-weight:600; white-space:nowrap; }
+.chip.on{ background:var(--ink); color:var(--bg); border-color:var(--ink); }
+.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+.stat{ background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:14px; }
+.stat .n{ font-family:var(--font-display); font-size:26px; font-weight:800; }
+.stat .l{ color:var(--ink-soft); font-size:12px; }
+.field{ margin-bottom:12px; }
+.field label{ display:block; font-size:12.5px; font-weight:600; margin-bottom:5px; color:var(--ink-soft); }
+.field input,.field select,.field textarea{ width:100%; border:1px solid var(--border); background:var(--surface); border-radius:13px; padding:12px; font-size:15px; }
+.note{ background:color-mix(in srgb, var(--brand) 11%, transparent); border-radius:14px; padding:11px 13px; font-size:12.5px; line-height:1.45; margin-top:10px; }
+.empty{ color:var(--ink-soft); text-align:center; padding:14px 0; font-size:13px; }
+
+/* bottom tabs */
+.tabs{ flex:none; display:flex; justify-content:space-around; border-top:1px solid var(--border); background:var(--surface); padding:7px 6px 26px; }
+@media (max-width:480px){ .tabs{ padding-bottom:max(10px, env(safe-area-inset-bottom)); } }
+.tab{ border:none; background:none; display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10.5px; font-weight:600; color:var(--ink-soft); padding:4px 6px; min-width:56px; }
+.tab svg{ width:22px; height:22px; }
+.tab.on{ color:var(--role); }
+
+/* landing + login */
+.landing{ flex:1; display:flex; flex-direction:column; justify-content:flex-end; padding:24px 22px 40px; color:#fff;
+  background:linear-gradient(180deg, rgba(15,26,56,.15) 0%, rgba(15,26,56,.88) 62%, #0f1a38 100%), radial-gradient(circle at 70% 25%, #f2a63c 0, #b8791f 30%, #3b2a12 62%, #0f1a38 100%); }
+.landing .logo{ display:flex; align-items:center; gap:9px; font-family:var(--font-display); font-weight:700; font-size:17px; margin-bottom:auto; padding-top:10px; }
+.logo .mark{ width:34px; height:34px; border-radius:11px; background:rgba(255,255,255,.16); display:grid; place-items:center; }
+.logo .mark svg{ width:20px; height:20px; }
+.badge{ display:inline-flex; align-items:center; gap:6px; border:1px solid rgba(242,166,60,.6); color:#f2b25a; border-radius:999px; padding:4px 11px; font-size:10.5px; font-weight:700; letter-spacing:.08em; margin-bottom:14px; }
+.landing h1{ font-size:34px; line-height:1.08; margin-bottom:12px; }
+.landing h1 span{ color:#f2b25a; }
+.landing p{ opacity:.85; line-height:1.5; margin:0 0 22px; }
+.feat{ display:flex; gap:10px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); border-radius:16px; padding:12px; margin-bottom:9px; font-size:12.5px; line-height:1.4; }
+.feat b{ display:block; font-size:13.5px; }
+.login-top{ background:linear-gradient(160deg,#0f1a38,#3b2a12 70%,#b8791f); color:#fff; padding:22px 22px 30px; border-radius:0 0 28px 28px; margin:0 -16px 18px; }
+.login-top h2{ font-size:26px; margin:14px 0 4px; }
+.demo{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+
+/* quiz */
+.qprog{ display:flex; justify-content:space-between; font-size:12.5px; color:var(--ink-soft); margin-bottom:6px; }
+.timer{ font-variant-numeric:tabular-nums; font-weight:700; color:var(--brand); }
+.question{ font-family:var(--font-display); font-size:20px; font-weight:700; line-height:1.3; margin:16px 0; }
+.opt{ display:flex; align-items:center; gap:12px; width:100%; text-align:left; border:1.5px solid var(--border); background:var(--surface); border-radius:16px; padding:14px; margin-bottom:9px; font-weight:500; }
+.opt .k{ width:28px; height:28px; border-radius:9px; background:var(--chip-bg); display:grid; place-items:center; font-weight:700; font-size:12px; flex:none; }
+.opt.sel{ border-color:var(--learner); background:var(--learner-tint); }
+.opt.sel .k{ background:var(--learner); color:#fff; }
+.opt.right{ border-color:var(--good); } .opt.wrong{ border-color:var(--bad); }
+.ring{ width:130px; height:130px; margin:8px auto 12px; display:block; }
+
+/* live class */
+.live{ flex:1; background:#0b0f17; color:#fff; display:flex; flex-direction:column; padding:8px 12px 30px; }
+.live-head{ display:flex; justify-content:space-between; align-items:center; padding:6px 4px 12px; }
+.teacher-cam{ flex:1; border-radius:22px; background:radial-gradient(circle at 50% 40%, #3b3270, #141a2e 70%); display:grid; place-items:center; position:relative; min-height:250px; }
+.teacher-cam .who{ position:absolute; left:12px; bottom:12px; background:rgba(0,0,0,.45); padding:4px 10px; border-radius:10px; font-size:12px; }
+.big-av{ width:96px; height:96px; border-radius:30px; background:var(--teacher); display:grid; place-items:center; font-family:var(--font-display); font-size:34px; font-weight:800; }
+.tiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin:9px 0; }
+.tile{ aspect-ratio:1; border-radius:14px; background:#1b2233; display:grid; place-items:center; font-weight:700; font-size:13px; position:relative; }
+.tile.me{ outline:2px solid var(--accent); }
+.tile small{ position:absolute; bottom:3px; font-size:9px; opacity:.7; font-weight:500; }
+.live-chat{ scrollbar-width:none; background:#151b29; border-radius:16px; padding:10px 12px; font-size:12.5px; line-height:1.45; max-height:96px; overflow-y:auto; }
+.live-chat b{ color:#f2b25a; }
+.controls{ display:flex; justify-content:center; gap:14px; margin-top:12px; }
+.ctrl{ width:54px; height:54px; border-radius:50%; border:none; background:#252d40; color:#fff; display:grid; place-items:center; }
+.ctrl svg{ width:22px; height:22px; }
+.ctrl.off{ background:#fff; color:#0b0f17; }
+.ctrl.leave{ background:var(--bad); }
+
+/* chat sheet, toast, sheets */
+.fab{ position:absolute; right:16px; bottom:96px; width:54px; height:54px; border-radius:50%; border:none; background:var(--brand); color:#fff; display:grid; place-items:center; box-shadow:0 8px 22px rgba(184,121,31,.45); z-index:15; }
+.fab svg{ width:24px; height:24px; }
+.sheet-bg{ position:absolute; inset:0; background:rgba(0,0,0,.4); z-index:20; display:flex; align-items:flex-end; }
+.sheet{ background:var(--bg); width:100%; max-height:86%; border-radius:26px 26px 0 0; display:flex; flex-direction:column; overflow:hidden; animation:up .22s ease-out; }
+@keyframes up{ from{ transform:translateY(40px); opacity:.4; } }
+.sheet-head{ padding:14px 16px 12px; background:linear-gradient(120deg,#0f1a38,#b8791f); color:#fff; display:flex; justify-content:space-between; align-items:center; }
+.sheet-head b{ font-family:var(--font-display); font-size:16px; display:block; }
+.sheet-head small{ opacity:.8; font-size:11.5px; }
+.sheet-head button{ background:rgba(255,255,255,.16); border:none; color:#fff; width:32px; height:32px; border-radius:10px; }
+.sheet-body{ padding:16px; overflow-y:auto; }
+.msgs{ flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:8px; min-height:300px; }
+.msg{ max-width:84%; padding:9px 12px; border-radius:16px; font-size:13px; line-height:1.45; white-space:pre-wrap; }
+.msg.user{ align-self:flex-end; background:var(--brand); color:#fff; border-bottom-right-radius:4px; }
+.msg.bot{ align-self:flex-start; background:var(--chip-bg); border-bottom-left-radius:4px; }
+.suggest{ display:flex; gap:6px; overflow-x:auto; padding:0 14px 8px; scrollbar-width:none; }
+.suggest::-webkit-scrollbar{ display:none; }
+.composer{ display:flex; gap:8px; padding:10px 14px 26px; border-top:1px solid var(--border); background:var(--surface); }
+.composer input{ flex:1; border:1px solid var(--border); background:var(--bg); border-radius:14px; padding:11px 13px; font-size:14px; }
+.toast{ position:absolute; left:16px; right:16px; bottom:100px; background:var(--ink); color:var(--bg); padding:12px 14px; border-radius:14px; font-size:13px; font-weight:600; z-index:40; display:flex; gap:8px; align-items:center; animation:up .2s ease-out; }
+.toast svg{ width:18px; height:18px; color:var(--good); flex:none; }
+.check{ width:24px; height:24px; border-radius:8px; border:1.5px solid var(--border); display:grid; place-items:center; flex:none; background:var(--surface); }
+.check.on{ background:var(--teacher); border-color:var(--teacher); color:#fff; }
+.check svg{ width:14px; height:14px; }
+.stars{ display:flex; gap:6px; }
+.stars button{ border:none; background:none; padding:2px; color:var(--border); }
+.stars button.on{ color:var(--accent); }
+.stars svg{ width:30px; height:30px; }
+.rating-bars .r{ display:flex; align-items:center; gap:8px; font-size:12px; margin:5px 0; }
+.rating-bars .bar{ flex:1; margin:0; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <aside class="side">
+    <h1>Smart Learning · Mobile</h1>
+    <p>A clickable phone prototype of the Smart Learning school app. Log in as any role, or jump straight to a screen below. Everything is sample data: nothing is saved.</p>
+    <h3>Jump to a role</h3>
+    <div class="jump" id="jumpRoles"></div>
+    <h3>Key flows</h3>
+    <div class="jump" id="jumpFlows"></div>
+    <h3>Theme</h3>
+    <div class="jump" id="jumpTheme"></div>
+    <h3>How to use</h3>
+    <div class="legend">Tap the tabs at the bottom of the phone, the chat bubble for the helper, and the bell for notifications. On a real phone, open this file and it fills the screen.</div>
+  </aside>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="screen" id="screen"></div>
+  </div>
+</div>
+
+<script>
+// ---------------- icons ----------------
+const P = {
+  home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  quiz:'<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  video:'<rect x="2.5" y="6" width="13" height="12" rx="3"/><path d="M15.5 10.5l6-3.5v10l-6-3.5z"/>',
+  paper:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h6"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-5.5 6.5-5.5s6.5 2 6.5 5.5"/><circle cx="17" cy="9" r="2.8"/><path d="M17 14.5c2.8.2 4.5 2 4.5 5"/>',
+  bell:'<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 21h4"/>',
+  chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  star:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z" fill="currentColor"/>',
+  chat:'<path d="M4 5h16v11H9l-5 4z"/>',
+  back:'<path d="M15 5l-7 7 7 7"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+  cam:'<rect x="2.5" y="6" width="13" height="12" rx="3"/><path d="M15.5 10.5l6-3.5v10l-6-3.5z"/>',
+  hand:'<path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12M11 11V4a1.5 1.5 0 0 1 3 0v7M14 11V5.5a1.5 1.5 0 0 1 3 0V14c0 4-2.5 7-6 7-2.5 0-4-1.2-5.5-3.5L3.5 14a1.6 1.6 0 0 1 2.6-1.8L8 15"/>',
+  phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
+  building:'<path d="M4 21V5l8-3 8 3v16M4 21h16M9 21v-5h6v5M8 8h1M15 8h1M8 12h1M15 12h1"/>',
+  cap:'<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  send:'<path d="M4 12l16-8-6 16-2.5-6.5z"/>',
+  file:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
+  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18"/>',
+  close:'<path d="M6 6l12 12M18 6L6 18"/>',
+  sparkle:'<path d="M10.5 3l1.7 5.3 5.3 1.7-5.3 1.7-1.7 5.3-1.7-5.3L3.5 10l5.3-1.7z" fill="currentColor"/>',
+};
+const ic = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+
+// ---------------- sample data ----------------
+const ROLES = {
+  learner:   { name:'Thabo Mokoena', email:'thabo@school.demo', color:'var(--learner)', label:'Learner', extra:'Grade 10' },
+  teacher:   { name:'Mrs. Dlamini', email:'dlamini@school.demo', color:'var(--teacher)', label:'Teacher', extra:'Mathematics' },
+  parent:    { name:'Nomsa Mokoena', email:'nomsa@school.demo', color:'var(--parent)', label:'Parent', extra:'Parent of Thabo' },
+  hod:       { name:'Mrs. Dlamini', email:'dlamini.hod@school.demo', color:'var(--hod)', label:'HOD', extra:'Mathematics department' },
+  principal: { name:'Mr. Sithole', email:'sithole@school.demo', color:'var(--principal)', label:'Principal', extra:'Principal' },
+  admin:     { name:'Ms. Pillay', email:'pillay@school.demo', color:'var(--admin)', label:'Admin', extra:'School administrator' },
+};
+const TABS = {
+  learner:   [['home','home','tab_home'],['quizzes','quiz','tab_quizzes'],['online','video','tab_online'],['papers','paper','tab_papers'],['me','user','tab_me']],
+  teacher:   [['class','users','tab_class'],['tquiz','quiz','tab_quizzes'],['tonline','video','tab_online'],['tpapers','paper','tab_papers'],['me','user','tab_me']],
+  parent:    [['child','chart','tab_child'],['alerts','bell','tab_alerts'],['me','user','tab_me']],
+  hod:       [['dept','building','tab_dept'],['hreports','file','tab_reports'],['me','user','tab_me']],
+  principal: [['pteachers','cap','tab_teachers'],['preports','file','tab_reports'],['me','user','tab_me']],
+  admin:     [['aover','building','tab_overview'],['ausers','users','tab_users'],['aclasses','cap','tab_classes'],['me','user','tab_me']],
+};
+const LESSONS = [
+  { t:'Algebraic expressions', p:100, done:true },
+  { t:'Exponents and surds', p:60, done:false },
+  { t:'Number patterns', p:0, done:false },
+];
+const QUIZZES = [
+  { id:1, title:'Algebra Basics', subject:'Mathematics', teacher:'Mrs. Dlamini', mins:5, qs:[
+    { q:'Simplify: 3x + 5x − 2', o:['8x − 2','15x − 2','8x + 2','6x'], a:0 },
+    { q:'Solve for x: 3x + 2 = 11', o:['x = 4','x = 3','x = 9','x = 13/3'], a:1 },
+    { q:'Expand: 2(x + 4)', o:['2x + 4','x + 8','2x + 8','2x + 6'], a:2 },
+  ]},
+  { id:2, title:'Cell Biology', subject:'Life Sciences', teacher:'Mr. Zulu', mins:3, qs:[
+    { q:'What is the basic unit of life?', o:['The atom','The cell','The organ','The tissue'], a:1 },
+    { q:'Which organelle releases energy?', o:['Nucleus','Ribosome','Mitochondrion','Vacuole'], a:2 },
+  ]},
+  { id:3, title:'Grammar & Vocabulary', subject:'English', teacher:'Mr. Khumalo', mins:4, done:{ s:2, t:3 }, qs:[
+    { q:'What is the past tense of "go"?', o:['goed','gone','went','going'], a:2 },
+  ]},
+];
+const ONLINE = [
+  { id:1, title:'Exponents revision', subject:'Mathematics', teacher:'Mrs. Dlamini', when:'Live now', live:true },
+  { id:2, title:'Poetry: figures of speech', subject:'English', teacher:'Mr. Khumalo', when:'Tomorrow · 14:00' },
+  { id:3, title:'Photosynthesis practical', subject:'Life Sciences', teacher:'Mr. Zulu', when:'Fri · 10:30' },
+];
+const PAPERS = [
+  { t:'Mathematics P1 · June 2025', s:'Mathematics', pages:12 },
+  { t:'Life Sciences study guide · Term 2', s:'Life Sciences', pages:28 },
+  { t:'English P2 · Poetry', s:'English', pages:9 },
+];
+const CLASS = [
+  { n:'Thabo Mokoena', s:'on_track', pct:86 }, { n:'Sipho Ndlovu', s:'watch', pct:62 },
+  { n:'Ayanda Mthembu', s:'at_risk', pct:38 }, { n:'Lerato Molefe', s:'on_track', pct:91 },
+  { n:'Kagiso Sithole', s:'at_risk', pct:44 }, { n:'Zanele Khumalo', s:'watch', pct:57 },
+];
+const PAPER_QS = [
+  'Simplify (2x³)² ÷ 4x⁴.', 'Solve for x: 2ˣ = 32.', 'Write 0.000345 in scientific notation.',
+  'The 5th term of 3; 7; 11; … is ____.', 'Simplify √50 + √18.', 'Factorise fully: x² − 9.',
+];
+const TEACHERS = [
+  { n:'Mrs. Dlamini', s:'Mathematics · Grade 10', att:96, perf:71, r:4.0, c:8, done:null },
+  { n:'Mr. Nkosi', s:'Mathematics · Grade 12', att:92, perf:74, r:4.7, c:6, done:true },
+  { n:'Mr. Khumalo', s:'English · Grade 11', att:91, perf:78, r:4.0, c:6, done:true },
+  { n:'Ms. Naidoo', s:'Life Sciences · Grade 12', att:88, perf:65, r:4.3, c:7, done:false },
+  { n:'Mr. Zulu', s:'Life Sciences · Grade 11', att:93, perf:70, r:4.4, c:7, done:true },
+];
+const USERS = [
+  ['Ms. Pillay','admin'],['Mr. Sithole','principal'],['Mrs. Dlamini','hod'],['Mrs. Dlamini','teacher'],['Mr. Khumalo','teacher'],
+  ['Mr. Zulu','teacher'],['Ms. Naidoo','teacher'],['Thabo Mokoena','learner'],['Sipho Ndlovu','learner'],['Lindiwe Khoza','learner'],['Nomsa Mokoena','parent'],
+];
+
+// ---------------- a few words in three languages ----------------
+const LANGS = { en:'English', zu:'isiZulu', af:'Afrikaans' };
+const W = {
+  en:{ tab_home:'Home', tab_quizzes:'Quizzes', tab_online:'Online', tab_papers:'Papers', tab_me:'Me', tab_class:'Class', tab_child:'Child', tab_alerts:'Alerts',
+       tab_dept:'Department', tab_reports:'Reports', tab_teachers:'Teachers', tab_overview:'Overview', tab_users:'Users', tab_classes:'Classes',
+       hello:'Hello', progress:'Your progress this term', lessons:'My lessons', start:'Start', continue:'Continue', join:'Join', live_now:'Live now' },
+  zu:{ tab_home:'Ekhaya', tab_quizzes:'Izivivinyo', tab_online:'Ku-inthanethi', tab_papers:'Amaphepha', tab_me:'Mina', tab_class:'Ikilasi', tab_child:'Ingane', tab_alerts:'Izaziso',
+       tab_dept:'Umnyango', tab_reports:'Imibiko', tab_teachers:'Othisha', tab_overview:'Uhlolojikelele', tab_users:'Abasebenzisi', tab_classes:'Amakilasi',
+       hello:'Sawubona', progress:'Inqubekela-phambili yakho kuleli themu', lessons:'Izifundo zami', start:'Qala', continue:'Qhubeka', join:'Joyina', live_now:'Iyaqhubeka manje' },
+  af:{ tab_home:'Tuis', tab_quizzes:'Vasvrae', tab_online:'Aanlyn', tab_papers:'Vraestelle', tab_me:'Ek', tab_class:'Klas', tab_child:'Kind', tab_alerts:'Kennisgewings',
+       tab_dept:'Departement', tab_reports:'Verslae', tab_teachers:'Onderwysers', tab_overview:'Oorsig', tab_users:'Gebruikers', tab_classes:'Klasse',
+       hello:'Hallo', progress:'Jou vordering hierdie kwartaal', lessons:'My lesse', start:'Begin', continue:'Gaan voort', join:'Sluit aan', live_now:'Nou regstreeks' },
+};
+const t = (k) => (W[S.lang] && W[S.lang][k]) || W.en[k] || k;
+
+// ---------------- state ----------------
+const S = {
+  screen:'landing', role:'learner', tab:'home', lang:'en', theme:null,
+  quiz:null,            // { id, i, picks:[], secs, done }
+  lessons:LESSONS.map((l) => ({ ...l })),
+  quizScores:{},        // quizId -> { s, t }
+  rating:{}, workDone:{}, picked:new Set([0,1,3,4]), published:false,
+  live:{ mic:false, cam:false, hand:false, secs:0 },
+  chatOpen:false, chat:[], sheet:null, toast:null, notifRead:false,
+  newClass:{ title:'', date:'Tomorrow', time:'14:00' }, scheduled:[],
+};
+let timer = null;
+
+// ---------------- rendering ----------------
+const $screen = document.getElementById('screen');
+const statusBar = `<div class="status"><span>9:41</span><span class="icons">
+  <svg viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+  <svg viewBox="0 0 25 12" fill="none" stroke="currentColor"><rect x=".5" y=".5" width="21" height="11" rx="3"/><rect x="2.5" y="2.5" width="15" height="7" rx="1.5" fill="currentColor"/><path d="M23.5 4v4" stroke-width="1.5"/></svg></span></div>`;
+
+function render(){
+  const r = ROLES[S.role];
+  $screen.style.setProperty('--role', r.color);
+  let html = statusBar;
+  if(S.screen==='landing') html += landing();
+  else if(S.screen==='login') html += `<div class="view">${login()}</div>`;
+  else if(S.screen==='live') html = statusBar.replace('class="status"', 'class="status" style="background:#0b0f17;color:#fff"') + liveClass();
+  else {
+    html += `<div class="view" id="view">${page()}</div>`;
+    html += `<nav class="tabs">${TABS[S.role].map(([id,icon,label]) =>
+      `<button class="tab ${S.tab===id?'on':''}" data-tab="${id}">${ic(icon)}${t(label)}</button>`).join('')}</nav>`;
+    if(S.screen==='app' && !S.quiz) html += `<button class="fab" data-act="chat" aria-label="Open the Smart Learning assistant">${ic('chat')}</button>`;
+  }
+  if(S.chatOpen) html += chatSheet();
+  if(S.sheet) html += sheet();
+  if(S.toast) html += `<div class="toast">${ic('check')}<span>${esc(S.toast)}</span></div>`;
+  $screen.innerHTML = html;
+  const msgs = $screen.querySelector('.msgs'); if(msgs) msgs.scrollTop = msgs.scrollHeight;
+  renderSide();
+}
+
+function topbar(title, sub, opts={}){
+  return `<div class="topbar"><div><h2>${title}</h2>${sub?`<div class="sub">${sub}</div>`:''}</div>
+    <div style="display:flex;gap:8px">${opts.lang!==false?`<button class="iconbtn" data-act="lang" aria-label="Language">${ic('globe')}</button>`:''}
+    <button class="iconbtn" data-act="notifs" aria-label="Notifications">${ic('bell')}${S.notifRead?'':'<span class="dot"></span>'}</button></div></div>`;
+}
+const initials = (n) => n.replace(/^(Mr|Mrs|Ms)\.\s*/,'').split(' ').map((p)=>p[0]).slice(0,2).join('');
+const statusPill = (s) => ({ on_track:'<span class="pill good">On track</span>', watch:'<span class="pill warn">Watch</span>', at_risk:'<span class="pill bad">At risk</span>' }[s]);
+const SUBJECT_COLOR = { Mathematics:'var(--learner)', 'Life Sciences':'var(--parent)', English:'var(--hod)' };
+
+// ---------- landing & login ----------
+function landing(){
+  return `<div class="landing">
+    <div class="logo"><span class="mark">${ic('cap')}</span>Smart Learning</div>
+    <span class="badge">● SMART LEARNING</span>
+    <h1>Every learner, <span>taught, tracked</span> and supported in one place.</h1>
+    <p>Welcome to Smart Learning! Log in to teach, learn and manage your school in one place.</p>
+    <div class="feat">${ic('sparkle')}<div><b>Smart, every step</b>Quizzes that mark themselves, study help and early warnings for learners at risk.</div></div>
+    <div class="feat">${ic('globe')}<div><b>Truly multilingual</b>The whole app in English and South Africa's other official languages.</div></div>
+    <button class="btn primary block" style="margin-top:12px;padding:15px" data-go="login">Get Started</button>
+    <div style="text-align:center;font-size:12px;opacity:.7;margin-top:10px">No account yet? Your school administrator creates it for you.</div>
+  </div>`;
+}
+function login(){
+  return `<div class="login-top"><span class="badge">● SMART LEARNING</span><h2>Welcome back</h2><div style="opacity:.85">Log in to continue to your dashboard</div></div>
+    <div class="field"><label>Email address</label><input id="em" type="email" value="${ROLES[S.role].email}" autocomplete="off"></div>
+    <div class="field"><label>Password</label><input type="password" value="Demo@1234"></div>
+    <div style="text-align:right;margin:-4px 0 14px"><button class="back" style="padding:0" data-act="forgot">Forgot password?</button></div>
+    <button class="btn primary block" style="padding:14px" data-act="login">Log in</button>
+    <div class="note"><b>Prototype:</b> pick a demo account to see that role's app.</div>
+    <div class="demo" style="margin-top:10px">${Object.entries(ROLES).map(([k,r]) =>
+      `<button class="chip ${S.role===k?'on':''}" data-role="${k}">${r.label}</button>`).join('')}</div>
+    <div style="text-align:center;margin-top:16px"><button class="back" data-go="landing">← Back home</button></div>`;
+}
+
+// ---------- pages per tab ----------
+function page(){
+  if(S.quiz) return quizPage();
+  switch(S.tab){
+    case 'home': return learnerHome();
+    case 'quizzes': return learnerQuizzes();
+    case 'online': return learnerOnline();
+    case 'papers': return papersPage(false);
+    case 'class': return teacherClass();
+    case 'tquiz': return teacherQuiz();
+    case 'tonline': return teacherOnline();
+    case 'tpapers': return papersPage(true);
+    case 'child': return parentChild();
+    case 'alerts': return alertsPage();
+    case 'dept': return hodDept();
+    case 'hreports': return reportsPage(true);
+    case 'pteachers': return principalTeachers();
+    case 'preports': return reportsPage(false);
+    case 'aover': return adminOverview();
+    case 'ausers': return adminUsers();
+    case 'aclasses': return adminClasses();
+    case 'me': return profilePage();
+  }
+  return '';
+}
+
+function learnerHome(){
+  const done = S.lessons.filter((l)=>l.done).length;
+  const pct = Math.round(S.lessons.reduce((a,l)=>a+l.p,0)/S.lessons.length);
+  const live = ONLINE.find((o)=>o.live);
+  return topbar(`${t('hello')}, Thabo`, 'Grade 10 · Smart High School') +
+    `<div class="hero" style="background:linear-gradient(135deg,var(--learner),#1e3a8a)">
+      <p>${t('progress')}</p><div class="big">${pct}%</div>
+      <div class="bar" style="background:rgba(255,255,255,.25)"><span style="width:${pct}%;background:#fff"></span></div>
+      <p style="margin-top:8px">${done} of ${S.lessons.length} lessons complete · <b>On track</b></p></div>
+    <div class="card" style="border-color:var(--bad)"><div class="row" style="padding:0">
+      <span class="avatar" style="background:var(--teacher)">${ic('video')}</span>
+      <div class="grow"><b>${live.title}</b><span class="meta">${live.teacher} · <span class="pill onair">● ${t('live_now')}</span></span></div>
+      <button class="btn primary small" data-act="joinlive">${t('join')}</button></div></div>
+    <div class="card"><h3>${t('lessons')} <small>Assessment first, then complete</small></h3>
+      ${S.lessons.map((l,i)=>`<div class="row"><div class="grow"><b>${l.t}</b>
+        <div class="bar"><span style="width:${l.p}%;background:${l.done?'var(--good)':'var(--learner)'}"></span></div></div>
+        ${l.done?'<span class="pill good">Done</span>':`<button class="btn small" data-lesson="${i}">${l.p?t('continue'):t('start')}</button>`}</div>`).join('')}
+    </div>
+    <div class="card"><h3>Up next</h3>
+      ${QUIZZES.filter((q)=>!q.done && !S.quizScores[q.id]).slice(0,2).map((q)=>quizRow(q)).join('') || '<div class="empty">All caught up!</div>'}</div>`;
+}
+function quizRow(q){
+  const score = S.quizScores[q.id] || q.done;
+  return `<div class="row"><span class="avatar" style="background:${SUBJECT_COLOR[q.subject]}">${ic('quiz')}</span>
+    <div class="grow"><b>${q.title}</b><span class="meta">${q.subject} · ${q.qs.length} questions · ${q.mins} min</span></div>
+    ${score ? `<span class="pill ${score.s/score.t>=.8?'good':score.s/score.t>=.5?'warn':'bad'}">${score.s}/${score.t}</span>`
+            : `<button class="btn primary small" data-quiz="${q.id}">${t('start')}</button>`}</div>`;
+}
+function learnerQuizzes(){
+  const f = S.quizFilter || 'All';
+  const list = QUIZZES.filter((q)=>f==='All'||q.subject===f);
+  return topbar(t('tab_quizzes'), 'Your first try counts · then practise') +
+    `<div class="chips">${['All','Mathematics','English','Life Sciences'].map((s)=>`<button class="chip ${f===s?'on':''}" data-filter="${s}">${s}</button>`).join('')}</div>
+    <div class="card"><h3>From your teachers</h3>${list.map(quizRow).join('') || '<div class="empty">No quizzes for this subject yet.</div>'}</div>
+    <div class="card"><h3>Check-in quiz <small>5 questions</small></h3>
+      <p class="meta" style="margin:0 0 10px">A quick check across your subjects. It helps your teachers see how you're doing.</p>
+      <button class="btn block" data-act="toast" data-msg="Check-in quiz opens like the quizzes above">Start check-in</button></div>`;
+}
+function quizPage(){
+  const qz = QUIZZES.find((q)=>q.id===S.quiz.id);
+  if(S.quiz.done){
+    const s = qz.qs.filter((x,i)=>S.quiz.picks[i]===x.a).length, n = qz.qs.length, pct = s/n;
+    const C = 2*Math.PI*52;
+    return `<button class="back" data-act="quitquiz">${ic('back')} Quizzes</button>
+      <div class="card" style="text-align:center">
+        <svg class="ring" viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="none" stroke="var(--chip-bg)" stroke-width="12"/>
+          <circle cx="60" cy="60" r="52" fill="none" stroke="${pct>=.8?'var(--good)':pct>=.5?'var(--warn)':'var(--bad)'}" stroke-width="12" stroke-linecap="round"
+            stroke-dasharray="${C*pct} ${C}" transform="rotate(-90 60 60)"/>
+          <text x="60" y="68" text-anchor="middle" font-family="Outfit" font-weight="800" font-size="26" fill="currentColor">${s}/${n}</text></svg>
+        <h2 style="font-size:20px">${pct>=.8?'On track — great job!':pct>=.5?'A little extra practice will help':'Needs assistance'}</h2>
+        <p class="meta">${qz.title} · ${qz.subject}</p>
+        ${pct<.8?'<div class="note">Your teacher can see this result and will help you with the topics you missed.</div>':''}
+      </div>
+      <div class="card"><h3>Answers</h3>${qz.qs.map((x,i)=>`<div class="row"><div class="grow"><b>${x.q}</b>
+        <span class="meta">Correct: ${x.o[x.a]}${S.quiz.picks[i]!==x.a?` · you chose ${x.o[S.quiz.picks[i]] ?? '—'}`:''}</span></div>
+        ${S.quiz.picks[i]===x.a?'<span class="pill good">✓</span>':'<span class="pill bad">✗</span>'}</div>`).join('')}</div>
+      <button class="btn primary block" data-act="quitquiz">Done</button>`;
+  }
+  const x = qz.qs[S.quiz.i], last = S.quiz.i===qz.qs.length-1, pick = S.quiz.picks[S.quiz.i];
+  const mm = String(Math.floor(S.quiz.secs/60)).padStart(2,'0'), ss = String(S.quiz.secs%60).padStart(2,'0');
+  return `<button class="back" data-act="quitquiz">${ic('back')} Leave quiz</button>
+    <div class="qprog"><span>${qz.title} · Question ${S.quiz.i+1} of ${qz.qs.length}</span><span class="timer">⏱ ${mm}:${ss}</span></div>
+    <div class="bar"><span style="width:${(S.quiz.i/qz.qs.length)*100}%;background:var(--learner)"></span></div>
+    <div class="question">${x.q}</div>
+    ${x.o.map((o,i)=>`<button class="opt ${pick===i?'sel':''}" data-pick="${i}"><span class="k">${'ABCD'[i]}</span>${o}</button>`).join('')}
+    <button class="btn primary block" style="margin-top:8px;padding:14px" data-act="${last?'submitquiz':'nextq'}" ${pick==null?'disabled':''}>${last?'Submit':'Next'}</button>`;
+}
+function learnerOnline(){
+  return topbar(t('tab_online'), 'Classes happen right here in the app') +
+    `<div class="card"><h3>Your online classes</h3>${ONLINE.map((o)=>`<div class="row">
+      <span class="avatar" style="background:${SUBJECT_COLOR[o.subject]}">${ic('video')}</span>
+      <div class="grow"><b>${o.title}</b><span class="meta">${o.teacher} · ${o.live?`<span class="pill onair">● ${t('live_now')}</span>`:o.when}</span></div>
+      ${o.live?`<button class="btn primary small" data-act="joinlive">${t('join')}</button>`:'<span class="pill soft">Scheduled</span>'}</div>`).join('')}</div>
+    <div class="card"><h3>Attendance</h3><div class="grid2" style="margin:0">
+      <div class="stat"><div class="n">9/10</div><div class="l">classes attended</div></div>
+      <div class="stat"><div class="n">1</div><div class="l">late arrival</div></div></div>
+      <div class="note">Joining a class marks you in the register automatically.</div></div>`;
+}
+function papersPage(teacher){
+  return topbar(t('tab_papers'), teacher?'Upload a paper — the app writes quiz questions':'Question papers and study guides') +
+    (teacher?`<button class="btn primary block" style="margin-bottom:12px" data-act="toast" data-msg="Choose a PDF, Word file or photo of the paper">${ic('plus').replace('<svg','<svg style="width:16px;height:16px;vertical-align:-3px"')} Upload paper or study guide</button>`:'') +
+    `<div class="card">${PAPERS.map((p)=>`<div class="row"><span class="avatar" style="background:${SUBJECT_COLOR[p.s]}">${ic('file')}</span>
+      <div class="grow"><b>${p.t}</b><span class="meta">${p.s} · ${p.pages} pages</span></div>
+      ${teacher?'<button class="btn small" data-go-tab="tquiz">Make quiz</button>':'<button class="btn small" data-act="toast" data-msg="Opening the paper…">Open</button>'}</div>`).join('')}</div>`;
+}
+
+// ---------- teacher ----------
+function teacherClass(){
+  const risk = CLASS.filter((c)=>c.s==='at_risk').length;
+  return topbar('My class', '10A · Mathematics · 32 learners') +
+    `<div class="grid2"><div class="stat"><div class="n" style="color:var(--bad)">${risk}</div><div class="l">learners at risk</div></div>
+      <div class="stat"><div class="n">68%</div><div class="l">class average</div></div></div>
+    <div class="chips">${['10A Maths','11B Maths','10C Maths'].map((c,i)=>`<button class="chip ${i===0?'on':''}">${c}</button>`).join('')}</div>
+    <div class="card"><h3>Learners <small>from first tries at your tests</small></h3>
+      ${CLASS.slice().sort((a,b)=>a.pct-b.pct).map((c)=>`<div class="row"><span class="avatar" style="background:var(--learner)">${initials(c.n)}</span>
+        <div class="grow"><b>${c.n.split(' ')[0]} ${c.n.split(' ')[1][0]}.</b><div class="bar"><span style="width:${c.pct}%;background:${c.s==='at_risk'?'var(--bad)':c.s==='watch'?'var(--warn)':'var(--good)'}"></span></div></div>
+        ${statusPill(c.s)}</div>`).join('')}
+      <div class="note">${ic('sparkle').replace('<svg','<svg style="width:14px;height:14px;vertical-align:-2px"')} Suggested: a 15-minute exponents recap for Ayanda and Kagiso before Friday's test.</div></div>`;
+}
+function teacherQuiz(){
+  if(S.published) return topbar(t('tab_quizzes'), 'Published to 10A Mathematics') +
+    `<div class="card" style="text-align:center"><div style="font-size:42px">✓</div><h2 style="font-size:19px">Quiz published</h2>
+      <p class="meta">"Exponents & Patterns" · ${S.picked.size} questions · 10 min<br>32 learners can take it now.</p>
+      <button class="btn block" data-act="newquiz">Make another quiz</button></div>
+    <div class="card"><h3>Results so far</h3>${CLASS.slice(0,4).map((c,i)=>`<div class="row"><div class="grow"><b>${c.n}</b></div><span class="pill ${i===2?'bad':'good'}">${i===2?2:5}/${S.picked.size}</span></div>`).join('')}</div>`;
+  return topbar('Quiz from paper', 'Mathematics P1 · June 2025') +
+    `<div class="note" style="margin:0 0 12px">The app read the paper (even scanned pages) and wrote these questions. Just tick the ones you want.</div>
+    <div class="card"><h3>Questions <small>${S.picked.size} selected</small></h3>
+      ${PAPER_QS.map((q,i)=>`<div class="row" data-pq="${i}" style="cursor:pointer"><span class="check ${S.picked.has(i)?'on':''}">${S.picked.has(i)?ic('check'):''}</span>
+        <div class="grow">${q}</div></div>`).join('')}</div>
+    <div class="card"><div class="field"><label>Quiz title</label><input value="Exponents & Patterns"></div>
+      <div class="field"><label>Send to</label><select><option>10A Mathematics</option><option>10C Mathematics</option></select></div>
+      <div class="field" style="margin:0"><label>Time limit</label><select><option>10 minutes</option><option>No limit</option></select></div></div>
+    <button class="btn primary block" style="padding:14px" data-act="publish" ${S.picked.size?'':'disabled'}>Publish quiz</button>`;
+}
+function teacherOnline(){
+  return topbar(t('tab_online'), 'Teach and take the register in the app') +
+    `<div class="card"><h3>Schedule a class</h3>
+      <div class="field"><label>Topic</label><input id="nc-title" placeholder="e.g. Exponents revision" value="${esc(S.newClass.title)}"></div>
+      <div class="grid2" style="margin-bottom:12px"><div class="field" style="margin:0"><label>Day</label><select id="nc-date"><option>Today</option><option selected>Tomorrow</option><option>Friday</option></select></div>
+        <div class="field" style="margin:0"><label>Time</label><input id="nc-time" type="time" value="14:00"></div></div>
+      <button class="btn primary block" data-act="schedule">Schedule for 10A</button></div>
+    <div class="card"><h3>Upcoming</h3>
+      ${[...S.scheduled, { title:'Exponents revision', when:'Live now', live:true }].map((o)=>`<div class="row"><span class="avatar" style="background:var(--teacher)">${ic('video')}</span>
+        <div class="grow"><b>${esc(o.title)}</b><span class="meta">10A · ${o.live?`<span class="pill onair">● ${t('live_now')}</span>`:esc(o.when)}</span></div>
+        ${o.live?'<button class="btn primary small" data-act="joinlive">Open</button>':'<span class="pill soft">Scheduled</span>'}</div>`).join('')}</div>
+    <div class="card"><h3>Last register <small>Tue · Number patterns</small></h3>
+      ${[['Thabo Mokoena','Present','good'],['Sipho Ndlovu','Late (6 min)','warn'],['Ayanda Mthembu','Absent','bad'],['Lerato Molefe','Present','good']].map(([n,s,c])=>
+        `<div class="row"><div class="grow"><b>${n}</b></div><span class="pill ${c}">${s}</span></div>`).join('')}
+      <button class="btn block" style="margin-top:8px" data-act="toast" data-msg="Register saved as a spreadsheet (CSV)">Download register</button></div>`;
+}
+
+// ---------- parent ----------
+function parentChild(){
+  return topbar('Thabo', 'Grade 10 · linked by the school') +
+    `<div class="hero" style="background:linear-gradient(135deg,var(--parent),#134e4a)"><p>Overall progress this term</p><div class="big">53%</div>
+      <div class="bar" style="background:rgba(255,255,255,.25)"><span style="width:53%;background:#fff"></span></div><p style="margin-top:8px">Status: <b>On track</b></p></div>
+    <div class="card"><h3>Quiz marks</h3>
+      ${[['Algebra Basics','Mathematics','3/3','good'],['Grammar & Vocabulary','English','2/3','warn'],['Cell Biology','Life Sciences','2/2','good']].map(([a,b,c,d])=>
+        `<div class="row"><div class="grow"><b>${a}</b><span class="meta">${b}</span></div><span class="pill ${d}">${c}</span></div>`).join('')}</div>
+    <div class="card"><h3>Attendance in online classes</h3><div class="grid2" style="margin:0">
+      <div class="stat"><div class="n">90%</div><div class="l">attended</div></div><div class="stat"><div class="n">1</div><div class="l">late</div></div></div></div>
+    <button class="btn primary block" data-act="toast" data-msg="Thabo's progress report downloaded">Download progress report</button>`;
+}
+function alertsPage(){
+  return topbar(t('tab_alerts'), '', { lang:false }) + notifList();
+}
+function notifList(){
+  const items = {
+    learner:[['Mrs. Dlamini set a new quiz: Algebra Basics','2 h ago'],['Online class "Exponents revision" is live','Now'],['Mr. Khumalo shared English P2 · Poetry','Yesterday']],
+    teacher:[['Ayanda M. scored 1/3 on "Algebra Basics" and may be at risk','1 h ago'],['Mr. Sithole sent you feedback','Yesterday']],
+    parent:[['Thabo scored 3/3 on "Algebra Basics" (Mathematics)','2 h ago'],['Thabo completed the lesson "Algebraic expressions"','Yesterday'],['Thabo joined the online class "Number patterns"','Tue']],
+    hod:[['Mrs. Dlamini completed her intervention plan','3 h ago']],
+    principal:[['Mrs. Dlamini sent a department report','Today']],
+    admin:[['3 accounts are waiting for their first login','Today']],
+  }[S.role];
+  return `<div class="card">${items.map(([m,w])=>`<div class="row"><span class="avatar" style="background:var(--role)">${ic('bell')}</span>
+    <div class="grow" style="${S.notifRead?'':'font-weight:600'}">${m}<span class="meta" style="display:block;font-weight:400">${w}</span></div></div>`).join('')}</div>
+    ${S.notifRead?'':'<button class="btn block" data-act="readall">Mark all as read</button>'}`;
+}
+
+// ---------- HOD & principal ----------
+function hodDept(){
+  return topbar('Mathematics', 'Your department · 2 teachers') +
+    TEACHERS.slice(0,2).map((tc,i)=>`<div class="card"><div class="row" style="padding:0 0 10px">
+      <span class="avatar" style="background:var(--hod)">${initials(tc.n)}</span><div class="grow"><b>${tc.n}</b><span class="meta">${tc.s}</span></div>
+      <span class="meta">★ ${tc.r.toFixed(1)}</span></div>
+      <div class="grid2" style="margin-bottom:10px"><div class="stat"><div class="n">${tc.att}%</div><div class="l">attendance</div></div><div class="stat"><div class="n">${tc.perf}%</div><div class="l">performance</div></div></div>
+      <div class="meta" style="margin-bottom:8px">Interventions done this week?</div>
+      ${S.workDone['h'+i]==null?`<div style="display:flex;gap:8px"><button class="btn small" data-work="h${i}" data-v="0">Not yet</button><button class="btn primary small" data-work="h${i}" data-v="1">Yes, done</button></div>`
+        : S.workDone['h'+i]?'<span class="pill good">Work completed</span>':'<span class="pill bad">Reminder sent</span>'}
+      </div>`).join('') +
+    `<button class="btn primary block" data-act="toast" data-msg="Department report sent to the principal">Send report to principal</button>`;
+}
+function reportsPage(hod){
+  return topbar(t('tab_reports'), hod?'Sent to the principal':'From your HODs') +
+    `<div class="card"><h3>Mathematics <small>Today 08:12</small></h3>
+      ${TEACHERS.slice(0,2).map((tc)=>`<div class="row"><div class="grow"><b>${tc.n}</b><span class="meta">${tc.s}</span></div><span class="meta">${tc.att}% · ${tc.perf}% · ★${tc.r}</span></div>`).join('')}</div>
+    <div class="card"><h3>Languages <small>Mon 15:40</small></h3>
+      <div class="row"><div class="grow"><b>Mr. Khumalo</b><span class="meta">English · Grade 11</span></div><span class="meta">91% · 78% · ★4.0</span></div></div>`;
+}
+function principalTeachers(){
+  const sel = S.selTeacher ?? 0, tc = TEACHERS[sel];
+  const dist = [Math.round(tc.c*.4),Math.round(tc.c*.35),1,0,0];
+  return topbar('Teachers', 'All 7 teachers · tap to review') +
+    `<div class="chips">${TEACHERS.map((x,i)=>`<button class="chip ${i===sel?'on':''}" data-teacher="${i}">${x.n}</button>`).join('')}</div>
+    <div class="card"><div class="row" style="padding:0 0 10px"><span class="avatar" style="background:var(--principal)">${initials(tc.n)}</span>
+      <div class="grow"><b>${tc.n}</b><span class="meta">${tc.s}</span></div></div>
+      <div class="grid2" style="margin-bottom:6px"><div class="stat"><div class="n">${tc.att}%</div><div class="l">attendance</div></div><div class="stat"><div class="n">${tc.perf}%</div><div class="l">performance</div></div></div></div>
+    <div class="card"><h3>Learner ratings <small>${tc.c} anonymous</small></h3>
+      <div class="stat" style="border:none;padding:0 0 6px"><div class="n">${tc.r.toFixed(1)} / 5</div></div>
+      <div class="rating-bars">${dist.map((d,i)=>`<div class="r"><span style="width:26px">${5-i}★</span><div class="bar"><span style="width:${d/Math.max(...dist)*100}%;background:var(--principal)"></span></div><span>${d}</span></div>`).join('')}</div></div>
+    <div class="card"><h3>Feedback</h3><div class="field" style="margin-bottom:8px"><textarea rows="3" placeholder="Write feedback for ${tc.n}…"></textarea></div>
+      <button class="btn primary block" data-act="toast" data-msg="Feedback sent — ${tc.n} has been notified">Send feedback</button></div>`;
+}
+
+// ---------- admin ----------
+function adminOverview(){
+  return topbar('School overview', 'Smart High School') +
+    `<div class="grid2">${[['Learners','312','var(--learner)'],['Teachers','24','var(--teacher)'],['Parents','287','var(--parent)'],['Classes','18','var(--admin)']].map(([l,n,c])=>
+      `<div class="stat"><div class="n" style="color:${c}">${n}</div><div class="l">${l}</div></div>`).join('')}</div>
+    <div class="card"><h3>Needs attention</h3>
+      <div class="row"><div class="grow"><b>3 accounts</b><span class="meta">haven't logged in for the first time</span></div><button class="btn small" data-go-tab="ausers">View</button></div>
+      <div class="row"><div class="grow"><b>2 classes</b><span class="meta">have no teacher yet</span></div><button class="btn small" data-go-tab="aclasses">Fix</button></div></div>
+    <button class="btn primary block" data-act="adduser">Add a user</button>`;
+}
+function adminUsers(){
+  const f = S.userFilter || 'all';
+  return topbar('Users', `${USERS.length} accounts`) +
+    `<div class="chips">${['all','learner','teacher','parent','hod','principal','admin'].map((r)=>`<button class="chip ${f===r?'on':''}" data-ufilter="${r}">${r==='all'?'All':ROLES[r].label}</button>`).join('')}</div>
+    <div class="card">${USERS.filter(([,r])=>f==='all'||r===f).map(([n,r])=>`<div class="row"><span class="avatar" style="background:${ROLES[r].color}">${initials(n)}</span>
+      <div class="grow"><b>${n}</b><span class="meta">${ROLES[r].label}</span></div><button class="btn small" data-act="toast" data-msg="A new temporary password was made for ${n}">Reset login</button></div>`).join('')}</div>
+    <button class="btn primary block" data-act="adduser">Add a user</button>`;
+}
+function adminClasses(){
+  return topbar('Classes', 'Grade, subject, teacher and learners') +
+    `<div class="card">${[['10A','Mathematics','Mrs. Dlamini',32],['10B','English','Mr. Khumalo',30],['11A','Life Sciences','Mr. Zulu',28],['12A','Mathematics',null,27]].map(([n,s,tc,c])=>
+      `<div class="row"><span class="avatar" style="background:var(--admin)">${n}</span><div class="grow"><b>${s}</b><span class="meta">${tc||'<span style="color:var(--bad)">No teacher yet</span>'} · ${c} learners</span></div>
+      <button class="btn small" data-act="toast" data-msg="Opening class ${n}">Edit</button></div>`).join('')}</div>
+    <button class="btn primary block" data-act="toast" data-msg="New class form">Add a class</button>`;
+}
+
+// ---------- profile ----------
+function profilePage(){
+  const r = ROLES[S.role];
+  return topbar('My profile', '', { lang:false }) +
+    `<div class="card" style="display:flex;gap:14px;align-items:center"><span class="avatar" style="background:${r.color};width:58px;height:58px;font-size:20px;border-radius:18px">${initials(r.name)}</span>
+      <div><h2 style="font-size:19px">${r.name}</h2><span class="pill soft">${r.label}</span> <span class="meta">${r.extra}</span></div></div>
+    <div class="card"><h3>Contact details</h3>
+      <div class="field"><label>Name</label><input value="${r.name}"></div><div class="field"><label>Email</label><input value="${r.email}"></div>
+      <div class="field"><label>Phone</label><input placeholder="e.g. 082 123 4567"></div>
+      <button class="btn primary block" data-act="toast" data-msg="Your details were saved">Save</button></div>
+    ${S.role==='learner'?`<div class="card"><h3>Rate your teachers <small>anonymous</small></h3>
+      ${['Mrs. Dlamini','Mr. Khumalo','Mr. Zulu'].map((n)=>`<div class="row"><div class="grow"><b>${n}</b></div><div class="stars">${[1,2,3,4,5].map((i)=>
+        `<button class="${i<=(S.rating[n]||0)?'on':''}" data-rate="${n}" data-v="${i}" aria-label="${i} stars">${ic('star')}</button>`).join('')}</div></div>`).join('')}</div>`:''}
+    <div class="card"><h3>Settings</h3>
+      <div class="row"><div class="grow"><b>Language</b><span class="meta">${LANGS[S.lang]}</span></div><button class="btn small" data-act="lang">Change</button></div>
+      <div class="row"><div class="grow"><b>Password</b><span class="meta">Changed 2 weeks ago</span></div><button class="btn small" data-act="toast" data-msg="Password change form">Change</button></div></div>
+    <button class="btn block" style="color:var(--bad)" data-act="logout">Log out</button>`;
+}
+
+// ---------- live classroom ----------
+function liveClass(){
+  const mm = String(Math.floor(S.live.secs/60)).padStart(2,'0'), ss = String(S.live.secs%60).padStart(2,'0');
+  const others = ['SN','LM','AM','KS','ZK','LK'];
+  return `<div class="live">
+    <div class="live-head"><div><b style="font-family:var(--font-display);font-size:16px">Exponents revision</b><div style="font-size:12px;opacity:.7">Mrs. Dlamini · 10A Mathematics</div></div>
+      <span class="pill onair">● ${mm}:${ss}</span></div>
+    <div class="teacher-cam"><div class="big-av">MD</div><span class="who">Mrs. Dlamini · presenting</span></div>
+    <div class="tiles">${[S.role==='teacher'?'MD':'TM',...others.slice(0,7)].map((x,i)=>`<div class="tile ${i===0?'me':''}">${x}<small>${i===0?'You':''}</small></div>`).join('')}</div>
+    <div class="live-chat"><div><b>Mrs. Dlamini:</b> Today: laws of exponents. Have your exercise books ready.</div>
+      <div><b>Sipho N.:</b> Ma'am, is (2³)² = 2⁵ or 2⁶?</div><div><b>Mrs. Dlamini:</b> 2⁶ — multiply the powers. Good question!</div>
+      ${S.live.hand?'<div><b>You:</b> ✋ raised your hand</div>':''}</div>
+    <div class="controls">
+      <button class="ctrl ${S.live.mic?'':'off'}" data-live="mic" aria-label="Microphone">${ic('mic')}</button>
+      <button class="ctrl ${S.live.cam?'':'off'}" data-live="cam" aria-label="Camera">${ic('cam')}</button>
+      <button class="ctrl ${S.live.hand?'off':''}" data-live="hand" aria-label="Raise hand">${ic('hand')}</button>
+      <button class="ctrl leave" data-act="leavelive" aria-label="Leave">${ic('phone')}</button></div>
+    <div style="text-align:center;font-size:11.5px;opacity:.6;margin-top:10px">✓ You were marked present at ${S.role==='teacher'?'the start':'09:41'}</div>
+  </div>`;
+}
+
+// ---------- chat helper ----------
+function chatSheet(){
+  return `<div class="sheet-bg" data-act="closechat"><div class="sheet" style="height:82%" data-stop>
+    <div class="sheet-head"><div><b>Smart Learning Assistant</b><small>Ask about the app, or try a sum</small></div><button data-act="closechat" aria-label="Close">✕</button></div>
+    <div class="msgs">${S.chat.length?S.chat.map((m)=>`<div class="msg ${m.r}">${esc(m.t)}</div>`).join('')
+      :'<div class="empty">Hi! Ask me how to use Smart Learning, or try "teach me how to count".</div>'}</div>
+    <div class="suggest">${['teach me how to count','what is 12 x 7','explain tenses','how do I join a class'].map((s)=>`<button class="chip" data-ask="${s}">${s}</button>`).join('')}</div>
+    <div class="composer"><input id="chatIn" placeholder="Type a message…" autocomplete="off"><button class="btn primary" data-act="send" aria-label="Send">${ic('send').replace('<svg','<svg style="width:18px;height:18px"')}</button></div>
+  </div></div>`;
+}
+function botReply(q){
+  const s = q.toLowerCase();
+  if(/count/.test(s)) return 'Let\'s learn to count! Say each number out loud:\n1 – one\n2 – two\n3 – three\n4 – four\n5 – five\n6 – six\n7 – seven\n8 – eight\n9 – nine\n10 – ten\n\nNext, try "count in 2s".';
+  const m = s.replace(/x|×/g,'*').match(/(-?\d+(?:\.\d+)?)\s*([+\-*/])\s*(-?\d+(?:\.\d+)?)/);
+  if(m){ const a=+m[1], b=+m[3]; const r = {'+':a+b,'-':a-b,'*':a*b,'/':b?a/b:NaN}[m[2]];
+    return Number.isNaN(r) ? 'You can\'t divide by 0.' : `${a} ${m[2].replace('*','×').replace('/','÷')} ${b} = ${+r.toFixed(6)}`; }
+  if(/tense/.test(s)) return 'Tense shows WHEN something happens.\n• Present: I walk to school.\n• Past: I walked to school.\n• Future: I will walk to school.\nTip: in an essay, stay in one tense unless the time changes.';
+  if(/class|join|online/.test(s)) return 'Open the Online tab. When a class is live, tap Join — it happens right inside Smart Learning, and joining marks you present.';
+  if(/quiz|test/.test(s)) return 'Your teachers\' quizzes are in the Quizzes tab. Your first try counts; after that you can practise.';
+  if(/password|login|log in/.test(s)) return 'Forgot your password? Tap "Forgot password?" on the login page and follow the link we email you.';
+  if(/^(hi|hello|hey|sawubona|molo)/.test(s)) return 'Hello! I can explain how the app works, teach counting, work out sums and explain school topics.';
+  return 'In the full app, the AI assistant answers any question in your language. In this prototype, try one of the suggestions below.';
+}
+
+// ---------- sheets ----------
+function sheet(){
+  if(S.sheet==='lang') return `<div class="sheet-bg" data-act="closesheet"><div class="sheet" data-stop>
+    <div class="sheet-head"><div><b>Language</b><small>The whole app switches</small></div><button data-act="closesheet">✕</button></div>
+    <div class="sheet-body">${Object.entries(LANGS).map(([k,v])=>`<button class="opt ${S.lang===k?'sel':''}" data-lang="${k}"><span class="k">${k.toUpperCase()}</span>${v}</button>`).join('')}
+      <div class="note">The full app has all 11 official languages; this prototype shows three.</div></div></div></div>`;
+  if(S.sheet==='notifs') return `<div class="sheet-bg" data-act="closesheet"><div class="sheet" data-stop>
+    <div class="sheet-head"><div><b>Notifications</b></div><button data-act="closesheet">✕</button></div><div class="sheet-body">${notifList()}</div></div></div>`;
+  if(S.sheet==='adduser') return `<div class="sheet-bg" data-act="closesheet"><div class="sheet" data-stop>
+    <div class="sheet-head"><div><b>Add a user</b><small>They get a temporary password</small></div><button data-act="closesheet">✕</button></div>
+    <div class="sheet-body"><div class="field"><label>Full name</label><input placeholder="e.g. Lerato Molefe"></div>
+      <div class="field"><label>Email</label><input placeholder="lerato@school.org"></div>
+      <div class="field"><label>Role</label><select><option>Learner</option><option>Teacher</option><option>Parent</option><option>HOD</option></select></div>
+      <div class="field"><label>Grade</label><select><option>Grade 10</option><option>Grade 11</option><option>Grade 12</option></select></div>
+      <button class="btn primary block" data-act="createuser">Create account</button></div></div></div>`;
+  if(S.sheet==='lesson') { const l = S.lessons[S.lessonI]; return `<div class="sheet-bg" data-act="closesheet"><div class="sheet" data-stop>
+    <div class="sheet-head"><div><b>${l.t}</b><small>Assessment · due 22 Sep</small></div><button data-act="closesheet">✕</button></div>
+    <div class="sheet-body"><p style="line-height:1.55;margin-top:0">Read the assessment brief, then work through the lesson notes and examples. When you're done, mark the lesson complete — your progress goes up and your parent is told.</p>
+      <button class="btn primary block" data-act="completelesson">Mark lesson complete</button></div></div></div>`; }
+  return '';
+}
+
+// ---------- side panel (desktop) ----------
+function renderSide(){
+  document.getElementById('jumpRoles').innerHTML = Object.entries(ROLES).map(([k,r])=>
+    `<button class="${S.screen!=='landing'&&S.screen!=='login'&&S.role===k?'on':''}" data-jrole="${k}">${r.label}</button>`).join('');
+  const flows = [['Welcome','landing'],['Log in','login'],['Take a quiz','quiz'],['Live class','live'],['Quiz from paper','tquiz'],['Chat helper','chat']];
+  document.getElementById('jumpFlows').innerHTML = flows.map(([l,k])=>`<button data-jflow="${k}">${l}</button>`).join('');
+  const theme = document.documentElement.dataset.theme || 'auto';
+  document.getElementById('jumpTheme').innerHTML = [['auto','Auto'],['light','Light'],['dark','Dark']].map(([k,l])=>`<button class="${theme===k?'on':''}" data-jtheme="${k}">${l}</button>`).join('');
+}
+
+// ---------------- actions ----------------
+function toast(msg){ S.toast = msg; render(); clearTimeout(toast.t); toast.t = setTimeout(()=>{ S.toast = null; render(); }, 2200); }
+function enter(role){ S.role = role; S.screen = 'app'; S.tab = TABS[role][0][0]; S.quiz = null; S.chatOpen = false; S.sheet = null; stopTimer(); render(); }
+function stopTimer(){ clearInterval(timer); timer = null; }
+function startQuiz(id){
+  const qz = QUIZZES.find((q)=>q.id===id);
+  S.quiz = { id, i:0, picks:[], secs:qz.mins*60, done:false }; stopTimer();
+  timer = setInterval(()=>{ if(!S.quiz||S.quiz.done) return stopTimer(); S.quiz.secs--; if(S.quiz.secs<=0){ finishQuiz(); return; }
+    const el = $screen.querySelector('.timer'); if(el){ el.textContent = '⏱ '+String(Math.floor(S.quiz.secs/60)).padStart(2,'0')+':'+String(S.quiz.secs%60).padStart(2,'0'); } }, 1000);
+  render();
+}
+function finishQuiz(){ const qz = QUIZZES.find((q)=>q.id===S.quiz.id); S.quiz.done = true; stopTimer();
+  S.quizScores[qz.id] = { s:qz.qs.filter((x,i)=>S.quiz.picks[i]===x.a).length, t:qz.qs.length }; render(); }
+function joinLive(){ S.screen = 'live'; S.live.secs = 754; stopTimer();
+  timer = setInterval(()=>{ S.live.secs++; const el = $screen.querySelector('.live-head .pill'); if(el) el.textContent = '● '+String(Math.floor(S.live.secs/60)).padStart(2,'0')+':'+String(S.live.secs%60).padStart(2,'0'); }, 1000);
+  render(); }
+function sendChat(text){ const q = (text||'').trim(); if(!q) return; S.chat.push({ r:'user', t:q }); render();
+  setTimeout(()=>{ S.chat.push({ r:'bot', t:botReply(q) }); render(); const i = $screen.querySelector('#chatIn'); if(i) i.focus(); }, 450); }
+
+document.addEventListener('click', (e)=>{
+  const el = e.target.closest('[data-act],[data-go],[data-tab],[data-role],[data-quiz],[data-pick],[data-filter],[data-lesson],[data-pq],[data-work],[data-teacher],[data-ufilter],[data-rate],[data-live],[data-ask],[data-lang],[data-go-tab],[data-jrole],[data-jflow],[data-jtheme],[data-stop]');
+  if(!el) return;
+  const d = el.dataset;
+  if('stop' in d && !d.act) return;  // a click inside a sheet doesn't close it
+  if(d.go){ S.screen = d.go; render(); return; }
+  if(d.tab){ S.tab = d.tab; S.quiz = null; stopTimer(); render(); $screen.querySelector('.view')?.scrollTo(0,0); return; }
+  if(d.goTab){ S.tab = d.goTab; render(); return; }
+  if(d.role){ S.role = d.role; render(); return; }
+  if(d.quiz){ startQuiz(+d.quiz); return; }
+  if(d.pick){ S.quiz.picks[S.quiz.i] = +d.pick; render(); return; }
+  if(d.filter){ S.quizFilter = d.filter; render(); return; }
+  if(d.ufilter){ S.userFilter = d.ufilter; render(); return; }
+  if(d.lesson){ S.lessonI = +d.lesson; S.sheet = 'lesson'; render(); return; }
+  if(d.pq){ const i = +d.pq; S.picked.has(i) ? S.picked.delete(i) : S.picked.add(i); render(); return; }
+  if(d.work){ S.workDone[d.work] = d.v==='1'; render(); toast(d.v==='1'?'Marked as done':'A reminder was sent to the teacher'); return; }
+  if(d.teacher){ S.selTeacher = +d.teacher; render(); return; }
+  if(d.rate){ S.rating[d.rate] = +d.v; render(); toast(`Thanks — ${d.v}/5 for ${d.rate}, shared anonymously`); return; }
+  if(d.live){ S.live[d.live] = !S.live[d.live]; render(); return; }
+  if(d.ask){ sendChat(d.ask); return; }
+  if(d.lang){ S.lang = d.lang; S.sheet = null; render(); toast('Language: '+LANGS[d.lang]); return; }
+  if(d.jrole){ enter(d.jrole); return; }
+  if(d.jtheme){ if(d.jtheme==='auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = d.jtheme; render(); return; }
+  if(d.jflow){ const f = d.jflow;
+    if(f==='landing'||f==='login'){ stopTimer(); S.screen = f; S.chatOpen = false; S.sheet = null; render(); }
+    else if(f==='quiz'){ enter('learner'); S.tab = 'quizzes'; startQuiz(1); }
+    else if(f==='live'){ enter('learner'); joinLive(); }
+    else if(f==='tquiz'){ enter('teacher'); S.tab = 'tquiz'; S.published = false; render(); }
+    else if(f==='chat'){ if(S.screen!=='app') enter('learner'); S.chatOpen = true; render(); }
+    return; }
+  switch(d.act){
+    case 'login': enter(S.role); break;
+    case 'forgot': toast('A reset link was emailed to you'); break;
+    case 'logout': stopTimer(); S.screen = 'login'; render(); break;
+    case 'chat': S.chatOpen = true; render(); $screen.querySelector('#chatIn')?.focus(); break;
+    case 'closechat': if(e.target===el || el.tagName==='BUTTON'){ S.chatOpen = false; render(); } break;
+    case 'send': sendChat($screen.querySelector('#chatIn').value); break;
+    case 'lang': S.sheet = 'lang'; render(); break;
+    case 'notifs': S.sheet = 'notifs'; render(); break;
+    case 'closesheet': if(e.target===el || el.tagName==='BUTTON'){ S.sheet = null; render(); } break;
+    case 'readall': S.notifRead = true; render(); break;
+    case 'nextq': S.quiz.i++; render(); break;
+    case 'submitquiz': finishQuiz(); break;
+    case 'quitquiz': S.quiz = null; stopTimer(); S.tab = 'quizzes'; render(); break;
+    case 'joinlive': joinLive(); break;
+    case 'leavelive': stopTimer(); S.screen = 'app'; S.live = { mic:false, cam:false, hand:false, secs:0 }; render(); toast('You left the class · attendance recorded'); break;
+    case 'publish': S.published = true; render(); toast('Quiz published to 10A Mathematics'); break;
+    case 'newquiz': S.published = false; S.picked = new Set(); render(); break;
+    case 'schedule': { const title = $screen.querySelector('#nc-title').value.trim();
+      if(!title){ toast('Give the class a topic first'); break; }
+      S.scheduled.unshift({ title, when:$screen.querySelector('#nc-date').value+' · '+$screen.querySelector('#nc-time').value }); S.newClass.title = ''; render(); toast('Scheduled — learners in 10A can see it'); break; }
+    case 'adduser': S.sheet = 'adduser'; render(); break;
+    case 'createuser': S.sheet = null; render(); toast('Account created · temporary password: quKC-7rWh'); break;
+    case 'completelesson': { const l = S.lessons[S.lessonI]; l.p = 100; l.done = true; S.sheet = null; render(); toast('Lesson complete — your parent was told'); break; }
+    case 'toast': toast(d.msg); break;
+  }
+});
+document.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && e.target.id==='chatIn') sendChat(e.target.value); });
+
+render();
+</script>
+</body>
+</html>
