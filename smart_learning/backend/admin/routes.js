@@ -9,6 +9,9 @@ const { catalog, deptForSubject } = require('../lib/catalog');
 const { ensureLessons } = require('../lib/learners');
 const { publicUser, findByEmail, findById } = require('../lib/users');
 const { classView } = require('../lib/classes');
+const sms = require('../lib/sms');
+const mailer = require('../lib/mailer');
+const { rateLimit } = require('../lib/rateLimit');
 const http = require('../lib/http');
 
 const router = express.Router();
@@ -47,7 +50,7 @@ async function withLinks(users) {
 }
 
 function invite(user, tempPassword) {
-  return { name: user.name, email: user.email, role: user.role, tempPassword, loginUrl: config.appUrl };
+  return { userId: user.id, name: user.name, email: user.email, role: user.role, tempPassword, loginUrl: config.appUrl };
 }
 
 async function requireUser(id, role) {
@@ -85,6 +88,7 @@ router.post('/users', async (req, res) => {
     role,
     ...roleDetails(role, b),
   };
+  if (b.phone) fields.phone = http.text(b.phone, 'phone', { max: 30, required: false }) || null;
   const childId = role === 'parent' && b.childId ? http.id(b.childId, 'childId') : null;
   if (await findByEmail(fields.email)) throw http.conflict('admin_error_email_taken', 'An account with this email already exists');
   if (childId) await requireUser(childId, 'learner');
@@ -140,6 +144,25 @@ router.post('/users/:id/reset-login', async (req, res) => {
     [await auth.hashPassword(tempPassword), user.id],
   );
   res.json({ invite: invite(user, tempPassword) });
+});
+
+// Emails someone their login details (the "Send email" button after adding a user or resetting
+// a login). Body: { tempPassword } as shown to the administrator. Only the account's current
+// temporary password is sent, so old details can't go out by mistake.
+const emailLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, key: (req) => 'invite-email:' + req.user.id });
+router.post('/users/:id/email-login', emailLimiter, async (req, res) => {
+  const user = await requireUser(http.id(req.params.id));
+  const tempPassword = http.body(req).tempPassword;
+  if (!user.must_change_password || typeof tempPassword !== 'string' || !(await auth.verifyPassword(tempPassword, user.password_hash))) {
+    throw http.conflict('invite_password_stale', 'These login details are out of date; make new ones with Resend login');
+  }
+  try {
+    await mailer.sendLoginDetails(user, tempPassword, config.appUrl);
+  } catch (err) {
+    console.error(`[admin] could not email the login details to ${user.email}: ${err.message}`);
+    throw new http.HttpError(502, 'email_failed', 'The email could not be sent');
+  }
+  res.json({ sent: mailer.configured(), email: user.email });
 });
 
 // pairs a parent with a learner: the parent then sees only their linked children's progress
@@ -262,6 +285,28 @@ router.get('/overview', async (req, res) => {
             (SELECT COUNT(*) FROM users WHERE must_change_password = 1) AS awaitingFirstLogin`,
   );
   res.json({ counts, totalUsers: Object.values(counts).reduce((a, b) => a + b, 0), subjects, ...quizzes });
+});
+
+// ---- text messages (textbee) ----
+
+const smsLimiter = rateLimit({ windowMs: 60 * 1000, max: 20, key: (req) => 'sms:' + req.user.id });
+
+// whether textbee is set up (without it, messages are only written to the server log)
+router.get('/sms', (req, res) => {
+  res.json(sms.status());
+});
+
+// Body: { to: one or more phone numbers (an array, or separated by commas), message }
+router.post('/sms', smsLimiter, async (req, res) => {
+  const b = http.body(req);
+  const raw = (Array.isArray(b.to) ? b.to : String(b.to || '').split(/[,;\n]+/)).map((x) => String(x).trim()).filter(Boolean);
+  if (raw.length === 0) throw http.badRequest('sms_no_number', 'Enter a phone number', { field: 'to' });
+  if (raw.length > 50) throw http.badRequest('invalid_field', 'Send to at most 50 numbers at once', { field: 'to' });
+  const bad = raw.find((x) => !sms.normalizeNumber(x));
+  if (bad) throw http.badRequest('sms_bad_number', `"${bad}" is not a phone number`, { field: 'to', number: bad });
+  const message = http.text(b.message, 'message', { max: sms.SMS_MAX });
+  const result = await sms.send(raw, message);
+  res.json({ ...result, configured: sms.status().configured, recipients: raw.map(sms.normalizeNumber) });
 });
 
 module.exports = router;

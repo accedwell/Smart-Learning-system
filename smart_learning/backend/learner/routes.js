@@ -11,6 +11,7 @@ const { parentIdsOf, notify } = require('../lib/users');
 const { learnerView, mark } = require('../lib/quizzes');
 const { sentToLearners, teachesLearner } = require('../lib/classes');
 const onlineClasses = require('../lib/onlineClasses');
+const sms = require('../lib/sms');
 const http = require('../lib/http');
 
 const router = express.Router();
@@ -18,6 +19,13 @@ router.use(auth.requireAuth(), auth.requireRole('learner'));
 
 // answers sent this long after a timed quiz's deadline are not accepted
 const DEADLINE_GRACE_MS = 30 * 1000;
+
+// An SMS to the learner's linked parents (those with a phone number on file). Sent after the
+// change is saved and never waited for, so a slow or failed SMS can't hold up the learner.
+function textParents(learner, message) {
+  parentIdsOf(learner.id).then(sms.phonesOf).then((phones) => sms.sendQuietly(phones, 'Smart Learning: ' + message))
+    .catch((err) => console.error('[sms] parent alert:', err.message));
+}
 
 // AI extras are best-effort: the main action still succeeds when AI is unavailable or the
 // learner has used up their AI budget for the minute
@@ -48,6 +56,7 @@ router.post('/lessons/:id/complete', async (req, res) => {
     await refreshProgress(req.user.id, conn);
     await notify(await parentIdsOf(req.user.id, conn), { message: `${req.user.name} completed the lesson "${t(lesson.lesson_key)}".` }, conn);
   });
+  textParents(req.user, `${req.user.name} completed the lesson "${t(lesson.lesson_key)}".`);
   const recommendation = await optionalAi(req, () => ai.askOneLiner(
     `A learner just completed the lesson "${t(lesson.lesson_key)}" on an education platform called Smart Learning. ` +
     'In ONE short sentence (max 25 words), recommend the next best personalised learning activity for them, warmly and ' +
@@ -215,6 +224,12 @@ router.post('/quizzes/:id/submit', async (req, res) => {
       }, conn);
     }
   });
+  // parents get a text for the first try only (the mark the teacher sees), not for practice
+  if (firstTry) {
+    const atRisk = statusFor(score / quiz.questions.length) === 'at_risk';
+    textParents(req.user, `${req.user.name} scored ${score}/${quiz.questions.length} on "${quiz.title}" (${t(quiz.subject_key)}).` +
+      (atRisk ? ' This mark puts them at risk: their teacher will follow up.' : ''));
+  }
   const saved = await db.one('SELECT * FROM quiz_attempts WHERE id = ?', [attempt.id]);
   res.json({
     attempt: attemptView(saved),

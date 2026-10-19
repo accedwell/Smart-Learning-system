@@ -14,7 +14,7 @@ import { Checkin, LearnerHome, LearnerOnline, LearnerPapers, LearnerQuizzes, Qui
 import { PaperQuiz, QuizBuilder, QuizResults, Register, TeacherClass, TeacherOnline, TeacherPapers, TeacherQuizzes } from './src/screens/Teacher';
 import { ParentChild } from './src/screens/Parent';
 import { HodDepartment, HodReports, PrincipalReports, PrincipalTeachers } from './src/screens/Staff';
-import { AdminClasses, AdminOverview, AdminUsers } from './src/screens/Admin';
+import { AdminClasses, AdminOverview, AdminSms, AdminUsers } from './src/screens/Admin';
 
 const LearnerProfile = () => <ProfileScreen extra={<RateTeachers />} />;
 
@@ -44,7 +44,8 @@ const TABS = {
   ],
   admin: [
     ['aover', 'business', 'nav_overview', AdminOverview], ['ausers', 'people', 'nav_users', AdminUsers],
-    ['aclasses', 'school', 'nav_classes', AdminClasses], ['me', 'person', 'm_tab_me', ProfileScreen],
+    ['aclasses', 'school', 'nav_classes', AdminClasses], ['asms', 'chatbox', 'm_sms_tab', AdminSms],
+    ['me', 'person', 'm_tab_me', ProfileScreen],
   ],
 };
 

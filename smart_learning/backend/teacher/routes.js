@@ -11,6 +11,7 @@ const { catalog, t, langNote } = require('../lib/catalog');
 const { riskFrom } = require('../lib/learners');
 const { shortName, notify } = require('../lib/users');
 const onlineClasses = require('../lib/onlineClasses');
+const sms = require('../lib/sms');
 const { documentText } = require('../lib/documentText');
 const quizGen = require('../lib/quizGen');
 
@@ -402,14 +403,22 @@ router.post('/online-classes', async (req, res) => {
     starts_at: onlineClasses.startsAt(b.startsAt),
     duration_min: onlineClasses.duration(b.durationMin),
   };
+  let learnerIds = [];
   const id = await db.tx(async (conn) => {
     const result = await db.query('INSERT INTO online_classes SET ?', [fields], conn);
     const learners = await db.query('SELECT learner_id FROM class_learners WHERE class_id = ?', [klass.id], conn);
-    await notify(learners.map((l) => l.learner_id), {
+    learnerIds = learners.map((l) => l.learner_id);
+    await notify(learnerIds, {
       message: `${req.user.name} scheduled an online class for ${klass.name} ${t(klass.subject_key)}: "${fields.title}".`,
     }, conn);
     return result.insertId;
   });
+  // a text reminder to the learners with a phone number on file (not waited for)
+  const when = fields.starts_at.toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  sms.phonesOf(learnerIds)
+    .then((phones) => sms.sendQuietly(phones, `Smart Learning: ${req.user.name} scheduled an online class for ${klass.name} ` +
+      `${t(klass.subject_key)}: "${fields.title}" on ${when} (${fields.duration_min} min). Join it in the Smart Learning app.`))
+    .catch((err) => console.error('[sms] class reminder:', err.message));
   const oc = await onlineClasses.find(id);
   res.status(201).json({ onlineClass: teacherOnlineView(oc, new Map()) });
 });

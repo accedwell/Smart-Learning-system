@@ -78,4 +78,34 @@ function sendEmailChanged(user, oldEmail, newEmail) {
   return send({ to: oldEmail, subject: 'Your Smart Learning email address was changed', text, html });
 }
 
-module.exports = { send, verify, sendPasswordReset, sendEmailChanged };
+// a new (or reset) account's login details, sent when the administrator presses "Send email"
+function sendLoginDetails(user, tempPassword, loginUrl) {
+  const text = [
+    `Hello ${user.name},`,
+    '',
+    'Your school has created a Smart Learning account for you. Your login details:',
+    '',
+    `  Email: ${user.email}`,
+    `  Temporary password: ${tempPassword}`,
+    '',
+    `Log in at ${loginUrl} (or in the Smart Learning app). The first time you log in, you will`,
+    'choose your own password.',
+    '',
+    'Smart Learning',
+  ].join('\n');
+  const html = `<p>Hello ${escapeHtml(user.name)},</p>
+<p>Your school has created a Smart Learning account for you. Your login details:</p>
+<table style="border-collapse:collapse;margin:8px 0 14px">
+<tr><td style="padding:4px 12px 4px 0;color:#555">Email</td><td style="padding:4px 0"><b>${escapeHtml(user.email)}</b></td></tr>
+<tr><td style="padding:4px 12px 4px 0;color:#555">Temporary password</td><td style="padding:4px 0;font-family:monospace;font-size:16px"><b>${escapeHtml(tempPassword)}</b></td></tr>
+</table>
+<p><a href="${escapeHtml(loginUrl)}" style="display:inline-block;padding:10px 18px;background:#b8791f;color:#fff;border-radius:6px;text-decoration:none">Log in to Smart Learning</a></p>
+<p>You can also log in in the Smart Learning app. The first time you log in, you will choose your own password.</p>
+<p>Smart Learning</p>`;
+  return send({ to: user.email, subject: 'Your Smart Learning login details', text, html });
+}
+
+// whether emails really go out (SMTP set up) or are only written to the log
+const configured = () => Boolean(transport);
+
+module.exports = { send, verify, sendPasswordReset, sendEmailChanged, sendLoginDetails, configured };

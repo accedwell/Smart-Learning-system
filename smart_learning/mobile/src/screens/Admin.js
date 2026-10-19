@@ -2,7 +2,7 @@
 // and the classes.
 import { useState } from 'react';
 import { Share, Text, View } from 'react-native';
-import { apiDelete, apiPost, errorText } from '../api';
+import { apiDelete, apiPatch, apiPost, errorText } from '../api';
 import {
   Avatar, Bar, Button, Card, Chips, Choice, Empty, ErrorText, Field, Grid2, Loaded, Note, Pill, Row,
   Screen, Sheet, Stat, initials, useData, useKit,
@@ -51,9 +51,28 @@ export function AdminOverview() {
 
 // the login details to pass on, with the phone's share menu (email, WhatsApp, SMS…)
 function InviteSheet({ invite, onClose }) {
-  const { t, c } = useKit();
   if (!invite) return null;
+  return <InviteDetails key={invite.userId + invite.tempPassword} invite={invite} onClose={onClose} />;
+}
+
+// "Send email" has the server email the login details straight away; "Share" uses the
+// phone's share menu (WhatsApp, SMS…)
+function InviteDetails({ invite, onClose }) {
+  const { t, has, token, c } = useKit();
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState(null); // { kind: 'sent' | 'logged' | 'error', text }
   const text = `Smart Learning\n${invite.name}\n${t('login_email_label')}: ${invite.email}\n${t('m_temp_password')}: ${invite.tempPassword}\n${invite.loginUrl}`;
+
+  async function sendEmail() {
+    setSending(true);
+    setResult(null);
+    const { data, error } = await apiPost(`/admin/users/${invite.userId}/email-login`, { tempPassword: invite.tempPassword }, token);
+    setSending(false);
+    if (error) return setResult({ kind: 'error', text: errorText(t, has, error) });
+    setResult(data.sent ? { kind: 'sent', text: t('admin_invite_sent', { email: data.email }) } : { kind: 'logged', text: t('admin_invite_logged') });
+  }
+
+  const sent = result && result.kind === 'sent';
   return (
     <Sheet visible title={t('admin_invite_title', { name: invite.name })} onClose={onClose}>
       <View style={{ padding: 16 }}>
@@ -61,8 +80,12 @@ function InviteSheet({ invite, onClose }) {
           <Row first title={t('login_email_label')} meta={invite.email} />
           <Row title={t('m_temp_password')} meta={<Text selectable style={{ color: c.ink, fontSize: 20, fontWeight: '800', letterSpacing: 1, marginTop: 4 }}>{invite.tempPassword}</Text>} />
         </Card>
-        <Note>{t('m_temp_password_note')}</Note>
-        <Button kind="primary" icon="share-outline" title={t('m_share')} onPress={() => Share.share({ message: text })} style={{ marginTop: 6 }} />
+        {result ? (
+          result.kind === 'error' ? <ErrorText>{result.text}</ErrorText> : <Note kind={sent ? 'good' : 'brand'}>{result.text}</Note>
+        ) : <Note>{t('m_temp_password_note')}</Note>}
+        <Button kind="primary" icon={sent ? 'checkmark-circle' : 'mail'} busy={sending} disabled={sent}
+          title={sent ? t('admin_invite_sent_btn') : t('admin_invite_send_btn')} onPress={sendEmail} style={{ marginTop: 6 }} />
+        <Button icon="share-outline" title={t('m_share')} onPress={() => Share.share({ message: text })} style={{ marginTop: 10 }} />
         <Button title={t('admin_invite_close')} onPress={onClose} style={{ marginTop: 10 }} />
       </View>
     </Sheet>
@@ -76,6 +99,7 @@ function AddUserSheet({ visible, onClose, onAdded }) {
   const [role, setRole] = useState('learner');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [grade, setGrade] = useState('10');
   const [group, setGroup] = useState(null);
   const [subjectKey, setSubjectKey] = useState(null);
@@ -87,7 +111,7 @@ function AddUserSheet({ visible, onClose, onAdded }) {
   async function add() {
     if (!name.trim()) return setError(t('admin_error_name'));
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError(t('admin_error_email'));
-    const body = { role, name: name.trim(), email: email.trim() };
+    const body = { role, name: name.trim(), email: email.trim(), ...(phone.trim() ? { phone: phone.trim() } : {}) };
     if (role === 'learner') body.grade = grade;
     if (role === 'teacher') { if (!subjectKey) return setError(t('signup_subject_label')); body.subjectKey = subjectKey; }
     if (role === 'hod') { if (!dept) return setError(t('hod_dept_select_label')); body.dept = dept; }
@@ -97,7 +121,7 @@ function AddUserSheet({ visible, onClose, onAdded }) {
     const { data, error: err } = await apiPost('/admin/users', body, token);
     setBusy(false);
     if (err) return setError(errorText(t, has, err));
-    setName(''); setEmail('');
+    setName(''); setEmail(''); setPhone('');
     onAdded(data.invite);
   }
 
@@ -109,6 +133,7 @@ function AddUserSheet({ visible, onClose, onAdded }) {
         <Choice label={t('admin_role_label')} value={role} onChange={setRole} options={ROLES.map((r) => ({ id: r, label: t(ROLE_KEY[r]) }))} />
         <Field label={t('signup_name_label')} value={name} onChangeText={setName} placeholder={t('admin_user_name_placeholder')} maxLength={100} />
         <Field label={t('signup_email_label')} value={email} onChangeText={setEmail} placeholder={t('admin_user_email_placeholder')} autoCapitalize="none" keyboardType="email-address" />
+        <Field label={t('profile_phone_label')} value={phone} onChangeText={setPhone} placeholder={t('profile_phone_placeholder')} keyboardType="phone-pad" maxLength={30} hint={t('m_phone_hint')} />
         {role === 'learner' ? <Choice label={t('login_grade_label')} value={grade} onChange={setGrade} options={['10', '11', '12'].map((g) => ({ id: g, label: t('grade_' + g) }))} /> : null}
         {role === 'teacher' && shownGroup ? (
           <View>
@@ -130,6 +155,37 @@ function AddUserSheet({ visible, onClose, onAdded }) {
   );
 }
 
+// the admin sets or changes someone's phone number (used for SMS)
+function PhoneSheet({ user, onClose, onSaved }) {
+  if (!user) return null;
+  return <PhoneForm key={user.id} user={user} onClose={onClose} onSaved={onSaved} />;
+}
+
+function PhoneForm({ user, onClose, onSaved }) {
+  const { t, has, token, showToast } = useKit();
+  const [phone, setPhone] = useState(user.phone || '');
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  async function save() {
+    setBusy(true);
+    const { error: err } = await apiPatch(`/admin/users/${user.id}`, { phone: phone.trim() }, token);
+    setBusy(false);
+    if (err) return setError(errorText(t, has, err));
+    showToast(t('m_phone_saved'));
+    onSaved();
+  }
+  return (
+    <Sheet visible title={t('m_phone_title', { name: user.name })} onClose={onClose}>
+      <View style={{ padding: 16 }}>
+        <Field label={t('profile_phone_label')} value={phone} onChangeText={setPhone} placeholder={t('profile_phone_placeholder')}
+          keyboardType="phone-pad" maxLength={30} hint={t('m_phone_hint')} autoFocus />
+        <ErrorText>{error}</ErrorText>
+        <Button kind="primary" title={t('profile_save_btn')} onPress={save} busy={busy} />
+      </View>
+    </Sheet>
+  );
+}
+
 export function AdminUsers() {
   const { t, has, token, c, showToast } = useKit();
   const [role, setRole] = useState('all');
@@ -138,6 +194,7 @@ export function AdminUsers() {
   const [adding, setAdding] = useState(false);
   const [invite, setInvite] = useState(null);
   const [confirmRemove, setConfirmRemove] = useState(null);
+  const [phoneFor, setPhoneFor] = useState(null);
 
   async function resetLogin(u) {
     const { data, error } = await apiPost(`/admin/users/${u.id}/reset-login`, {}, token);
@@ -164,10 +221,11 @@ export function AdminUsers() {
             <Row key={u.id} first={i === 0} left={<Avatar text={initials(u.name)} color={c.brand} size={38} />}
               title={u.name}
               meta={<View style={{ marginTop: 2, gap: 4 }}>
-                <Text style={{ color: c.inkSoft, fontSize: 12.5 }}>{t(ROLE_KEY[u.role])}{u.grade ? ' · ' + t('grade_' + u.grade) : ''} · {u.email}</Text>
+                <Text style={{ color: c.inkSoft, fontSize: 12.5 }}>{t(ROLE_KEY[u.role])}{u.grade ? ' · ' + t('grade_' + u.grade) : ''} · {u.email}{u.phone ? ' · ' + u.phone : ''}</Text>
                 {u.mustChangePassword ? <Pill kind="warn" text={t('admin_awaiting_login_pill')} /> : null}
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
                   <Button small title={t('admin_resend_btn')} onPress={() => resetLogin(u)} />
+                  <Button small icon="call-outline" title={t('m_phone_btn')} onPress={() => setPhoneFor(u)} />
                   <Button small kind="danger" title={t('admin_remove_user_btn')} onPress={() => setConfirmRemove(u)} />
                 </View>
               </View>} />
@@ -178,6 +236,7 @@ export function AdminUsers() {
 
       <AddUserSheet visible={adding} onClose={() => setAdding(false)} onAdded={(inv) => { setAdding(false); setInvite(inv); state.reload(); }} />
       <InviteSheet invite={invite} onClose={() => setInvite(null)} />
+      <PhoneSheet user={phoneFor} onClose={() => setPhoneFor(null)} onSaved={() => { setPhoneFor(null); state.reload(); }} />
       <Sheet visible={Boolean(confirmRemove)} title={t('admin_remove_user_btn')} onClose={() => setConfirmRemove(null)}>
         {confirmRemove ? (
           <View style={{ padding: 16 }}>
@@ -213,3 +272,56 @@ export function AdminClasses() {
   );
 }
 
+
+// ---- text messages (textbee) ----
+
+const SMS_MAX = 480;
+
+export function AdminSms() {
+  const { t, has, token, c, showToast } = useKit();
+  const status = useData('/admin/sms');
+  const people = useData('/admin/users');
+  const [to, setTo] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const withPhone = people.data ? people.data.users.filter((u) => u.phone) : [];
+  // adds a saved number to the "To" box (once)
+  const addNumber = (n) => setTo((cur) => {
+    const list = cur.split(',').map((x) => x.trim()).filter(Boolean);
+    return list.includes(n) ? cur : [...list, n].join(', ');
+  });
+
+  async function send() {
+    setBusy(true);
+    setError(null);
+    const { data, error: err } = await apiPost('/admin/sms', { to, message: message.trim() }, token);
+    setBusy(false);
+    if (err) return setError(errorText(t, has, err));
+    showToast(data.configured ? t('m_sms_sent', { n: data.sent }) : t('m_sms_logged'));
+    setMessage('');
+  }
+
+  return (
+    <Screen title={t('m_sms_title')} right={<HeaderButtons />} onRefresh={() => { status.reload(); people.reload(); }} refreshing={status.loading}>
+      {status.data ? (
+        <Note kind={status.data.configured ? 'good' : 'brand'}>{status.data.configured ? t('m_sms_ready') : t('m_sms_not_set_up')}</Note>
+      ) : null}
+      <Card>
+        <Field label={t('m_sms_to')} value={to} onChangeText={setTo} placeholder="082 123 4567, 073 555 0101" keyboardType="phone-pad" />
+        {withPhone.length ? (
+          <View style={{ marginTop: -4, marginBottom: 4 }}>
+            <Text style={{ color: c.inkSoft, fontWeight: '600', fontSize: 13, marginBottom: 6 }}>{t('m_sms_pick')}</Text>
+            <Chips value={null} onChange={addNumber} items={withPhone.map((u) => ({ id: u.phone, label: u.name }))} />
+          </View>
+        ) : null}
+        <Field label={t('m_sms_message')} value={message} onChangeText={setMessage} multiline maxLength={SMS_MAX}
+          hint={`${message.length}/${SMS_MAX}`} />
+        <ErrorText>{error}</ErrorText>
+        <Button kind="primary" icon="send" title={t('m_sms_send')} onPress={send} busy={busy} disabled={!to.trim() || !message.trim()} />
+      </Card>
+      <Text style={{ color: c.inkSoft, fontSize: 12.5, lineHeight: 18, textAlign: 'center' }}>{t('m_sms_auto')}</Text>
+    </Screen>
+  );
+}

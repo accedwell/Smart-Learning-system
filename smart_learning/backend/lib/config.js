@@ -54,6 +54,15 @@ module.exports = {
     from: env.MAIL_FROM || env.SMTP_USER || 'Smart Learning <no-reply@localhost>',
   },
 
+  // text messages through textbee (an Android phone running the textbee app sends them)
+  sms: {
+    apiKey: env.TEXTBEE_API_KEY || '',
+    deviceId: env.TEXTBEE_DEVICE_ID || '',
+    apiUrl: (env.TEXTBEE_API_URL || 'https://api.textbee.dev/api/v1').replace(/\/+$/, ''),
+    // local numbers like 082 123 4567 get this country code (27 = South Africa)
+    countryCode: (env.SMS_COUNTRY_CODE || '27').replace(/\D/g, ''),
+  },
+
   uploadDir: path.resolve(ROOT, env.UPLOAD_DIR || 'uploads'),
   maxUploadBytes: 5 * 1024 * 1024,
 
