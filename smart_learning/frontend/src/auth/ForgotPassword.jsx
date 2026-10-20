@@ -36,13 +36,13 @@ export default function ForgotPassword({ onLogin, onHome }){
           <HeroIllustration/>
           <span className="hero-badge">SMART LEARNING</span>
           <h1>{t('forgot_title')}</h1>
-          <p>{t('forgot_subtitle')}</p>
+          <p>{t('forgot_identifier_subtitle')}</p>
         </div>
         {sentTo==null ? (
           <form className="login-body" onSubmit={(e)=>{ e.preventDefault(); sendLink(email.trim()); }}>
             <div className="field">
-              <label htmlFor="forgotEmail">{t('forgot_email_label')}</label>
-              <input type="email" id="forgotEmail" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder={t('forgot_email_placeholder')} autoComplete="email" required/>
+              <label htmlFor="forgotEmail">{t('login_identifier_label')}</label>
+              <input type="text" id="forgotEmail" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder={t('login_identifier_placeholder')} autoComplete="username" required/>
             </div>
             {errorLine}
             <button type="submit" className="btn btn-primary" style={{ padding:10, fontSize:13 }} disabled={sending}>{t('forgot_submit_btn')}</button>

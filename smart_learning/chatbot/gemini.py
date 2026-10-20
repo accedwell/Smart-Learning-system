@@ -1,18 +1,14 @@
-"""Google Gemini, for schools without an Anthropic key: Gemini's free tier needs only a key from
-https://aistudio.google.com/apikey (no card). Set GEMINI_API_KEY (and optionally GEMINI_MODEL) in
-backend/.env.
+"""Google Gemini, through Google's official `google-genai` package. Gemini's free tier needs only a
+key from https://aistudio.google.com/apikey (no card). Set GEMINI_API_KEY (and optionally
+GEMINI_MODEL) in backend/.env.
 
 Note: Google may use free-tier prompts and replies to improve its products, so learners should not
 type personal details into the chat while the school is on the free tier.
-
-Uses only Python's standard library: the reply is streamed from Gemini's server-sent events.
 """
-import json
-import urllib.error
-import urllib.request
+from google import genai
+from google.genai import errors, types
 
-API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse"
-TIMEOUT_S = 60
+_clients: dict[str, genai.Client] = {}
 
 
 class GeminiError(Exception):
@@ -24,38 +20,40 @@ class GeminiError(Exception):
         self.code = code
 
 
+def _client(api_key: str) -> genai.Client:
+    if api_key not in _clients:
+        _clients[api_key] = genai.Client(api_key=api_key)
+    return _clients[api_key]
+
+
+def _as_error(exc: Exception) -> GeminiError:
+    status = getattr(exc, "code", None)
+    if status == 429:
+        return GeminiError("ai_busy", "Gemini's limit is reached for now (HTTP 429)")
+    if status in (400, 401, 403, 404):
+        return GeminiError("ai_unavailable", f"Gemini refused the request (HTTP {status}): {getattr(exc, 'message', exc)}")
+    if isinstance(exc, errors.APIError):
+        return GeminiError("upstream_error", f"Gemini had a problem (HTTP {status})")
+    return GeminiError("ai_unavailable", f"Could not reach Gemini: {exc}")
+
+
 def stream_reply(api_key: str, model: str, system: str, messages: list[dict], max_tokens: int):
     """Yields the reply a piece at a time. messages: [{role: 'user'|'assistant', content}]."""
-    body = {
-        "systemInstruction": {"parts": [{"text": system}]},
+    contents = [
         # Gemini calls the assistant's turns "model"
-        "contents": [{"role": "model" if m["role"] == "assistant" else "user", "parts": [{"text": m["content"]}]}
-                     for m in messages],
-        "generationConfig": {"maxOutputTokens": max_tokens},
-    }
-    request = urllib.request.Request(
-        API.format(model=model), data=json.dumps(body).encode("utf-8"), method="POST",
-        # the key goes in a header, never in the address, so it stays out of logs
-        headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
+        types.Content(role="model" if m["role"] == "assistant" else "user", parts=[types.Part(text=m["content"])])
+        for m in messages
+    ]
+    config = types.GenerateContentConfig(
+        system_instruction=system, max_output_tokens=max_tokens,
+        # plain chat: no tools for Gemini to call
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
     try:
-        response = urllib.request.urlopen(request, timeout=TIMEOUT_S)
-    except urllib.error.HTTPError as exc:
-        if exc.code == 429:
-            raise GeminiError("ai_busy", "The AI assistant is busy, try again shortly") from None
-        if exc.code in (400, 401, 403, 404):
-            raise GeminiError("ai_unavailable", f"Gemini refused the request (HTTP {exc.code})") from None
-        raise GeminiError("upstream_error", f"Gemini had a problem (HTTP {exc.code})") from None
-    except (urllib.error.URLError, TimeoutError) as exc:
-        raise GeminiError("ai_unavailable", f"Could not reach Gemini: {exc}") from None
-
-    with response:
-        for raw in response:
-            line = raw.decode("utf-8").strip()
-            if not line.startswith("data:"):
-                continue
-            chunk = json.loads(line[5:])
-            for candidate in chunk.get("candidates", []):
-                for part in (candidate.get("content") or {}).get("parts", []):
-                    if part.get("text") and not part.get("thought"):
-                        yield part["text"]
+        for chunk in _client(api_key).models.generate_content_stream(model=model, contents=contents, config=config):
+            if chunk.text:
+                yield chunk.text
+    except GeminiError:
+        raise
+    except Exception as exc:  # the SDK raises its own errors, or network errors from underneath
+        raise _as_error(exc) from None

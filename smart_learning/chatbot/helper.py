@@ -333,6 +333,10 @@ def answer(message: str, role: str = "", name: str = "", earlier: list[str] | No
     reply = app_answer(text, role)
     if reply:
         return reply
+    # last: a topic word with a small spelling mistake ("grammer", "photosyntesis")
+    topic = topics.best_topic(text, fuzzy=True)
+    if topic:
+        return topic["notes"]
     if any("I'm the Smart Learning helper" in r for r in (earlier or [])):
         return ("Sorry, I don't have notes on that yet. Topics I can explain: " + SUBJECTS + ". For any other "
                 "question, the school can switch on the full AI assistant with a free Gemini key.")

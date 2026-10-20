@@ -6,9 +6,10 @@ const express = require('express');
 const config = require('../lib/config');
 const db = require('../lib/db');
 const auth = require('../lib/auth');
-const { publicUser, findByEmail, childIdsOf } = require('../lib/users');
+const { publicUser, findByEmail, findByLogin, parentsWithEmail, childIdsOf } = require('../lib/users');
 const { rateLimit, failureLimit } = require('../lib/rateLimit');
 const mailer = require('../lib/mailer');
+const { subjectsOf } = require('../lib/subjects');
 const http = require('../lib/http');
 
 const router = express.Router();
@@ -20,7 +21,7 @@ const GUESS_WINDOW_MS = 15 * 60 * 1000;
 const credentialLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
-  key: (req) => req.ip + '|' + String(http.body(req).email || '').toLowerCase(),
+  key: (req) => req.ip + '|' + String(http.body(req).email || '').replace(/[\s-]/g, '').toLowerCase(),
 });
 
 // Wrong passwords, counted per account and per IP address separately. The account limit
@@ -41,11 +42,14 @@ function wrongGuess(req, email) {
 }
 
 // for changes a stolen session must not be able to make on its own
+// the key wrong guesses at an account are counted under (learners may have no email)
+const accountKey = (user) => user.email || 'user:' + user.id;
+
 async function requireCurrentPassword(req, res) {
-  checkGuesses(req, res, req.user.email);
+  checkGuesses(req, res, accountKey(req.user));
   const current = http.body(req).currentPassword;
   if (!(await auth.verifyPassword(typeof current === 'string' ? current : '', req.user.password_hash))) {
-    wrongGuess(req, req.user.email);
+    wrongGuess(req, accountKey(req.user));
     throw http.badRequest('pw_error_current', 'Your current password is wrong');
   }
 }
@@ -58,17 +62,18 @@ async function session(user) {
   return { token: auth.signToken(user), user: out, mustChangePassword: Boolean(user.must_change_password) };
 }
 
-// `role` is optional; when sent it must match the account, as on the login screen
+// `email` is what was typed in the login box: an email address, or a learner's ID number.
+// `role` is optional; when sent it must match the account, as on the login screen.
 router.post('/login', credentialLimiter, async (req, res) => {
   const b = http.body(req);
-  const email = typeof b.email === 'string' ? b.email.trim().toLowerCase() : '';
+  const login = typeof b.email === 'string' ? b.email.trim().replace(/[\s-]/g, '').toLowerCase() : '';
   const password = typeof b.password === 'string' ? b.password : '';
-  checkGuesses(req, res, email);
-  const user = email ? await findByEmail(email) : null;
+  checkGuesses(req, res, login);
+  const user = login ? await findByLogin(b.email) : null;
   const ok = await auth.verifyPassword(password, user && user.password_hash);
   if (!user || !ok) {
-    wrongGuess(req, email);
-    throw http.unauthorized('login_error_password', 'Wrong email or password');
+    wrongGuess(req, login);
+    throw http.unauthorized('login_error_password', 'Wrong email/ID number or password');
   }
   if (b.role && b.role !== user.role) {
     throw http.forbidden('login_error_role', `This account is a ${user.role} account`, { role: user.role });
@@ -90,13 +95,16 @@ router.post('/change-password', auth.requireAuth({ allowPendingPassword: true })
   res.json(await session(await db.one('SELECT * FROM users WHERE id = ?', [user.id])));
 });
 
-// Emails a one-hour reset link. Always answers the same way, and sends the email after
+// Emails a one-hour reset link: to the account's email, or for a learner (who types their ID
+// number) to their parents' email. Always answers the same way, and sends the email after
 // answering, so neither the reply nor its timing tells anyone who has an account.
 router.post('/forgot-password', credentialLimiter, async (req, res) => {
   const b = http.body(req);
-  const user = typeof b.email === 'string' ? await findByEmail(b.email) : null;
+  const user = await findByLogin(b.email);
   res.json({ ok: true });
   if (!user) return;
+  const parents = user.email ? [] : await parentsWithEmail(user.id);
+  if (!user.email && parents.length === 0) return; // nobody to send it to
   try {
     const token = crypto.randomBytes(32).toString('hex');
     // the account's row lock lets one request at a time through, so a burst of them can't
@@ -115,9 +123,10 @@ router.post('/forgot-password', credentialLimiter, async (req, res) => {
     if (!created) return;
     // after the #, which browsers never send to a server or put in a Referer header
     const link = `${config.appUrl}/#reset=${token}`;
-    await mailer.sendPasswordReset(user, link, RESET_TTL_MS / 60000);
+    if (user.email) await mailer.sendPasswordReset(user, link, RESET_TTL_MS / 60000);
+    else for (const parent of parents) await mailer.sendLearnerPasswordReset(parent, user, link, RESET_TTL_MS / 60000);
   } catch (err) {
-    console.error(`[auth] could not send the password reset email to ${user.email}: ${err.message}`);
+    console.error(`[auth] could not send the password reset email for account ${user.id}: ${err.message}`);
   }
 });
 
@@ -147,6 +156,7 @@ router.get('/me', auth.requireAuth({ allowPendingPassword: true }), async (req, 
         WHERE pc.parent_id = ? ORDER BY u.name`, [req.user.id]);
   }
   if (req.user.role === 'learner') {
+    out.subjects = await subjectsOf(req.user.id);
     out.parents = (await db.query(
       `SELECT u.name FROM parent_children pc JOIN users u ON u.id = pc.parent_id
         WHERE pc.learner_id = ? ORDER BY u.name`, [req.user.id])).map((p) => p.name);
@@ -162,7 +172,8 @@ router.patch('/me', auth.requireAuth(), async (req, res) => {
   const updates = {};
   if ('name' in b) updates.name = http.text(b.name, 'name', { max: 100 });
   if ('phone' in b) updates.phone = http.text(b.phone, 'phone', { max: 30, required: false }) || null;
-  if ('email' in b) {
+  // learners added with an ID number have no email: their login details go to their parent
+  if ('email' in b && !(user.role === 'learner' && !user.email)) {
     const email = http.email(b.email);
     if (email !== user.email) {
       await requireCurrentPassword(req, res);

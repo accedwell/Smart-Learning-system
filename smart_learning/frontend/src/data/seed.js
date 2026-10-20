@@ -178,7 +178,10 @@ export function createInitialState(){
       nextClassId: 8,
       newClass: { name:'', grade:'10', subjectKey:'subject_1', teacherId:'' },
       classError: null,
-      newUser: { name:'', email:'', role:'teacher', grade:'10', idNumber:'', subjectKey:'subject_1', dept:'mathematics', childId:'' },
+      // a learner's parent: a new one (parentName, parentEmail) or one already added (parentId)
+      newUser: { name:'', email:'', role:'teacher', grade:'10', idNumber:'', subjectKey:'subject_1', dept:'mathematics', childId:'',
+        parentMode:'new', parentId:'', parentName:'', parentEmail:'',
+        subjects:['subject_lo'] }, // a learner's 7 subjects (Life Orientation is compulsory)
       lastInvite: null, // { name, email, role, tempPassword } shown after adding a user or resending a login
       userFilter: 'all',
       tab: 'overview', // 'overview' | 'users' | 'add'

@@ -3,7 +3,6 @@ import { useStore } from '../src/store/AppStore.jsx'
 import { scoreClass } from '../src/store/metrics.js'
 import { useI18n } from '../src/i18n/I18nContext.jsx'
 import { SectionHead, Icon } from '../src/components/ui.jsx'
-import { saveTextFile } from '../src/services/downloads.js'
 import { apiGet, apiPost, errorText } from '../src/services/api.js'
 
 const STATUS_PILL = { on_track:'good', watch:'warn', at_risk:'bad' };
@@ -24,6 +23,7 @@ export default function ParentDashboard(){
   const [details, setDetails] = useState({}); // childId -> { child, status, lessons, quizMarks }
   const [notifications, setNotifications] = useState([]);
   const [error, setError] = useState(null);
+  const [reportBusy, setReportBusy] = useState(null); // 'view' | 'download' while the PDF is made
 
   useEffect(()=>{
     let cancelled = false;
@@ -75,22 +75,37 @@ export default function ParentDashboard(){
     setNotifications(list=>list.map(n=>({ ...n, read:true })));
   }
 
-  function downloadChildReport(){
-    const lines = [
-      'Smart Learning - Learner Progress Report',
-      'Learner: '+child.name+(child.grade ? ' ('+t('grade_'+child.grade)+')' : ''),
-      'Generated: '+new Date().toLocaleString(),
-      '',
-      'Overall progress this term: '+progress+'%',
-      ...(detail && detail.status ? ['Status: '+t('status_'+detail.status)] : []),
-      '',
-      'Quiz marks:',
-      ...(marks.length ? marks.map(m=>`  - ${m.title}${m.subjectKey ? ' ('+t(m.subjectKey)+')' : ''}: ${m.score}/${m.total}`) : ['  - none yet']),
-      '',
-      'Recent notifications:',
-      ...(notifications.length ? notifications.slice(0, 10).map(n=>`  - [${formatTime(n.createdAt)}] ${noteText(n)}`) : ['  - none']),
-    ].join('\n');
-    saveTextFile(child.name.replace(/\s+/g,'_')+'-progress-report.txt', lines);
+  // the report as a PDF, made by the server: shown in a new tab, or saved as a file
+  async function reportPdf(){
+    const res = await fetch(`/api/parent/children/${child.id}/report.pdf`, { headers:{ Authorization:'Bearer '+token } });
+    if(!res.ok) throw new Error('report');
+    return URL.createObjectURL(await res.blob());
+  }
+  async function viewReport(){
+    setReportBusy('view');
+    const tab = window.open('', '_blank'); // opened straight away, so the browser doesn't block it
+    try{
+      const url = await reportPdf();
+      if(tab) tab.location.href = url; else window.location.href = url;
+    } catch{
+      if(tab) tab.close();
+      setError(t('m_paper_open_error'));
+    }
+    setReportBusy(null);
+  }
+  async function downloadReport(){
+    setReportBusy('download');
+    try{
+      const url = await reportPdf();
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = child.name.replace(/\s+/g,'-')+'-progress-report.pdf';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 10000);
+    } catch{
+      setError(t('m_paper_open_error'));
+    }
+    setReportBusy(null);
   }
 
   return (
@@ -109,8 +124,9 @@ export default function ParentDashboard(){
           <div className="bar" style={{ height:10 }}><span style={{ width:progress+'%', background:'var(--parent)' }}/></div>
           <p className="muted" style={{ marginTop:6 }}>{t('parent_progress_caption',{ pct:progress })}</p>
           {detail && detail.status && <span className={'pill pill-'+STATUS_PILL[detail.status]}>{t('status_'+detail.status)}</span>}
-          <div>
-            <button className="btn btn-primary" style={{ marginTop:12 }} onClick={downloadChildReport}><Icon name="download"/>{' '+t('parent_download_btn')}</button>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:12 }}>
+            <button className="btn" onClick={viewReport} disabled={reportBusy!=null}><Icon name="file"/>{' '+(reportBusy==='view' ? t('online_loading') : t('parent_report_view_btn'))}</button>
+            <button className="btn btn-primary" onClick={downloadReport} disabled={reportBusy!=null}><Icon name="download"/>{' '+(reportBusy==='download' ? t('online_loading') : t('parent_download_btn'))}</button>
           </div>
         </div>
 

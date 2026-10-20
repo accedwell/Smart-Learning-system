@@ -3,16 +3,23 @@
 // Every demo account's password is Demo@1234. Runs only while the users table is empty.
 const db = require('./db');
 const { hashPassword } = require('./auth');
-const { deptForSubject } = require('./catalog');
+const { catalog, deptForSubject } = require('./catalog');
+const { setSubjects } = require('./subjects');
 const { ensureLessons, refreshProgress } = require('./learners');
 
 const DEMO_PASSWORD = 'Demo@1234';
 const LESSON_KEYS = ['lesson_1', 'lesson_2', 'lesson_3'];
 
 const LEARNERS = [
-  { name: 'Thabo Mokoena', email: 'thabo@school.demo', grade: '10', lessons: [100, 60, 0], checkin: [5, 5] },
-  { name: 'Lindiwe Khoza', email: 'lindiwe@school.demo', grade: '11', lessons: [80, 40, 0], checkin: [2, 5] },
-  { name: 'Sipho Ndlovu', email: 'sipho@school.demo', grade: '10', lessons: [100, 20, 0], checkin: [3, 5] },
+  // the ID numbers are made up, but valid in form (date and check digit), so learners can log in with them
+  // 7 subjects each: two languages, a mathematics, Life Orientation and three more (including the
+  // Mathematics, English and Life Sciences classes they are in)
+  { name: 'Thabo Mokoena', email: 'thabo@school.demo', idNumber: '1003155123089', grade: '10', lessons: [100, 60, 0], checkin: [5, 5],
+    subjects: ['subject_2', 'subject_sesotho', 'subject_lo', 'subject_1', 'subject_physical_sciences', 'subject_3', 'subject_geography'] },
+  { name: 'Lindiwe Khoza', email: 'lindiwe@school.demo', idNumber: '0906110245089', grade: '11', lessons: [80, 40, 0], checkin: [2, 5],
+    subjects: ['subject_2', 'subject_isizulu', 'subject_lo', 'subject_1', 'subject_3', 'subject_accounting', 'subject_business'] },
+  { name: 'Sipho Ndlovu', email: 'sipho@school.demo', idNumber: '1008225067083', grade: '10', lessons: [100, 20, 0], checkin: [3, 5],
+    subjects: ['subject_2', 'subject_isizulu', 'subject_lo', 'subject_1', 'subject_3', 'subject_history', 'subject_geography'] },
 ];
 
 const TEACHERS = [
@@ -91,13 +98,50 @@ const SUBJECT_STATS = [['subject_1', 94, 71], ['subject_2', 91, 78], ['subject_3
 const PARENT_NOTIFICATIONS = ['notif_1', 'notif_2', 'notif_3'];
 
 // lessons exist in every database, demo or not
+// One lesson per subject. Mathematics, English and Life Sciences have their own lesson topics
+// (lesson_1..3); every other subject gets "This term's {subject} work".
+const OWN_LESSONS = { subject_1: 'lesson_1', subject_2: 'lesson_2', subject_3: 'lesson_3' };
+
 async function ensureLessonCatalog() {
   for (const [i, key] of LESSON_KEYS.entries()) {
     await db.query('INSERT IGNORE INTO lessons (lesson_key, sort_order) VALUES (?, ?)', [key, i + 1]);
   }
+  for (const [i, subject] of catalog.SUBJECT_OPTIONS.entries()) {
+    const key = OWN_LESSONS[subject] || 'lesson_term_work:' + subject;
+    await db.query(
+      `INSERT INTO lessons (lesson_key, sort_order, subject_key) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order), subject_key = VALUES(subject_key)`,
+      [key, i + 1, subject],
+    );
+  }
 }
 
 async function seedDemoData() {
+  // demo learners from before ID-number logins get their ID numbers (only where none is set)
+  for (const l of LEARNERS) {
+    await db.query("UPDATE users SET id_number = ? WHERE email = ? AND role = 'learner' AND id_number IS NULL", [l.idNumber, l.email])
+      .catch(() => {}); // the number is taken by another account: leave this one without
+  }
+  // demo learners from before learners had subjects get their 7 (their lesson marks are kept)
+  for (const l of LEARNERS) {
+    const row = await db.one(
+      "SELECT u.id FROM users u WHERE u.email = ? AND u.role = 'learner' AND NOT EXISTS (SELECT 1 FROM learner_subjects s WHERE s.learner_id = u.id)",
+      [l.email],
+    );
+    if (!row) continue;
+    await setSubjects(row.id, l.subjects);
+    await ensureLessons(row.id);
+    await refreshProgress(row.id);
+  }
+  // demo parent notifications from before they named the child ("{child} completed ...")
+  await db.query(
+    `UPDATE notifications n
+       JOIN parent_children pc ON pc.parent_id = n.user_id
+       JOIN users l ON l.id = pc.learner_id
+        SET n.params = JSON_SET(COALESCE(n.params, JSON_OBJECT()), '$.child', l.name)
+      WHERE n.msg_key IN (?) AND JSON_EXTRACT(n.params, '$.child') IS NULL`,
+    [PARENT_NOTIFICATIONS],
+  );
   const { n } = await db.one('SELECT COUNT(*) AS n FROM users');
   if (n > 0) return false;
   const hash = await hashPassword(DEMO_PASSWORD);
@@ -111,7 +155,8 @@ async function seedDemoData() {
     };
 
     for (const l of LEARNERS) {
-      const learnerId = await addUser({ name: l.name, email: l.email, role: 'learner', grade: l.grade });
+      const learnerId = await addUser({ name: l.name, email: l.email, id_number: l.idNumber, role: 'learner', grade: l.grade });
+      await setSubjects(learnerId, l.subjects, conn);
       await ensureLessons(learnerId, conn);
       for (const [i, progress] of l.lessons.entries()) {
         await db.query(
@@ -146,9 +191,10 @@ async function seedDemoData() {
         await db.query('INSERT INTO parent_children (parent_id, learner_id) VALUES (?, ?)', [userId, ids[childEmail]], conn);
       }
       if (s.role === 'parent') {
+        const child = LEARNERS.find((l) => l.email === (s.children || [])[0]);
         for (const [i, key] of PARENT_NOTIFICATIONS.entries()) {
           await db.query('INSERT INTO notifications (user_id, msg_key, params, is_read) VALUES (?, ?, ?, ?)',
-            [userId, key, JSON.stringify({ timeKey: 'time_' + (i + 1) }), i === 2], conn);
+            [userId, key, JSON.stringify({ timeKey: 'time_' + (i + 1), child: child ? child.name : '' }), i === 2], conn);
         }
       }
     }

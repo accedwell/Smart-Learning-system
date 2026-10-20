@@ -12,9 +12,9 @@ import { FirstLogin, Forgot, Login } from './src/screens/Auth';
 import { ChatSheet, NotificationsScreen, ProfileScreen } from './src/screens/Common';
 import { Checkin, LearnerHome, LearnerOnline, LearnerPapers, LearnerQuizzes, QuizTake, RateTeachers } from './src/screens/Learner';
 import { PaperQuiz, QuizBuilder, QuizResults, Register, TeacherClass, TeacherOnline, TeacherPapers, TeacherQuizzes } from './src/screens/Teacher';
-import { ParentChild } from './src/screens/Parent';
+import { ChildReport, ParentChild } from './src/screens/Parent';
 import { HodDepartment, HodReports, PrincipalReports, PrincipalTeachers } from './src/screens/Staff';
-import { AdminClasses, AdminOverview, AdminSms, AdminUsers } from './src/screens/Admin';
+import { AdminClasses, AdminOverview, AdminUsers } from './src/screens/Admin';
 
 const LearnerProfile = () => <ProfileScreen extra={<RateTeachers />} />;
 
@@ -44,13 +44,15 @@ const TABS = {
   ],
   admin: [
     ['aover', 'business', 'nav_overview', AdminOverview], ['ausers', 'people', 'nav_users', AdminUsers],
-    ['aclasses', 'school', 'nav_classes', AdminClasses], ['asms', 'chatbox', 'm_sms_tab', AdminSms],
-    ['me', 'person', 'm_tab_me', ProfileScreen],
+    ['aclasses', 'school', 'nav_classes', AdminClasses], ['me', 'person', 'm_tab_me', ProfileScreen],
   ],
 };
 
 // screens opened on top of a tab
-const ROUTES = { quiz: QuizTake, checkin: Checkin, quizBuilder: QuizBuilder, quizResults: QuizResults, paperQuiz: PaperQuiz, register: Register };
+const ROUTES = {
+  quiz: QuizTake, checkin: Checkin, quizBuilder: QuizBuilder, quizResults: QuizResults, paperQuiz: PaperQuiz, register: Register,
+  childReport: ChildReport,
+};
 
 function Signed() {
   const { user, tab, switchTab, stack, pop, toast, t, c } = useKit();

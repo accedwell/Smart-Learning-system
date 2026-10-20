@@ -134,8 +134,8 @@ export function Login({ onForgot }) {
 
   return (
     <AuthShell heading={t('login_title')} sub={t('login_subtitle')} footer={<NoAccount />}>
-      <AuthInput icon="mail-outline" label={t('login_email_label')} value={email} onChangeText={setEmail}
-        placeholder={t('login_email_placeholder')} autoCapitalize="none" autoComplete="email" keyboardType="email-address"
+      <AuthInput icon="person-outline" label={t('login_identifier_label')} value={email} onChangeText={setEmail}
+        placeholder={t('login_identifier_placeholder')} autoCapitalize="none" autoComplete="username"
         textContentType="username" returnKeyType="next" />
       <AuthInput icon="lock-closed-outline" label={t('login_password_label')} value={password} onChangeText={setPassword}
         secure autoCapitalize="none" autoComplete="password" textContentType="password" returnKeyType="go" onSubmitEditing={submit} />
@@ -238,9 +238,9 @@ export function Forgot({ onBack }) {
     );
   }
   return (
-    <AuthShell icon="key" heading={t('forgot_title')} sub={t('forgot_subtitle')} footer={back}>
-      <AuthInput icon="mail-outline" label={t('forgot_email_label')} value={email} onChangeText={setEmail}
-        placeholder={t('forgot_email_placeholder')} autoCapitalize="none" keyboardType="email-address" autoComplete="email"
+    <AuthShell icon="key" heading={t('forgot_title')} sub={t('forgot_identifier_subtitle')} footer={back}>
+      <AuthInput icon="person-outline" label={t('login_identifier_label')} value={email} onChangeText={setEmail}
+        placeholder={t('login_identifier_placeholder')} autoCapitalize="none" autoComplete="username"
         returnKeyType="send" onSubmitEditing={send} />
       {error ? <Text style={{ color: c.bad, marginBottom: 10 }}>{error}</Text> : null}
       <Button kind="primary" title={t('forgot_submit_btn')} onPress={send} busy={busy} disabled={!email.trim()}

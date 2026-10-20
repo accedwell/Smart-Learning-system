@@ -6,12 +6,11 @@ const auth = require('../lib/auth');
 const ai = require('../lib/ai');
 const { aiLimiter } = require('../lib/rateLimit');
 const { catalog, t, langNote } = require('../lib/catalog');
-const { lessonsFor, refreshProgress, statusFor, latestCheckin } = require('../lib/learners');
+const { lessonsFor, lessonTitle, refreshProgress, statusFor, latestCheckin } = require('../lib/learners');
 const { parentIdsOf, notify } = require('../lib/users');
 const { learnerView, mark } = require('../lib/quizzes');
 const { sentToLearners, teachesLearner } = require('../lib/classes');
 const onlineClasses = require('../lib/onlineClasses');
-const sms = require('../lib/sms');
 const http = require('../lib/http');
 
 const router = express.Router();
@@ -19,13 +18,6 @@ router.use(auth.requireAuth(), auth.requireRole('learner'));
 
 // answers sent this long after a timed quiz's deadline are not accepted
 const DEADLINE_GRACE_MS = 30 * 1000;
-
-// An SMS to the learner's linked parents (those with a phone number on file). Sent after the
-// change is saved and never waited for, so a slow or failed SMS can't hold up the learner.
-function textParents(learner, message) {
-  parentIdsOf(learner.id).then(sms.phonesOf).then((phones) => sms.sendQuietly(phones, 'Smart Learning: ' + message))
-    .catch((err) => console.error('[sms] parent alert:', err.message));
-}
 
 // AI extras are best-effort: the main action still succeeds when AI is unavailable or the
 // learner has used up their AI budget for the minute
@@ -48,17 +40,20 @@ router.get('/lessons', async (req, res) => {
 // marks the lesson done and asks AI for the next best activity (`recommendation` is null without AI)
 router.post('/lessons/:id/complete', async (req, res) => {
   const lessonId = http.id(req.params.id);
-  const lesson = await db.one('SELECT * FROM lessons WHERE id = ?', [lessonId]);
-  if (!lesson) throw http.notFound('lesson_not_found', 'No such lesson');
   await lessonsFor(req.user); // makes sure the learner has their lesson rows
+  // only a lesson of the learner's own subjects
+  const lesson = await db.one(
+    'SELECT l.* FROM lessons l JOIN learner_lessons ll ON ll.lesson_id = l.id AND ll.learner_id = ? WHERE l.id = ?',
+    [req.user.id, lessonId],
+  );
+  if (!lesson) throw http.notFound('lesson_not_found', 'No such lesson');
   await db.tx(async (conn) => {
     await db.query('UPDATE learner_lessons SET progress = 100, done = 1 WHERE learner_id = ? AND lesson_id = ?', [req.user.id, lessonId], conn);
     await refreshProgress(req.user.id, conn);
-    await notify(await parentIdsOf(req.user.id, conn), { message: `${req.user.name} completed the lesson "${t(lesson.lesson_key)}".` }, conn);
+    await notify(await parentIdsOf(req.user.id, conn), { message: `${req.user.name} completed the lesson "${lessonTitle(lesson)}".` }, conn);
   });
-  textParents(req.user, `${req.user.name} completed the lesson "${t(lesson.lesson_key)}".`);
   const recommendation = await optionalAi(req, () => ai.askOneLiner(
-    `A learner just completed the lesson "${t(lesson.lesson_key)}" on an education platform called Smart Learning. ` +
+    `A learner just completed the lesson "${lessonTitle(lesson)}" on an education platform called Smart Learning. ` +
     'In ONE short sentence (max 25 words), recommend the next best personalised learning activity for them, warmly and ' +
     `specifically.${langNote(http.body(req).lang)}`,
   ));
@@ -224,12 +219,6 @@ router.post('/quizzes/:id/submit', async (req, res) => {
       }, conn);
     }
   });
-  // parents get a text for the first try only (the mark the teacher sees), not for practice
-  if (firstTry) {
-    const atRisk = statusFor(score / quiz.questions.length) === 'at_risk';
-    textParents(req.user, `${req.user.name} scored ${score}/${quiz.questions.length} on "${quiz.title}" (${t(quiz.subject_key)}).` +
-      (atRisk ? ' This mark puts them at risk: their teacher will follow up.' : ''));
-  }
   const saved = await db.one('SELECT * FROM quiz_attempts WHERE id = ?', [attempt.id]);
   res.json({
     attempt: attemptView(saved),

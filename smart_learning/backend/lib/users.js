@@ -1,5 +1,6 @@
 // Turning user rows into API objects, plus lookups several routers need.
 const db = require('./db');
+const { normalizeIdNumber, looksLikeIdNumber } = require('./idNumber');
 
 const bool = (v) => (v == null ? null : Boolean(v));
 
@@ -8,7 +9,7 @@ function publicUser(u) {
   const out = {
     id: u.id,
     name: u.name,
-    email: u.email,
+    email: u.email || '', // learners added by ID number have none
     role: u.role,
     phone: u.phone || '',
     mustChangePassword: Boolean(u.must_change_password),
@@ -27,6 +28,31 @@ function publicUser(u) {
 
 async function findByEmail(email, conn) {
   return db.one('SELECT * FROM users WHERE email = ?', [String(email).trim().toLowerCase()], conn);
+}
+
+async function findByIdNumber(idNumber, conn) {
+  return db.one('SELECT * FROM users WHERE id_number = ?', [idNumber], conn);
+}
+
+// the account for what someone typed on the login screen: an email address, or (learners)
+// an ID number
+async function findByLogin(value, conn) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  if (!text) return null;
+  if (looksLikeIdNumber(text)) {
+    const idNumber = normalizeIdNumber(text);
+    return idNumber ? findByIdNumber(idNumber, conn) : null;
+  }
+  return findByEmail(text, conn);
+}
+
+// the parents of a learner who can be emailed (name and address)
+async function parentsWithEmail(learnerId, conn) {
+  return db.query(
+    `SELECT u.* FROM parent_children pc JOIN users u ON u.id = pc.parent_id
+      WHERE pc.learner_id = ? AND u.email IS NOT NULL AND u.email <> '' ORDER BY pc.parent_id`,
+    [learnerId], conn,
+  );
 }
 
 async function findById(id, conn) {
@@ -59,4 +85,6 @@ async function notify(userIds, { key = null, params = null, message = null }, co
   }
 }
 
-module.exports = { bool, publicUser, findByEmail, findById, childIdsOf, parentIdsOf, shortName, notify };
+module.exports = {
+  bool, publicUser, findByEmail, findByIdNumber, findByLogin, parentsWithEmail, findById, childIdsOf, parentIdsOf, shortName, notify,
+};

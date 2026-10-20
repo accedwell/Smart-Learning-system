@@ -2,7 +2,7 @@
 const express = require('express');
 const db = require('../lib/db');
 const auth = require('../lib/auth');
-const { lessonsFor, latestCheckin, statusFor } = require('../lib/learners');
+const { childReport, writePdf } = require('../lib/report');
 const http = require('../lib/http');
 
 const router = express.Router();
@@ -22,32 +22,27 @@ router.get('/children', async (req, res) => {
   res.json({ children: (await linkedChildren(req.user.id)).map(childSummary) });
 });
 
-// progress, lessons, check-in and quiz marks for one linked child
-router.get('/children/:id', async (req, res) => {
+async function linkedChild(req) {
   const childId = http.id(req.params.id);
   const child = (await linkedChildren(req.user.id)).find((c) => c.id === childId);
   if (!child) throw http.notFound('child_not_found', 'This learner is not linked to your account');
-  const checkin = await latestCheckin(child.id);
-  // the first try at each quiz: the mark the teacher sees (later tries are practice, and a
-  // retake in progress must not hide the mark)
-  const marks = await db.query(
-    `SELECT z.id AS quiz_id, z.title, z.subject_key, s.score, s.total, s.timed_out, s.submitted_at
-       FROM quiz_submissions s JOIN quizzes z ON z.id = s.quiz_id
-      WHERE s.learner_id = ? AND s.id = (
-        SELECT MIN(s2.id) FROM quiz_submissions s2 WHERE s2.quiz_id = s.quiz_id AND s2.learner_id = s.learner_id)
-      ORDER BY s.submitted_at DESC`,
-    [child.id],
-  );
-  res.json({
-    child: childSummary(child),
-    status: checkin ? statusFor(checkin.score / checkin.total) : null,
-    checkin,
-    lessons: await lessonsFor(child),
-    quizMarks: marks.map((m) => ({
-      quizId: m.quiz_id, title: m.title, subjectKey: m.subject_key, score: m.score, total: m.total,
-      timedOut: Boolean(m.timed_out), submittedAt: m.submitted_at,
-    })),
-  });
+  return child;
+}
+
+// the child's report: progress, status, lessons and assessments, quiz marks (first tries),
+// the check-in quiz and online-class attendance
+router.get('/children/:id', async (req, res) => {
+  res.json(await childReport(await linkedChild(req)));
+});
+
+// the same report as a PDF to download
+router.get('/children/:id/report.pdf', async (req, res) => {
+  const child = await linkedChild(req);
+  const report = await childReport(child);
+  const fileName = `${child.name.replace(/[^\w]+/g, '-')}-progress-report.pdf`;
+  res.set('Content-Type', 'application/pdf');
+  res.set('Content-Disposition', `attachment; filename="${fileName}"`);
+  writePdf(report, req.user.name, res);
 });
 
 module.exports = router;

@@ -217,15 +217,37 @@ TOPICS = [
 ]
 
 
-def best_topic(text: str):
-    """The topic whose words best match `text` (longer phrases count more), or None."""
+# Correctly spelt words that look like a topic word but aren't a misspelling of it ("class" is
+# not "clause"): these are never treated as typos.
+REAL_WORDS = {
+    "class", "classes", "glass", "sense", "tense", "cells", "test", "tests", "lesson", "lessons", "grade",
+    "rated", "notes", "paper", "papers", "report", "child", "online", "phone", "photo", "photos", "cause",
+    "clauses", "sentences", "atoms", "agree", "force", "forces", "areas", "perimeters", "circle", "triangle",
+}
+
+
+def _close(word: str, typed: list[str]) -> bool:
+    """Whether a typed word is `word` with a small spelling mistake ("grammer", "photosyntesis")."""
+    from difflib import SequenceMatcher
+    return any(w not in REAL_WORDS and abs(len(w) - len(word)) <= 2 and SequenceMatcher(None, word, w).ratio() >= 0.8
+               for w in typed)
+
+
+def best_topic(text: str, fuzzy: bool = False):
+    """The topic whose words best match `text` (longer phrases count more), or None. With `fuzzy`,
+    single words with a small spelling mistake count too (the helper tries that last)."""
     import re
+    typed = re.findall(r"[a-z']+", text)
+    known = {w for topic in TOPICS for w in topic["words"] if " " not in w}
+    typed_unknown = [w for w in typed if w not in known]
     best, best_score = None, 0
     for topic in TOPICS:
         score = 0
         for w in topic["words"]:
             if re.search(r"(?<![a-z])" + re.escape(w) + r"(?![a-z])", text):
                 score += len(w.split()) * 2 + len(w) / 20
+            elif fuzzy and " " not in w and len(w) >= 5 and _close(w, typed_unknown):
+                score += 1
         if score > best_score:
             best, best_score = topic, score
     return best

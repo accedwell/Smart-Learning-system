@@ -10,14 +10,14 @@ USE smart_learning;
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
-  email VARCHAR(254) NOT NULL UNIQUE,
+  email VARCHAR(254) NULL UNIQUE,  -- learners have none: they log in with their ID number
   role ENUM('learner','teacher','parent','hod','principal','admin') NOT NULL,
   password_hash VARCHAR(100) NOT NULL,
   must_change_password TINYINT(1) NOT NULL DEFAULT 0,  -- 1 while on an administrator-issued temporary password
   token_version INT NOT NULL DEFAULT 0,                -- bumped on password change: logs out older sessions
   phone VARCHAR(30) NULL,
   grade VARCHAR(4) NULL,            -- learner: the grade they are in
-  id_number VARCHAR(30) NULL,       -- learner
+  id_number VARCHAR(30) NULL UNIQUE,  -- learner: their (South African) ID number, used to log in
   progress INT NOT NULL DEFAULT 0,  -- learner: overall progress this term (%)
   subject_key VARCHAR(60) NULL,     -- teacher: the subject they teach
   teach_grade VARCHAR(4) NULL,      -- teacher: the grade they mainly teach
@@ -41,8 +41,17 @@ CREATE TABLE IF NOT EXISTS parent_children (
 
 CREATE TABLE IF NOT EXISTS lessons (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  lesson_key VARCHAR(60) NOT NULL UNIQUE,  -- i18n key of the lesson title, e.g. lesson_1
-  sort_order INT NOT NULL
+  lesson_key VARCHAR(60) NOT NULL UNIQUE,  -- i18n key of the lesson title, e.g. lesson_1 (lesson_term_work:<subject> for the rest)
+  sort_order INT NOT NULL,
+  subject_key VARCHAR(60) NULL             -- the subject the lesson belongs to
+) ENGINE=InnoDB;
+
+-- a learner's 7 subjects (two languages, a mathematics, Life Orientation and three more)
+CREATE TABLE IF NOT EXISTS learner_subjects (
+  learner_id INT NOT NULL,
+  subject_key VARCHAR(60) NOT NULL,
+  PRIMARY KEY (learner_id, subject_key),
+  FOREIGN KEY (learner_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS learner_lessons (

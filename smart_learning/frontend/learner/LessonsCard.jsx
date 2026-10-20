@@ -56,7 +56,8 @@ export default function LessonsCard(){
           <div key={l.id} className="row" style={{ flexDirection:'column', alignItems:'stretch', gap:6 }}>
             <div className="row" style={{ border:'none', padding:0 }}>
               <div style={{ flex:1 }}>
-                <div>{t(l.key)}</div>
+                {l.subjectKey && <div className="meta" style={{ fontWeight:700, color:'var(--learner)' }}>{t(l.subjectKey)}</div>}
+                <div>{t(l.key,{ subject:t(l.subjectKey) })}</div>
                 <div className="bar"><span style={{ width:l.progress+'%', background:l.progress===100?'var(--good)':'var(--learner)' }}/></div>
               </div>
               <button className={'btn'+(l.done?'':' btn-primary')} disabled={l.done || !l.assessmentViewed || busyId!=null} onClick={()=>completeLesson(l)}>
@@ -69,9 +70,9 @@ export default function LessonsCard(){
                   <button className="btn" style={{ fontSize:11.5, padding:'5px 10px' }} onClick={()=>toggleAssessment(l, expanded)}>
                     {expanded ? t('assess_hide_btn') : t('assess_view_btn')}
                   </button>
-                  <span className="meta">{t(assessment.titleKey)+' · '+t('assess_due',{ date:assessment.due })}</span>
+                  <span className="meta">{t(assessment.titleKey,{ subject:t(assessment.subjectKey) })+' · '+t('assess_due',{ date:assessment.due })}</span>
                 </div>
-                {expanded && <p className="muted" style={{ margin:'2px 0 0' }}>{t(assessment.descKey)}</p>}
+                {expanded && <p className="muted" style={{ margin:'2px 0 0' }}>{t(assessment.descKey,{ subject:t(assessment.subjectKey) })}</p>}
                 {!l.done && (
                   <p className="muted" style={{ margin:'2px 0 0', fontSize:11 }}>
                     <Icon name={l.assessmentViewed?'check':'lock'}/>{' '+(l.assessmentViewed ? t('assess_viewed_note') : t('assess_gate_note'))}

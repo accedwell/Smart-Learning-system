@@ -356,6 +356,27 @@
     "quiz_q5_d": "Vacuole",
     "status_on_track": "on track",
     "status_at_risk": "at risk",
-    "status_watch": "watch"
+    "status_watch": "watch",
+    "assess_g10_math_title": "Algebra Test: Equations & Inequalities",
+    "assess_g10_math_desc": "Covers solving linear equations, inequalities and word problems. Bring your formula sheet and a calculator.",
+    "assess_g10_eng_title": "Essay: Analytical Response",
+    "assess_g10_eng_desc": "A 300-word analytical essay on the set short story. Focus on theme, tone and character development.",
+    "assess_g10_ls_title": "Practical: Cell Structures",
+    "assess_g10_ls_desc": "Practical write-up identifying plant and animal cell organelles under the microscope.",
+    "assess_g11_math_title": "Trigonometry Assessment",
+    "assess_g11_math_desc": "Covers trig ratios, identities and graphs of sine, cosine and tangent functions.",
+    "assess_g11_eng_title": "Essay: Literary Analysis",
+    "assess_g11_eng_desc": "A structured essay analysing themes and characterisation in the prescribed novel.",
+    "assess_g11_ls_title": "Test: Human Reproduction",
+    "assess_g11_ls_desc": "Covers the male and female reproductive systems, the menstrual cycle and fertilisation.",
+    "assess_g12_math_title": "Calculus & Functions Exam",
+    "assess_g12_math_desc": "Covers differentiation, function graphs and optimisation problems — key matric exam topics.",
+    "assess_g12_eng_title": "Essay: Critical Analysis (Matric Prep)",
+    "assess_g12_eng_desc": "A timed critical essay in matric exam format, covering the prescribed poetry and drama texts.",
+    "assess_g12_ls_title": "Test: Genetics & Evolution",
+    "assess_g12_ls_desc": "Covers Mendelian genetics, DNA, meiosis and the theory of evolution by natural selection.",
+    "lesson_term_work": "This term's {subject} work",
+    "assess_generic_title": "{subject} term assessment",
+    "assess_generic_desc": "A test on this term's {subject} work. Your teacher will share the topics to study."
   }
 }

@@ -76,8 +76,9 @@ export function LearnerHome() {
         <ErrorText>{error}</ErrorText>
         <Loaded state={lessons}>
           {() => list.map((l, i) => (
-            <Row key={l.id} first={i === 0} title={t(l.key)}
+            <Row key={l.id} first={i === 0} title={l.subjectKey ? t(l.subjectKey) : t(l.key)}
               meta={<View>
+                {l.subjectKey ? <Text style={{ color: c.ink, fontSize: 13.5, marginTop: 1 }}>{t(l.key, { subject: t(l.subjectKey) })}</Text> : null}
                 <Bar pct={l.progress} color={l.done ? c.good : c.brand} />
                 {l.assessment ? (
                   <Pressable onPress={() => viewAssessment(l)} style={{ marginTop: 7 }}>
@@ -104,11 +105,11 @@ export function LearnerHome() {
         ))}
       </Card>
 
-      <Sheet visible={Boolean(open)} title={open && open.assessment ? t(open.assessment.titleKey) : ''}
+      <Sheet visible={Boolean(open)} title={open && open.assessment ? t(open.assessment.titleKey, { subject: t(open.assessment.subjectKey) }) : ''}
         sub={open && open.assessment ? t('assess_due', { date: open.assessment.due }) : ''} onClose={() => setOpen(null)}>
         {open && open.assessment ? (
           <View style={{ padding: 16 }}>
-            <Text style={{ color: c.ink, fontSize: 15, lineHeight: 22 }}>{t(open.assessment.descKey)}</Text>
+            <Text style={{ color: c.ink, fontSize: 15, lineHeight: 22 }}>{t(open.assessment.descKey, { subject: t(open.assessment.subjectKey) })}</Text>
             <Note kind="good">{t('assess_viewed_note')}</Note>
             <Button kind="primary" title={t('learner_mark_complete')} disabled={open.done}
               onPress={() => { const l = open; setOpen(null); complete(l); }} />

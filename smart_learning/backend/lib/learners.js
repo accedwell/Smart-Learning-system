@@ -1,33 +1,67 @@
 // Learner progress: lessons, the check-in quiz and the status shown on the teacher's class list.
 const db = require('./db');
-const { catalog } = require('./catalog');
+const { catalog, t } = require('./catalog');
 
-// every learner gets a row per lesson; call after creating a learner or before reading their lessons
+// A learner has one lesson per subject they take (their 7 subjects). Learners from before
+// subjects were chosen (none saved) keep the original three lessons. Call after creating a
+// learner or changing their subjects, and before reading their lessons.
 async function ensureLessons(learnerId, conn) {
+  const subjects = await db.query('SELECT subject_key FROM learner_subjects WHERE learner_id = ?', [learnerId], conn);
+  if (subjects.length === 0) {
+    await db.query(
+      "INSERT IGNORE INTO learner_lessons (learner_id, lesson_id) SELECT ?, id FROM lessons WHERE lesson_key IN ('lesson_1', 'lesson_2', 'lesson_3')",
+      [learnerId], conn,
+    );
+    return;
+  }
   await db.query(
-    'INSERT IGNORE INTO learner_lessons (learner_id, lesson_id) SELECT ?, id FROM lessons',
-    [learnerId],
-    conn,
+    `DELETE ll FROM learner_lessons ll JOIN lessons l ON l.id = ll.lesson_id
+      WHERE ll.learner_id = ? AND (l.subject_key IS NULL OR l.subject_key NOT IN (SELECT subject_key FROM learner_subjects WHERE learner_id = ?))`,
+    [learnerId, learnerId], conn,
   );
+  await db.query(
+    `INSERT IGNORE INTO learner_lessons (learner_id, lesson_id)
+     SELECT ?, l.id FROM lessons l JOIN learner_subjects ls ON ls.subject_key = l.subject_key AND ls.learner_id = ?`,
+    [learnerId, learnerId], conn,
+  );
+}
+
+// the assessment for a subject in a grade: the bank's own where there is one (Mathematics,
+// English, Life Sciences), otherwise the subject's term assessment
+const TERM_ASSESSMENT_DUE = { 10: '30 Oct', 11: '31 Oct', 12: '3 Nov' };
+function assessmentFor(grade, subjectKey) {
+  const own = (catalog.ASSESSMENTS_BANK[grade] || []).find((a) => a.subjectKey === subjectKey);
+  if (own) return own;
+  return subjectKey
+    ? { subjectKey, titleKey: 'assess_generic_title', descKey: 'assess_generic_desc', due: TERM_ASSESSMENT_DUE[grade] || '30 Oct' }
+    : null;
+}
+
+// a lesson's title in English, e.g. for notifications: "Algebraic Functions & Graphs", or
+// "This term's Geography work"
+function lessonTitle(lessonRow) {
+  return lessonRow.lesson_key.startsWith('lesson_term_work:')
+    ? t('lesson_term_work', { subject: t(lessonRow.subject_key) })
+    : t(lessonRow.lesson_key);
 }
 
 async function lessonsFor(learner) {
   await ensureLessons(learner.id);
   const rows = await db.query(
-    `SELECT l.id, l.lesson_key, l.sort_order, ll.progress, ll.done, ll.assessment_viewed
+    `SELECT l.id, l.lesson_key, l.sort_order, l.subject_key, ll.progress, ll.done, ll.assessment_viewed
        FROM learner_lessons ll JOIN lessons l ON l.id = ll.lesson_id
       WHERE ll.learner_id = ? ORDER BY l.sort_order`,
     [learner.id],
   );
-  // lesson N is paired with the Nth assessment for the learner's grade, as on the dashboard
-  const assessments = catalog.ASSESSMENTS_BANK[learner.grade] || [];
-  return rows.map((r, i) => ({
+  return rows.map((r) => ({
     id: r.id,
-    key: r.lesson_key,
+    // the lesson title's i18n key; "This term's {subject} work" for subjects without their own topic
+    key: r.lesson_key.startsWith('lesson_term_work:') ? 'lesson_term_work' : r.lesson_key,
+    subjectKey: r.subject_key,
     progress: r.progress,
     done: Boolean(r.done),
     assessmentViewed: Boolean(r.assessment_viewed),
-    assessment: assessments[i] || null,
+    assessment: assessmentFor(learner.grade, r.subject_key),
   }));
 }
 
@@ -64,4 +98,4 @@ async function latestCheckin(learnerId) {
   return row && { score: row.score, total: row.total, feedback: row.feedback, takenAt: row.created_at };
 }
 
-module.exports = { ensureLessons, lessonsFor, refreshProgress, statusFor, riskFrom, latestCheckin };
+module.exports = { ensureLessons, lessonsFor, lessonTitle, refreshProgress, statusFor, riskFrom, latestCheckin };

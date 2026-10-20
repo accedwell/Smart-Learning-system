@@ -58,16 +58,18 @@ export default function ProfilePage({ onBack }){
     );
   }
 
-  const emailChanged = email.trim().toLowerCase()!==person.email;
+  // learners added with their ID number have no email (their login details go to their parent)
+  const noEmail = person.role==='learner' && !person.email;
+  const emailChanged = !noEmail && email.trim().toLowerCase()!==person.email;
 
   async function saveDetails(e){
     e.preventDefault();
     const n = name.trim(), em = email.trim();
     if(!n) return setError(t('admin_error_name'));
-    if(!isValidEmail(em)) return setError(t('admin_error_email'));
+    if(!noEmail && !isValidEmail(em)) return setError(t('admin_error_email'));
     setError(null);
     setSaving(true);
-    const body = { name:n, phone:phone.trim(), email:em, ...(emailChanged ? { currentPassword } : {}) };
+    const body = { name:n, phone:phone.trim(), ...(noEmail ? {} : { email:em }), ...(emailChanged ? { currentPassword } : {}) };
     const { data, error: err } = await apiPatch('/auth/me', body, token);
     setSaving(false);
     if(err) return setError(errorText(t, err));
@@ -112,10 +114,12 @@ export default function ProfilePage({ onBack }){
               <label htmlFor="profileName">{t('signup_name_label')}</label>
               <input type="text" id="profileName" maxLength={100} value={name} onChange={(e)=>{ setName(e.target.value); setSaved(false); }}/>
             </div>
-            <div className="field">
-              <label htmlFor="profileEmail">{t('signup_email_label')}</label>
-              <input type="email" id="profileEmail" value={email} onChange={(e)=>{ setEmail(e.target.value); setSaved(false); }}/>
-            </div>
+            {!noEmail && (
+              <div className="field">
+                <label htmlFor="profileEmail">{t('signup_email_label')}</label>
+                <input type="email" id="profileEmail" value={email} onChange={(e)=>{ setEmail(e.target.value); setSaved(false); }}/>
+              </div>
+            )}
             {emailChanged && (
               <div className="field">
                 <label htmlFor="profileCurrentPw">{t('pw_current_label')}</label>
@@ -138,6 +142,7 @@ export default function ProfilePage({ onBack }){
           <DetailRow label={t('admin_role_label')}>{t('tab_'+person.role)}</DetailRow>
           {person.role==='learner' && <DetailRow label={t('login_grade_label')}>{t('grade_'+(person.grade||'10'))}</DetailRow>}
           {person.role==='learner' && person.idNumber && <DetailRow label={t('login_id_label')}>{person.idNumber}</DetailRow>}
+          {person.role==='learner' && person.subjects && person.subjects.length>0 && <DetailRow label={t('profile_subjects_label')}>{person.subjects.map(s=>t(s)).join(', ')}</DetailRow>}
           {person.role==='learner' && <DetailRow label={t('profile_parents_label')}>{(person.parents||[]).join(', ') || '—'}</DetailRow>}
           {person.role==='teacher' && <DetailRow label={t('signup_subject_label')}>{person.subjectKey ? t(person.subjectKey) : '—'}</DetailRow>}
           {person.role==='teacher' && person.staffNumber && <DetailRow label={t('login_staff_label')}>{person.staffNumber}</DetailRow>}

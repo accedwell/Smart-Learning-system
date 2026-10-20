@@ -6,6 +6,7 @@ import { SectionHead } from '../src/components/ui.jsx'
 import { apiGet, apiPost, apiRequest, errorText } from '../src/services/api.js'
 import { Avatar, RolePill } from '../src/components/RoleBadges.jsx'
 import InviteEmailCard from './InviteEmailCard.jsx'
+import SubjectPicker from './SubjectPicker.jsx'
 
 // every account in the school (from the backend): search, filter by role, pair parents with
 // their children, resend login details and remove people
@@ -18,6 +19,7 @@ export default function UserListCard(){
   const [classes, setClasses] = useState([]);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
+  const [editing, setEditing] = useState(null); // { id, subjects, error } while a learner's subjects are being changed
 
   useEffect(()=>{
     let cancelled = false;
@@ -36,7 +38,7 @@ export default function UserListCard(){
   const parentsOf = (learnerId)=>all.filter(u=>u.role==='parent' && (u.childIds||[]).includes(learnerId));
   const q = query.trim().toLowerCase();
   const shown = all.filter(u=>(s.userFilter==='all' || u.role===s.userFilter)
-    && (!q || u.name.toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q)));
+    && (!q || u.name.toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q) || (u.idNumber||'').includes(q)));
   const setFilter = (f)=>update(st=>{ st.admin.userFilter = f; });
 
   // puts a parent as the backend now has it into the list (and their children's parent lists)
@@ -71,6 +73,14 @@ export default function UserListCard(){
     .filter(c=>u.role==='teacher' ? c.teacherId===u.id : (c.learnerIds||[]).includes(u.id))
     .map(c=>c.name))].join(', ');
   // issues a fresh temporary password and shows the login email again
+  // a learner's 7 subjects: their lessons follow
+  async function saveSubjects(user){
+    const { data, error: err } = await apiRequest('PUT', `/admin/users/${user.id}/subjects`, { token, body:{ subjects:editing.subjects } });
+    if(err) return setEditing(e=>({ ...e, error:errorText(t, err) }));
+    setUsers(list=>list.map(u=>(u.id===user.id ? { ...u, subjects:data.user.subjects } : u)));
+    setEditing(null);
+  }
+
   async function resendLogin(user){
     const { data, error: err } = await apiPost(`/admin/users/${user.id}/reset-login`, {}, token);
     if(err) return setError(errorText(t, err));
@@ -109,8 +119,21 @@ export default function UserListCard(){
                   <RolePill role={u.role}/>
                   {u.mustChangePassword && <span className="pill pill-warn">{t('admin_awaiting_login_pill')}</span>}
                 </div>
-                <div className="meta">{u.email || '—'}{u.role==='learner' && u.grade ? ' · '+t('grade_'+u.grade) : ''}{u.role==='teacher' && u.subjectKey ? ' · '+t(u.subjectKey) : ''}
+                <div className="meta">{u.email || (u.idNumber ? t('login_id_label')+': '+u.idNumber : '—')}{u.role==='learner' && u.grade ? ' · '+t('grade_'+u.grade) : ''}{u.role==='teacher' && u.subjectKey ? ' · '+t(u.subjectKey) : ''}
                   {(u.role==='learner' || u.role==='teacher') && classNamesOf(u) ? ' · '+t('admin_user_classes',{ classes:classNamesOf(u) }) : ''}</div>
+                {u.role==='learner' && (
+                  <div className="meta">{t('profile_subjects_label')+': '}{(u.subjects||[]).length ? u.subjects.map(x=>t(x)).join(', ') : <span className="pill pill-warn">{t('admin_subjects_none')}</span>}</div>
+                )}
+                {editing && editing.id===u.id && (
+                  <div style={{ marginTop:8 }}>
+                    <SubjectPicker value={editing.subjects} onChange={(v)=>setEditing(e=>({ ...e, subjects:v, error:null }))}/>
+                    {editing.error && <p className="field-error">{editing.error}</p>}
+                    <div style={{ display:'flex', gap:8 }}>
+                      <button className="btn btn-primary" onClick={()=>saveSubjects(u)}>{t('profile_save_btn')}</button>
+                      <button className="btn" onClick={()=>setEditing(null)}>{t('pw_cancel_btn')}</button>
+                    </div>
+                  </div>
+                )}
                 {u.role==='learner' && parentsOf(u.id).length>0 && (
                   <div className="meta">{t('admin_parents_label')+' '+parentsOf(u.id).map(p=>p.name).join(', ')}</div>
                 )}
@@ -135,7 +158,8 @@ export default function UserListCard(){
               </div>
               {!isMe && (
                 <div className="user-actions">
-                  {u.email && <button className="btn" onClick={()=>resendLogin(u)}>{t('admin_resend_btn')}</button>}
+                  {u.role==='learner' && <button className="btn" onClick={()=>setEditing({ id:u.id, subjects:u.subjects&&u.subjects.length ? u.subjects : ['subject_lo'], error:null })}>{t('admin_subjects_btn')}</button>}
+                  {(u.email || u.role==='learner') && <button className="btn" onClick={()=>resendLogin(u)}>{t('admin_resend_btn')}</button>}
                   <button className="btn btn-danger" onClick={()=>removeUser(u)}>{t('admin_remove_user_btn')}</button>
                 </div>
               )}

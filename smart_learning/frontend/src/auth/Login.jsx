@@ -33,8 +33,8 @@ export default function Login({ onSubmit, onForgot, onHome }){
         </div>
         <form className="login-body" onSubmit={submit}>
           <div className="field">
-            <label htmlFor="loginEmail">{t('login_email_label')}</label>
-            <input type="text" id="loginEmail" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder={t('login_email_placeholder')} autoComplete="username" required/>
+            <label htmlFor="loginEmail">{t('login_identifier_label')}</label>
+            <input type="text" id="loginEmail" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder={t('login_identifier_placeholder')} autoComplete="username" required/>
           </div>
           <div className="field">
             <label htmlFor="loginPassword">{t('login_password_label')}</label>

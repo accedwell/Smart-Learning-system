@@ -2,7 +2,7 @@
 // assistant, opening a question paper, and My Profile.
 import { useEffect, useRef, useState } from 'react';
 import { FlatList, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { File, Paths } from 'expo-file-system';
+import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import { API_URL, apiGet, apiPatch, apiPost, errorText } from '../api';
@@ -88,19 +88,58 @@ export function NotificationsScreen() {
 // ---- question papers ----
 
 // Downloads the paper with the login token, then opens the phone's viewer (PDF, Word or photo).
-export async function openPaper(paper, token) {
-  const url = API_URL.replace(/\/api$/, '') + paper.fileUrl;
+export function openPaper(paper, token) {
+  return openFile(paper.fileUrl, paper.id + '-' + (paper.fileName || 'paper'), paper.mimeType, token, paper.title);
+}
+
+// Downloads a file the backend serves at `path` (e.g. /api/papers/7/file) with the login token,
+// then opens the phone's viewer for it, from where it can also be saved or shared.
+export async function openFile(path, fileName, mimeType, token, title) {
+  const url = API_URL.replace(/\/api$/, '') + path;
   if (Platform.OS === 'web') {
     const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
     if (!res.ok) throw new Error('download failed');
     window.open(URL.createObjectURL(await res.blob()), '_blank');
     return;
   }
-  const safeName = paper.id + '-' + (paper.fileName || 'paper').replace(/[^\w.-]+/g, '_');
-  const file = new File(Paths.cache, safeName);
+  const file = new File(Paths.cache, fileName.replace(/[^\w.-]+/g, '_'));
   if (file.exists) file.delete();
   const saved = await File.downloadFileAsync(url, file, { headers: { Authorization: 'Bearer ' + token } });
-  await Sharing.shareAsync(saved.uri, { mimeType: paper.mimeType, dialogTitle: paper.title });
+  await Sharing.shareAsync(saved.uri, { mimeType, dialogTitle: title, UTI: mimeType === 'application/pdf' ? 'com.adobe.pdf' : undefined });
+}
+
+// Downloads a file the backend serves at `path` and saves it on the phone. On Android the person
+// picks the folder (e.g. Downloads); where that isn't possible (iPhone, or no folder picked
+// because the picker failed), the share menu offers "Save to Files" instead. Resolves to true
+// when saved, false when the person cancelled.
+export async function saveFile(path, fileName, mimeType, token, title) {
+  const url = API_URL.replace(/\/api$/, '') + path;
+  const name = fileName.replace(/[^\w.-]+/g, '_');
+  if (Platform.OS === 'web') {
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) throw new Error('download failed');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(await res.blob());
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    return true;
+  }
+  const cached = new File(Paths.cache, name);
+  if (cached.exists) cached.delete();
+  const downloaded = await File.downloadFileAsync(url, cached, { headers: { Authorization: 'Bearer ' + token } });
+  if (Platform.OS === 'android') {
+    let folder;
+    try {
+      folder = await Directory.pickDirectoryAsync();
+    } catch {
+      return false; // the person closed the folder picker
+    }
+    const out = folder.createFile(name, mimeType);
+    out.write(await downloaded.bytes());
+    return true;
+  }
+  await Sharing.shareAsync(downloaded.uri, { mimeType, dialogTitle: title, UTI: mimeType === 'application/pdf' ? 'com.adobe.pdf' : undefined });
+  return true;
 }
 
 // ---- chat assistant ----
@@ -191,12 +230,14 @@ export function ProfileScreen({ extra }) {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
-  const emailChanged = email.trim().toLowerCase() !== user.email;
+  // learners added with their ID number have no email (their login details go to their parent)
+  const noEmail = user.role === 'learner' && !user.email;
+  const emailChanged = !noEmail && email.trim().toLowerCase() !== user.email;
 
   async function save() {
     setBusy(true);
     setError(null);
-    const body = { name: name.trim(), phone: phone.trim(), email: email.trim(), ...(emailChanged ? { currentPassword } : {}) };
+    const body = { name: name.trim(), phone: phone.trim(), ...(noEmail ? {} : { email: email.trim() }), ...(emailChanged ? { currentPassword } : {}) };
     const { data, error: err } = await apiPatch('/auth/me', body, token);
     setBusy(false);
     if (err) return setError(errorText(t, has, err));
@@ -228,7 +269,7 @@ export function ProfileScreen({ extra }) {
 
       <Card title={t('profile_details_title')}>
         <Field label={t('signup_name_label')} value={name} onChangeText={setName} maxLength={100} />
-        <Field label={t('signup_email_label')} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
+        {noEmail ? null : <Field label={t('signup_email_label')} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />}
         {emailChanged ? (
           <Field label={t('pw_current_label')} value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry hint={t('profile_email_password_hint')} />
         ) : null}
@@ -240,6 +281,8 @@ export function ProfileScreen({ extra }) {
       <Card title={t('profile_school_title')}>
         <Row first title={t('admin_role_label')} right={<Text style={{ color: c.ink, fontWeight: '600' }}>{t(ROLE_KEY[user.role])}</Text>} />
         {p.grade ? <Row title={t('login_grade_label')} right={<Text style={{ color: c.ink, fontWeight: '600' }}>{t('grade_' + p.grade)}</Text>} /> : null}
+        {p.idNumber ? <Row title={t('login_id_label')} right={<Text style={{ color: c.ink, fontWeight: '600' }}>{p.idNumber}</Text>} /> : null}
+        {p.subjects && p.subjects.length ? <Row title={t('profile_subjects_label')} meta={p.subjects.map((s) => t(s)).join(', ')} /> : null}
         {p.subjectKey ? <Row title={t('signup_subject_label')} right={<Text style={{ color: c.ink, fontWeight: '600' }}>{t(p.subjectKey)}</Text>} /> : null}
         {p.parents ? <Row title={t('profile_parents_label')} right={<Text style={{ color: c.ink, fontWeight: '600' }}>{p.parents.join(', ') || '—'}</Text>} /> : null}
         {p.children ? <Row title={t('profile_children_label')} right={<Text style={{ color: c.ink, fontWeight: '600', flexShrink: 1, textAlign: 'right' }}>{p.children.map((ch) => ch.name).join(', ') || '—'}</Text>} /> : null}

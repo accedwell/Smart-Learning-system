@@ -130,22 +130,6 @@ Install **Expo Go** on an Android phone or iPhone, connect it to the same Wi-Fi 
 
 Joining a live online class opens the website's classroom in the phone's browser. For that, start the frontend with `npm run dev -- --host` so the phone can reach it.
 
-### Text messages (SMS)
-
-SMS go out through [textbee](https://textbee.dev), which sends them from an Android phone, so they use that phone's airtime or bundle.
-
-1. Install the textbee app on an Android phone with a SIM card, and create an account at textbee.dev.
-2. Register the phone in the textbee dashboard, then copy the **API key** and the **device ID**.
-3. Add them to `backend/.env` as `TEXTBEE_API_KEY=...` and `TEXTBEE_DEVICE_ID=...`, then restart the backend.
-
-The app then sends:
-
-- **Parents:** a text when their child completes a lesson or hands in the first try at a quiz, with a warning if the mark puts the child at risk. Practice retakes don't send texts.
-- **Learners:** a text when their teacher schedules an online class.
-- **The administrator:** any message, to any numbers, from the **SMS** tab in the mobile app.
-
-Texts only go to people whose phone number is saved. People add their own under My Profile, or the administrator adds it in the mobile app (Users → Phone). Local numbers like `082 123 4567` get South Africa's code; change `SMS_COUNTRY_CODE` for another country. Until textbee is set up, each SMS is written to the backend's log instead of being sent.
-
 ### AI features
 
 The AI features need an Anthropic API key. Add `ANTHROPIC_API_KEY=...` to `backend/.env` and restart the backend and the chatbot. The features are:

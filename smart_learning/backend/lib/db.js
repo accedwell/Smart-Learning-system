@@ -39,6 +39,22 @@ const MIGRATIONS = [
   { table: 'online_attendance', column: 'last_joined_at', exists: false, sql: 'ADD COLUMN last_joined_at DATETIME NULL AFTER joined_at' },
   { table: 'online_attendance', column: 'seconds_attended', exists: false, sql: 'ADD COLUMN seconds_attended INT NOT NULL DEFAULT 0 AFTER last_joined_at' },
   { table: 'papers', column: 'extracted_text', exists: false, sql: 'ADD COLUMN extracted_text MEDIUMTEXT NULL AFTER size_bytes' },
+  { table: 'lessons', column: 'subject_key', exists: false, sql: 'ADD COLUMN subject_key VARCHAR(60) NULL AFTER sort_order' },
+];
+
+// Other changes to existing tables: `needed` is a query that returns a row while the change
+// still has to be made, and `sql` the statements that make it.
+const CHANGES = [
+  // learners are added with their ID number and need no email address of their own
+  {
+    needed: "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'email' AND IS_NULLABLE = 'NO'",
+    sql: ['ALTER TABLE users MODIFY email VARCHAR(254) NULL'],
+  },
+  // one account per ID number (empty values become NULL first, which the index allows many of)
+  {
+    needed: "SELECT 1 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'id_number' AND NON_UNIQUE = 0)",
+    sql: ["UPDATE users SET id_number = NULL WHERE id_number = ''", 'ALTER TABLE users ADD UNIQUE INDEX uq_users_id_number (id_number)'],
+  },
 ];
 
 async function migrate() {
@@ -48,6 +64,10 @@ async function migrate() {
       [m.table, m.column],
     );
     if ((rows.length > 0) === m.exists) await pool.query(`ALTER TABLE \`${m.table}\` ${m.sql}`);
+  }
+  for (const change of CHANGES) {
+    const [rows] = await pool.query(change.needed);
+    if (rows.length) for (const sql of change.sql) await pool.query(sql);
   }
 }
 
