@@ -20,7 +20,7 @@ export default function AppShell({ onLogout }){
   const { t, lang, setLanguage, translating } = useI18n();
   const { state } = useStore();
   const [showProfile, setShowProfile] = useState(false);
-  const surname = (state.auth.name||'').trim().split(/\s+/).pop();
+  const fullName = (state.auth.name||'').trim();
   const Dashboard = DASHBOARDS[state.role];
 
   return (
@@ -41,7 +41,7 @@ export default function AppShell({ onLogout }){
           </div>
           <div className="lang-switch">
             <div className="logged-bar">
-              <span>{surname ? t('tab_'+state.auth.role)+' · '+surname : t('tab_'+state.auth.role)}</span>
+              <span><b>{fullName}</b>{fullName ? ' · ' : ''}{t('tab_'+state.auth.role)}</span>
             </div>
             <LanguageSelect value={lang} onChange={setLanguage}/>
             {translating && <div className="spin"/>}

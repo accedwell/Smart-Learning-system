@@ -10,16 +10,18 @@ const { ensureLessons, refreshProgress } = require('../lib/learners');
 const { checkLearnerSubjects, subjectsOf, subjectsByLearner, setSubjects } = require('../lib/subjects');
 const { publicUser, findByEmail, findById, findByIdNumber, parentsWithEmail } = require('../lib/users');
 const { normalizeIdNumber } = require('../lib/idNumber');
-const { classView } = require('../lib/classes');
+const { classView, registerClasses, syncRegisterClass } = require('../lib/classes');
 const mailer = require('../lib/mailer');
 const { rateLimit } = require('../lib/rateLimit');
+const security = require('../lib/security');
 const http = require('../lib/http');
 
 const router = express.Router();
 router.use(auth.requireAuth(), auth.requireRole('admin'));
 
-// role-specific details, from the add-user form or an edit; only the fields sent are returned
-function roleDetails(role, b, { partial = false } = {}) {
+// role-specific details, from the add-user form or an edit; only the fields sent are returned.
+// `grade` is the learner's grade before this edit (for checking their class).
+function roleDetails(role, b, { partial = false, grade = null } = {}) {
   const has = (k) => !partial || k in b;
   const d = {};
   if (role === 'learner') {
@@ -27,6 +29,13 @@ function roleDetails(role, b, { partial = false } = {}) {
     if ('idNumber' in b) {
       d.id_number = normalizeIdNumber(b.idNumber);
       if (!d.id_number) throw http.badRequest('admin_error_id_number', 'Enter a valid 13-digit South African ID number', { field: 'idNumber' });
+    }
+    // their register class, e.g. 10B ('' = none yet)
+    if ('className' in b) {
+      const name = String(b.className || '').trim().toUpperCase();
+      if (!name) d.class_name = null;
+      else if (registerClasses(d.grade || grade || '').includes(name)) d.class_name = name;
+      else throw http.badRequest('admin_error_class', "Choose a class in the learner's grade", { field: 'className' });
     }
   }
   if (role === 'teacher') {
@@ -98,7 +107,8 @@ router.get('/users', async (req, res) => {
     const like = '%' + q.replace(/[\\%_]/g, (c) => '\\' + c) + '%';
     params.push(like, like, like);
   }
-  const rows = await db.query(`SELECT * FROM users ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY role, name`, params);
+  // learners by grade, then class (10A, 10B, 10C), then name
+  const rows = await db.query(`SELECT * FROM users ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY role, grade, class_name IS NULL, class_name, name`, params);
   const { total } = await db.one('SELECT COUNT(*) AS total FROM users');
   res.json({ users: await withLinks(rows), total });
 });
@@ -145,6 +155,7 @@ router.post('/users', async (req, res) => {
     if (learner) {
       await setSubjects(result.insertId, subjects, conn);
       await ensureLessons(result.insertId, conn);
+      await syncRegisterClass(result.insertId, conn);
     }
     if (childId) await db.query('INSERT INTO parent_children (parent_id, learner_id) VALUES (?, ?)', [result.insertId, childId], conn);
     let pid = parentId;
@@ -155,6 +166,8 @@ router.post('/users', async (req, res) => {
       parent: pid ? await db.one('SELECT * FROM users WHERE id = ?', [pid], conn) : null,
     };
   });
+  await security.logEvent(req, 'user_created', { user, actor: req.user });
+  if (newParent) await security.logEvent(req, 'user_created', { user: parent, actor: req.user });
   const [out, parentOut] = await withLinks(parent ? [user, parent] : [user]);
   res.status(201).json({
     user: out,
@@ -166,7 +179,9 @@ router.post('/users', async (req, res) => {
 router.patch('/users/:id', async (req, res) => {
   const user = await requireUser(http.id(req.params.id));
   const b = http.body(req);
-  const updates = roleDetails(user.role, b, { partial: true });
+  const updates = roleDetails(user.role, b, { partial: true, grade: user.grade });
+  // a learner moved to another grade can't keep a class of the old one
+  if (updates.grade && updates.grade !== user.grade && !('class_name' in updates)) updates.class_name = null;
   if (updates.id_number) await checkIdNumberFree(updates.id_number, user.id);
   if ('name' in b) updates.name = http.text(b.name, 'name', { max: 100 });
   if ('phone' in b) updates.phone = http.text(b.phone, 'phone', { max: 30, required: false }) || null;
@@ -181,6 +196,7 @@ router.patch('/users/:id', async (req, res) => {
     await db.query('DELETE cl FROM class_learners cl JOIN classes k ON k.id = cl.class_id WHERE cl.learner_id = ? AND k.grade <> ?',
       [user.id, updates.grade]);
   }
+  if (user.role === 'learner' && updates.class_name) await syncRegisterClass(user.id);
   const [out] = await withLinks([await findById(user.id)]);
   res.json({ user: out });
 });
@@ -194,6 +210,7 @@ router.put('/users/:id/subjects', async (req, res) => {
     await setSubjects(learner.id, subjects, conn);
     await ensureLessons(learner.id, conn);
     await refreshProgress(learner.id, conn);
+    await syncRegisterClass(learner.id, conn);
   });
   const [out] = await withLinks([await findById(learner.id)]);
   res.json({ user: out });
@@ -203,6 +220,7 @@ router.put('/users/:id/subjects', async (req, res) => {
 router.delete('/users/:id', async (req, res) => {
   const user = await requireUser(http.id(req.params.id));
   if (user.id === req.user.id) throw http.badRequest('admin_error_delete_self', 'You cannot remove your own account');
+  await security.logEvent(req, 'user_removed', { user, actor: req.user });
   await db.query('DELETE FROM users WHERE id = ?', [user.id]);
   res.status(204).end();
 });
@@ -212,10 +230,50 @@ router.post('/users/:id/reset-login', async (req, res) => {
   const user = await requireUser(http.id(req.params.id));
   const tempPassword = auth.generateTempPassword();
   await db.query(
-    'UPDATE users SET password_hash = ?, must_change_password = 1, token_version = token_version + 1 WHERE id = ?',
+    'UPDATE users SET password_hash = ?, must_change_password = 1, token_version = token_version + 1, failed_logins = 0, locked_until = NULL WHERE id = ?',
     [await auth.hashPassword(tempPassword), user.id],
   );
+  await security.logEvent(req, 'login_reset', { user, actor: req.user });
   res.json({ invite: await invite(user, tempPassword) });
+});
+
+// ends a lockout early (for someone who is sure it was them typing the wrong password)
+router.post('/users/:id/unlock', async (req, res) => {
+  const user = await requireUser(http.id(req.params.id));
+  await security.clearFailures(user.id);
+  await security.logEvent(req, 'account_unlocked', { user, actor: req.user });
+  res.json({ user: publicUser(await findById(user.id)) });
+});
+
+// The Security page: the latest security log entries (optionally one kind, e.g.
+// ?event=login_failed), the accounts locked right now and counts for the last 24 hours.
+router.get('/security', async (req, res) => {
+  const event = typeof req.query.event === 'string' && /^[a-z_]{1,40}$/.test(req.query.event) ? req.query.event : null;
+  const events = await db.query(
+    `SELECT e.id, e.event, e.user_id, COALESCE(u.name, e.user_name) AS user_name, u.role, e.login, a.name AS actor_name,
+            e.ip, e.user_agent, e.created_at
+       FROM security_events e
+       LEFT JOIN users u ON u.id = e.user_id
+       LEFT JOIN users a ON a.id = e.actor_id
+      ${event ? 'WHERE e.event = ?' : ''}
+      ORDER BY e.id DESC LIMIT 200`,
+    event ? [event] : [],
+  );
+  const locked = await db.query(
+    "SELECT id, name, email, id_number, role, locked_until FROM users WHERE locked_until > UTC_TIMESTAMP() ORDER BY locked_until DESC");
+  const counts = {};
+  for (const row of await db.query(
+    'SELECT event, COUNT(*) AS n FROM security_events WHERE created_at > UTC_TIMESTAMP() - INTERVAL 1 DAY GROUP BY event')) {
+    counts[row.event] = row.n;
+  }
+  res.json({
+    events: events.map((e) => ({
+      id: e.id, event: e.event, userId: e.user_id, userName: e.user_name || '', role: e.role || null,
+      login: e.login || '', actorName: e.actor_name || '', ip: e.ip || '', userAgent: e.user_agent || '', createdAt: e.created_at,
+    })),
+    locked: locked.map((u) => ({ id: u.id, name: u.name, login: u.email || u.id_number || '', role: u.role, lockedUntil: u.locked_until })),
+    last24h: counts,
+  });
 });
 
 // Emails someone their login details (the "Send email" button after adding a user or resetting

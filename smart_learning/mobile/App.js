@@ -14,7 +14,7 @@ import { Checkin, LearnerHome, LearnerOnline, LearnerPapers, LearnerQuizzes, Qui
 import { PaperQuiz, QuizBuilder, QuizResults, Register, TeacherClass, TeacherOnline, TeacherPapers, TeacherQuizzes } from './src/screens/Teacher';
 import { ChildReport, ParentChild } from './src/screens/Parent';
 import { HodDepartment, HodReports, PrincipalReports, PrincipalTeachers } from './src/screens/Staff';
-import { AdminClasses, AdminOverview, AdminUsers } from './src/screens/Admin';
+import { AdminClasses, AdminOverview, AdminSecurity, AdminUsers } from './src/screens/Admin';
 
 const LearnerProfile = () => <ProfileScreen extra={<RateTeachers />} />;
 
@@ -44,7 +44,8 @@ const TABS = {
   ],
   admin: [
     ['aover', 'business', 'nav_overview', AdminOverview], ['ausers', 'people', 'nav_users', AdminUsers],
-    ['aclasses', 'school', 'nav_classes', AdminClasses], ['me', 'person', 'm_tab_me', ProfileScreen],
+    ['aclasses', 'school', 'nav_classes', AdminClasses], ['asecurity', 'shield-checkmark', 'nav_security', AdminSecurity],
+    ['me', 'person', 'm_tab_me', ProfileScreen],
   ],
 };
 
@@ -55,7 +56,7 @@ const ROUTES = {
 };
 
 function Signed() {
-  const { user, tab, switchTab, stack, pop, toast, t, c } = useKit();
+  const { user, tab, switchTab, stack, pop, toast, touch, t, c } = useKit();
   const insets = useSafeAreaInsets();
   const [chatOpen, setChatOpen] = useState(false);
   const tabs = TABS[user.role];
@@ -74,7 +75,8 @@ function Signed() {
 
   const Page = top ? ROUTES[top.name] : current[3];
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    // every touch counts as activity for the automatic sign-out (it doesn't take the touch)
+    <View style={{ flex: 1, backgroundColor: c.bg }} onStartShouldSetResponderCapture={() => { touch(); return false; }}>
       <Page key={top ? top.name + stack.length : current[0]} {...(top ? top.params : {})} />
 
       {!top ? (

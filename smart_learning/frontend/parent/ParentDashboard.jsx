@@ -4,19 +4,16 @@ import { scoreClass } from '../src/store/metrics.js'
 import { useI18n } from '../src/i18n/I18nContext.jsx'
 import { SectionHead, Icon } from '../src/components/ui.jsx'
 import { apiGet, apiPost, errorText } from '../src/services/api.js'
+import { formatDate, timeAgo } from '../src/services/dates.js'
 
 const STATUS_PILL = { on_track:'good', watch:'warn', at_risk:'bad' };
 
-function formatTime(value){
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
-}
 
 // A parent only ever sees the learners the school administrator linked to their account.
 // Children, their marks and the parent's notifications all come from the backend.
 export default function ParentDashboard(){
   const { state, update } = useStore();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const token = state.auth.token;
   const s = state.parent;
   const [children, setChildren] = useState(null); // null while loading
@@ -139,7 +136,7 @@ export default function ParentDashboard(){
           {notifications.map(n=>(
             <div key={n.id} className="row">
               <div style={n.read ? undefined : { fontWeight:700 }}>{n.read ? '' : '● '}{noteText(n)}</div>
-              <span className="meta">{formatTime(n.createdAt)}</span>
+              <span className="meta" style={{ whiteSpace:'nowrap' }} title={formatDate(n.createdAt)}>{timeAgo(n.createdAt, lang)}</span>
             </div>
           ))}
         </div>
@@ -153,12 +150,48 @@ export default function ParentDashboard(){
           <div key={m.quizId+'-'+m.submittedAt} className="row">
             <div>
               <b>{m.title}</b>
-              <div className="meta">{[m.subjectKey && t(m.subjectKey), formatTime(m.submittedAt)].filter(Boolean).join(' · ')}</div>
+              <div className="meta">{[m.subjectKey && t(m.subjectKey), formatDate(m.submittedAt)].filter(Boolean).join(' · ')}</div>
             </div>
             <span className={'pill pill-'+scoreClass(m.score/m.total)}>{m.score+'/'+m.total}</span>
           </div>
         ))}
       </div>
+
+      {/* the child's subjects: a lesson and an assessment for each */}
+      {detail && (
+        <div className="grid grid-2" style={{ marginTop:14 }}>
+          <div className="card card-parent">
+            <SectionHead icon="book" title={t('parent_lessons_title',{ child:child.name.split(' ')[0] })}/>
+            {detail.lessons.map(l=>{
+              const subject = l.subjectKey ? t(l.subjectKey) : '';
+              return (
+                <div key={l.id} className="row" style={{ alignItems:'flex-start' }}>
+                  <div style={{ flex:1 }}>
+                    {subject && <div className="lesson-subject">{subject}</div>}
+                    <div>{t(l.key,{ subject })}</div>
+                    {l.assessment && <div className="meta">{t('parent_assessment_line',{ title:t(l.assessment.titleKey,{ subject }), date:l.assessment.due })}</div>}
+                    <div className="bar"><span style={{ width:l.progress+'%', background:l.done ? 'var(--good)' : 'var(--brand)' }}/></div>
+                  </div>
+                  {l.done ? <span className="pill pill-good">{t('learner_completed')}</span> : <span className="meta">{l.progress+'%'}</span>}
+                </div>
+              );
+            })}
+          </div>
+          <div className="card card-parent">
+            <SectionHead icon="users" title={t('nav_online_classes')}/>
+            <p style={{ margin:'0 0 8px' }}>{detail.attendance.total ? t('parent_attendance_line', detail.attendance) : t('parent_attendance_none')}</p>
+            {detail.attendance.classes.slice(0, 10).map((oc, i)=>(
+              <div key={i} className="row">
+                <div>
+                  <b>{oc.title}</b>
+                  <div className="meta">{t(oc.subjectKey)+' · '+formatDate(oc.startsAt)}</div>
+                </div>
+                <span className={'pill pill-'+({ present:'good', late:'warn', absent:'bad' }[oc.status])}>{t('online_status_'+oc.status)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

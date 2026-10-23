@@ -7,16 +7,16 @@ img{max-width:100%}
     /* navy + gold + blue palette, matching the TUT-style reference: a warm gold as
        the dominant/CTA color, dark navy as the anchor for gradients, and a bright
        blue (the sidebar's active-highlight color) as the secondary accent */
-    --bg:#f6f5ee; --surface:color-mix(in srgb, #f6f5ee 93%, transparent); --ink:#182219; --ink-soft:#5c6b5c; --border:#e4ddc7;
+    --bg:#f6f5ee; --surface:#fffdf6; --brand-tint:#f6ead6; --ink:#182219; --ink-soft:#5c6b5c; --border:#e4ddc7;
     --brand:#b8791f; --brand-ink:#0f1a38; --accent:#f2a63c;
     --font-display:'Outfit','Inter',system-ui,-apple-system,sans-serif;
     --font-body:'Inter',system-ui,-apple-system,sans-serif;
-    --learner:#2563eb; --learner-tint:#eaf1fd;
-    --teacher:#7c3aed; --teacher-tint:#f2edfc;
-    --parent:#0f766e; --parent-tint:#e7faf7;
-    --principal:#c8871a; --principal-tint:#fbf1de;
-    --hod:#b23a63; --hod-tint:#fbe9f0;
-    --admin:#155c3a; --admin-tint:#e9f3ec;
+    /* every role uses the same colours (as in the phone app): gold for actions and highlights;
+       green / amber / red only carry meaning (on track, watch, at risk) */
+    --learner:var(--brand); --teacher:var(--brand); --parent:var(--brand);
+    --principal:var(--brand); --hod:var(--brand); --admin:var(--brand);
+    --learner-tint:var(--brand-tint); --teacher-tint:var(--brand-tint); --parent-tint:var(--brand-tint);
+    --principal-tint:var(--brand-tint); --hod-tint:var(--brand-tint); --admin-tint:var(--brand-tint);
     --good:#2f9159; --warn:#c8871a; --bad:#c0392b;
     --chip-bg:#f2efdf;
     --shadow: 0 10px 30px rgba(28,42,32,.10);
@@ -25,28 +25,16 @@ img{max-width:100%}
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --bg:#0f1712; --surface:color-mix(in srgb, #16211a 93%, transparent); --ink:#eaf3ec; --ink-soft:#9db3a4; --border:#28362c;
+      --bg:#0f1712; --surface:#16211a; --brand-tint:#2c2210; --ink:#eaf3ec; --ink-soft:#9db3a4; --border:#28362c;
       --brand:#d9a13c; --brand-ink:#0f1a38; --accent:#f2b25a;
-      --learner:#6d95ec; --learner-tint:#182238;
-      --teacher:#a688ee; --teacher-tint:#221c37;
-      --parent:#3fc2af; --parent-tint:#0f2823;
-      --principal:#e3b23c; --principal-tint:#2c2210;
-      --hod:#e08bab; --hod-tint:#2c1620;
-      --admin:#5fbd8b; --admin-tint:#14261c;
       --good:#4cb579; --warn:#e3b23c; --bad:#f0776a;
       --chip-bg:#1c2a20;
       --shadow: 0 10px 30px rgba(0,0,0,.45);
     }
   }
   :root[data-theme="dark"]{
-    --bg:#0f1712; --surface:color-mix(in srgb, #16211a 93%, transparent); --ink:#eaf3ec; --ink-soft:#9db3a4; --border:#28362c;
+    --bg:#0f1712; --surface:#16211a; --brand-tint:#2c2210; --ink:#eaf3ec; --ink-soft:#9db3a4; --border:#28362c;
     --brand:#d9a13c; --brand-ink:#0f1a38; --accent:#f2b25a;
-    --learner:#6d95ec; --learner-tint:#182238;
-    --teacher:#a688ee; --teacher-tint:#221c37;
-    --parent:#3fc2af; --parent-tint:#0f2823;
-    --principal:#e3b23c; --principal-tint:#2c2210;
-    --hod:#e08bab; --hod-tint:#2c1620;
-    --admin:#5fbd8b; --admin-tint:#14261c;
     --good:#4cb579; --warn:#e3b23c; --bad:#f0776a;
     --chip-bg:#1c2a20;
     --shadow: 0 10px 30px rgba(0,0,0,.45);
@@ -62,35 +50,35 @@ img{max-width:100%}
   body.in-app::before{
     content:''; position:fixed; inset:0; z-index:-1;
     background-image:
-      linear-gradient(180deg, color-mix(in srgb, var(--bg) 55%, transparent), color-mix(in srgb, var(--bg) 88%, transparent) 45%, var(--bg) 80%),
+      linear-gradient(180deg, color-mix(in srgb, var(--bg) 78%, transparent), color-mix(in srgb, var(--bg) 92%, transparent) 40%, var(--bg) 75%),
       url('/img/bg-dashboard-chalkboard.png');
     background-size:cover; background-position:center top; background-repeat:no-repeat; background-attachment:fixed;
   }
-  /* learner dashboard: its own photo, kept clear (just a light wash so the cards stay readable) */
+  /* learner dashboard: its own photo under a soft wash, so the cards stay easy to read */
   body.in-app[data-role="learner"]::before{
     background-image:
-      linear-gradient(180deg, color-mix(in srgb, var(--bg) 10%, transparent), color-mix(in srgb, var(--bg) 25%, transparent)),
+      linear-gradient(180deg, color-mix(in srgb, var(--bg) 72%, transparent), color-mix(in srgb, var(--bg) 88%, transparent)),
       url('/img/bg-learner.jpg');
     background-position:center bottom;
   }
   /* teacher dashboard: lecture hall photo, kept clear the same way */
   body.in-app[data-role="teacher"]::before{
     background-image:
-      linear-gradient(180deg, color-mix(in srgb, var(--bg) 10%, transparent), color-mix(in srgb, var(--bg) 25%, transparent)),
+      linear-gradient(180deg, color-mix(in srgb, var(--bg) 72%, transparent), color-mix(in srgb, var(--bg) 88%, transparent)),
       url('/img/bg-teacher.jpg');
     background-position:center;
   }
   /* HOD dashboard: a rose-and-lavender sunrise over layered hills (drawn in SVG), kept clear the same way */
   body.in-app[data-role="hod"]::before{
     background-image:
-      linear-gradient(180deg, color-mix(in srgb, var(--bg) 10%, transparent), color-mix(in srgb, var(--bg) 25%, transparent)),
+      linear-gradient(180deg, color-mix(in srgb, var(--bg) 72%, transparent), color-mix(in srgb, var(--bg) 88%, transparent)),
       url('/img/bg-hod.svg');
     background-position:center bottom;
   }
   /* administrator dashboard: school building photo, kept clear the same way */
   body.in-app[data-role="admin"]::before{
     background-image:
-      linear-gradient(180deg, color-mix(in srgb, var(--bg) 10%, transparent), color-mix(in srgb, var(--bg) 25%, transparent)),
+      linear-gradient(180deg, color-mix(in srgb, var(--bg) 72%, transparent), color-mix(in srgb, var(--bg) 88%, transparent)),
       url('/img/bg-admin.jpg');
     background-position:center;
   }
@@ -256,9 +244,16 @@ img{max-width:100%}
   .lang-switch{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; flex:none; }
   .lang-switch label{ font-size:11px; font-weight:700; opacity:.9; white-space:nowrap; }
   .lang-switch select{
-    font-size:12.5px; padding:6px 8px; border-radius:8px; border:1px solid rgba(255,255,255,.4);
-    background:rgba(255,255,255,.16); color:#fff;
+    -webkit-appearance:none; appearance:none; cursor:pointer;
+    font-size:12.5px; font-weight:700; padding:7px 30px 7px 32px; border-radius:999px;
+    border:1px solid rgba(255,255,255,.35); color:#fff;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M3 12h18M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18'/%3E%3C/svg%3E") 11px center/15px no-repeat,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") right 11px center/13px no-repeat,
+      rgba(255,255,255,.14);
   }
+  .lang-switch select:hover{ background-color:rgba(255,255,255,.24); }
+  .lang-switch select:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
   .lang-switch select option{ color:#111; }
   .lang-switch .spin{ width:13px; height:13px; border-radius:50%; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; animation:spin .7s linear infinite; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
@@ -491,8 +486,12 @@ img{max-width:100%}
   /* Chat */
   .chat-fab{
     position:fixed; right:20px; bottom:20px; width:56px; height:56px; border-radius:50%;
-    background:var(--brand); color:#fff; border:none; box-shadow:var(--shadow); cursor:pointer; font-size:22px; z-index:40;
+    background:var(--brand); color:#fff; border:none; cursor:pointer; z-index:40;
+    display:grid; place-items:center; box-shadow:0 8px 22px color-mix(in srgb, var(--brand) 45%, transparent);
+    transition:transform .15s ease;
   }
+  .chat-fab:hover{ transform:translateY(-2px); }
+  .chat-fab svg{ width:26px; height:26px; }
   .chat-panel{
     position:fixed; right:20px; bottom:88px; width:min(360px, calc(100vw - 40px)); max-height:min(560px, calc(100vh - 140px));
     background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow);
@@ -541,3 +540,56 @@ img{max-width:100%}
 .live-chat-form{ display:flex; gap:6px; margin-top:8px; }
 .live-chat-form input{ flex:1; min-width:0; }
 .live-closed{ text-align:center; padding:28px 16px; }
+
+/* the learner's progress banner (navy with a gold glow, as in the phone app) */
+.progress-hero{
+  position:relative; overflow:hidden; border-radius:16px; padding:18px 20px; margin-bottom:16px;
+  background:var(--brand-ink); color:#fff;
+}
+.progress-hero::after{
+  content:''; position:absolute; right:-60px; top:-70px; width:220px; height:220px; border-radius:50%;
+  background:#b8791f; opacity:.45;
+}
+.progress-hero > *{ position:relative; z-index:1; }
+.progress-hero .hello{ font-family:var(--font-display); font-size:20px; font-weight:800; margin:0; }
+.progress-hero .pct{ font-family:var(--font-display); font-size:34px; font-weight:800; line-height:1.1; }
+.progress-hero .caption{ font-size:12.5px; opacity:.85; }
+.progress-hero .bar{ background:rgba(255,255,255,.18); }
+.progress-hero .bar span{ background:#f2b25a; }
+.lesson-subject{ font-weight:800; font-size:12px; color:var(--brand); text-transform:uppercase; letter-spacing:.04em; }
+.fold-toggle{ margin-top:10px; }
+
+/* sign-in security: the code step, the "signed out" notice and the idle warning */
+.code-badge{
+  display:grid; place-items:center; width:58px; height:58px; margin:0 auto 10px; border-radius:18px;
+  background:var(--brand-tint); color:var(--brand);
+}
+.code-badge .icon-inline, .code-badge svg{ width:30px; height:30px; }
+.code-input{ width:100%; box-sizing:border-box; font-size:24px !important; letter-spacing:8px; text-align:center; font-family:ui-monospace, monospace; }
+.login-notice{
+  margin:0 0 12px; padding:10px 12px; border-radius:10px; font-size:12.5px;
+  background:var(--brand-tint); color:var(--ink); border:1px solid color-mix(in srgb, var(--brand) 35%, transparent);
+}
+.idle-warning{
+  position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:60; max-width:calc(100% - 32px);
+  display:flex; align-items:center; gap:12px; padding:10px 12px 10px 16px; border-radius:12px;
+  background:var(--brand-ink); color:#fff; box-shadow:var(--shadow); font-size:13px;
+}
+.idle-warning .btn{ flex:none; }
+.sec-event{ display:grid; grid-template-columns:1fr auto; gap:2px 12px; padding:10px 0; border-bottom:1px solid var(--border); }
+.sec-event:last-child{ border-bottom:none; }
+.sec-event .meta{ grid-column:1 / -1; }
+.sec-event .meta.sec-time{ grid-column:2; grid-row:1; white-space:nowrap; align-self:center; }
+
+/* the users list: learners by grade, then class (10A, 10B, 10C) */
+.learner-grade{ margin:6px 0 18px; }
+.learner-grade .group-head{
+  display:flex; align-items:baseline; gap:10px; margin:14px 0 8px; padding-bottom:6px;
+  font-family:var(--font-display); font-size:16px; border-bottom:2px solid var(--brand);
+}
+.class-group{ margin:0 0 12px; padding:4px 12px; border-radius:12px; background:var(--brand-tint); }
+.class-group .user-row{ background:var(--surface); border-radius:10px; margin:6px 0; padding:10px; }
+.class-group-head{ display:flex; align-items:baseline; gap:10px; padding:8px 0 2px; }
+.class-group-head b{ font-size:14px; color:var(--brand); }
+.class-select{ width:auto; font-size:12px; padding:5px 8px; }
+

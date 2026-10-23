@@ -4,9 +4,24 @@ import { UI } from '../i18n/strings.js'
 // Resolves to { data } or { error: { code, message, vars } }; error codes are i18n keys
 // where one exists, so screens can show t(error.code, error.vars).
 // `token` is the sign-in token from POST /auth/login (state.auth.token).
+// A random id this browser keeps, sent with every request, so the backend can tell a sign-in
+// from a new device (and email a login alert). It identifies the browser, never the person.
+const DEVICE_KEY = 'smart-learning-device';
+let deviceId = null;
+function getDeviceId(){
+  if(deviceId) return deviceId;
+  try{ deviceId = localStorage.getItem(DEVICE_KEY); } catch{ /* not kept: a new id each visit */ }
+  if(!deviceId){
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    deviceId = Array.from(bytes, b=>b.toString(16).padStart(2, '0')).join('');
+    try{ localStorage.setItem(DEVICE_KEY, deviceId); } catch{ /* not kept */ }
+  }
+  return deviceId;
+}
+
 export async function apiRequest(method, path, { body, token } = {}){
   try{
-    const headers = {};
+    const headers = { 'X-Device-Id':getDeviceId() };
     if(body!==undefined) headers['Content-Type'] = 'application/json';
     if(token) headers.Authorization = 'Bearer '+token;
     const res = await fetch('/api'+path, {

@@ -3,6 +3,7 @@ import { useStore } from '../src/store/AppStore.jsx'
 import { useI18n } from '../src/i18n/I18nContext.jsx'
 import { DEPARTMENTS } from '../src/data/seed.js'
 import { SectionHead, Icon, AiNote } from '../src/components/ui.jsx'
+import { formatDateTime } from '../src/services/dates.js'
 import { apiGet, apiPatch, apiPost, errorText } from '../src/services/api.js'
 
 // The HOD's teachers, escalations and reports all come from the backend (/api/hod), so they
@@ -126,13 +127,9 @@ export default function HodDashboard(){
           </>
         )}
         <button className="btn btn-primary" style={{ marginTop:10 }} disabled={!teachers || teachers.length===0 || busy.report} onClick={sendReport}>{t('hod_report_send_btn')}</button>
-        {lastReport && <p className="ai-note"><Icon name="check"/>{' '+t('hod_report_last_sent',{ time:formatTime(lastReport.sentAt) })}</p>}
+        {lastReport && <p className="ai-note"><Icon name="check"/>{' '+t('hod_report_last_sent',{ time:formatDateTime(lastReport.sentAt) })}</p>}
       </div>
     </div>
   );
 }
 
-function formatTime(value){
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
-}

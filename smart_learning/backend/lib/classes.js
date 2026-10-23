@@ -3,6 +3,7 @@
 // gets only the quizzes and papers sent to the classes they are in.
 const db = require('./db');
 const http = require('./http');
+const { catalog } = require('./catalog');
 
 const MAX_CLASSES_PER_ITEM = 50;
 
@@ -11,6 +12,29 @@ const LINKS = {
   quiz: { table: 'quiz_classes', column: 'quiz_id' },
   paper: { table: 'paper_classes', column: 'paper_id' },
 };
+
+// "10A", "10B", "10C": the register classes of a grade
+const registerClasses = (grade) => catalog.CLASS_LETTERS.map((letter) => grade + letter);
+
+// A learner in register class 10B is in the 10B class of each of their subjects (where the
+// school has one), and in no other 10A/10B/10C class of their grade. Classes with other names
+// (e.g. an extra Maths group) are left as the administrator set them.
+async function syncRegisterClass(learnerId, conn) {
+  const learner = await db.one('SELECT grade, class_name FROM users WHERE id = ?', [learnerId], conn);
+  if (!learner || !learner.grade || !learner.class_name) return;
+  const others = registerClasses(learner.grade).filter((name) => name !== learner.class_name);
+  if (others.length) {
+    await db.query(
+      `DELETE cl FROM class_learners cl JOIN classes k ON k.id = cl.class_id
+        WHERE cl.learner_id = ? AND k.grade = ? AND k.name IN (?)`,
+      [learnerId, learner.grade, others], conn);
+  }
+  await db.query(
+    `INSERT IGNORE INTO class_learners (class_id, learner_id)
+     SELECT k.id, ? FROM classes k JOIN learner_subjects s ON s.learner_id = ? AND s.subject_key = k.subject_key
+      WHERE k.grade = ? AND k.name = ?`,
+    [learnerId, learnerId, learner.grade, learner.class_name], conn);
+}
 
 function classView(c) {
   return { id: c.id, name: c.name, grade: c.grade, subjectKey: c.subject_key, teacherId: c.teacher_id };
@@ -72,4 +96,5 @@ async function teachesLearner(teacherId, learnerId) {
   return Boolean(row);
 }
 
-module.exports = { classView, teacherClassesFor, sendToClasses, classIdsOf, sentToLearners, teachesLearner };
+module.exports = {
+  registerClasses, syncRegisterClass, classView, teacherClassesFor, sendToClasses, classIdsOf, sentToLearners, teachesLearner };

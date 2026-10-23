@@ -10,6 +10,7 @@ const { publicUser, findByEmail, findByLogin, parentsWithEmail, childIdsOf } = r
 const { rateLimit, failureLimit } = require('../lib/rateLimit');
 const mailer = require('../lib/mailer');
 const { subjectsOf } = require('../lib/subjects');
+const security = require('../lib/security');
 const http = require('../lib/http');
 
 const router = express.Router();
@@ -70,14 +71,33 @@ router.post('/login', credentialLimiter, async (req, res) => {
   const password = typeof b.password === 'string' ? b.password : '';
   checkGuesses(req, res, login);
   const user = login ? await findByLogin(b.email) : null;
+  if (security.isLocked(user)) {
+    await security.logEvent(req, 'login_blocked', { user, login });
+    throw security.lockedError(user);
+  }
   const ok = await auth.verifyPassword(password, user && user.password_hash);
   if (!user || !ok) {
     wrongGuess(req, login);
+    if (user) await security.failedAttempt(req, user, 'login_failed', login);
+    else await security.logEvent(req, 'login_failed', { login });
     throw http.unauthorized('login_error_password', 'Wrong email/ID number or password');
   }
   if (b.role && b.role !== user.role) {
     throw http.forbidden('login_error_role', `This account is a ${user.role} account`, { role: user.role });
   }
+  await security.clearFailures(user.id);
+  // staff finish with the code emailed to them (POST /login/verify)
+  if (security.needsCode(user)) return res.json(await security.startCodeSignIn(req, user));
+  await security.signedIn(req, user);
+  res.json(await session(user));
+});
+
+// the second step for staff: { challenge } from /login and the 6-digit { code } from the email
+router.post('/login/verify', credentialLimiter, async (req, res) => {
+  const b = http.body(req);
+  const user = await security.finishCodeSignIn(req, b.challenge, b.code);
+  await security.clearFailures(user.id);
+  await security.signedIn(req, user);
   res.json(await session(user));
 });
 
@@ -92,6 +112,7 @@ router.post('/change-password', auth.requireAuth({ allowPendingPassword: true })
     'UPDATE users SET password_hash = ?, must_change_password = 0, token_version = token_version + 1 WHERE id = ?',
     [await auth.hashPassword(next), user.id],
   );
+  await security.logEvent(req, 'password_changed', { user });
   res.json(await session(await db.one('SELECT * FROM users WHERE id = ?', [user.id])));
 });
 
@@ -102,6 +123,7 @@ router.post('/forgot-password', credentialLimiter, async (req, res) => {
   const b = http.body(req);
   const user = await findByLogin(b.email);
   res.json({ ok: true });
+  await security.logEvent(req, 'reset_requested', { user, login: user ? null : b.email });
   if (!user) return;
   const parents = user.email ? [] : await parentsWithEmail(user.id);
   if (!user.email && parents.length === 0) return; // nobody to send it to
@@ -142,7 +164,10 @@ router.post('/reset-password', credentialLimiter, async (req, res) => {
       [await auth.hashPassword(next), reset.user_id], conn,
     );
     await db.query('DELETE FROM password_resets WHERE user_id = ?', [reset.user_id], conn);
+    // the owner proved it is them (the email reached them), so a lockout ends too
+    await security.clearFailures(reset.user_id, conn);
   });
+  await security.logEvent(req, 'password_reset', { user: await db.one('SELECT id, name FROM users WHERE id = ?', [reset.user_id]) });
   res.json({ ok: true });
 });
 

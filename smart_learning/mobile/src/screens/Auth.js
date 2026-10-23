@@ -5,6 +5,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { apiPost, errorText } from '../api';
+import { IDLE_MINUTES } from '../AppContext';
 import { LANGUAGES } from '../i18n';
 import { Button, ErrorText, PasswordField, Sheet, useKit } from '../ui';
 
@@ -115,25 +116,107 @@ const NoAccount = () => {
   );
 };
 
-export function Login({ onForgot }) {
+// Administrators, principals and HODs finish signing in with the 6-digit code emailed to them.
+function CodeStep({ step, onResend, onBack }) {
   const { t, has, enter, c } = useKit();
+  const [code, setCode] = useState('');
+  const [error, setError] = useState(null);
+  const [note, setNote] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    const { data, error: err } = await apiPost('/auth/login/verify', { challenge: step.challenge, code });
+    setBusy(false);
+    if (err) { setCode(''); return setError(errorText(t, has, err)); }
+    enter(data);
+  }
+
+  async function resend() {
+    setBusy(true);
+    setError(null);
+    const err = await onResend();
+    setBusy(false);
+    if (err) setError(err);
+    else { setCode(''); setNote(t('two_factor_resent')); }
+  }
+
+  return (
+    <AuthShell icon="shield-checkmark" heading={t('two_factor_title')} sub={t('two_factor_subtitle', { email: step.email, minutes: step.minutes })}
+      footer={<Pressable onPress={onBack} style={styles.footer} hitSlop={8}>
+        <Ionicons name="arrow-back" size={17} color={GOLD} />
+        <Text style={{ color: GOLD, fontWeight: '700' }}>{t('two_factor_back')}</Text>
+      </Pressable>}>
+      <AuthInput icon="keypad-outline" label={t('two_factor_label')} value={code} onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
+        placeholder="000000" keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode"
+        maxLength={6} autoFocus returnKeyType="go" onSubmitEditing={() => code.length === 6 && submit()}
+        style={[styles.input, { color: c.ink, fontSize: 22, letterSpacing: 6 }]} />
+      {error ? (
+        <View style={[styles.errorBox, { backgroundColor: c.bad + '1a' }]}>
+          <Ionicons name="alert-circle" size={18} color={c.bad} />
+          <Text style={{ color: c.bad, flex: 1, fontSize: 13.5 }}>{error}</Text>
+        </View>
+      ) : null}
+      {note ? (
+        <View style={[styles.errorBox, { backgroundColor: c.good + '1a' }]}>
+          <Ionicons name="checkmark-circle" size={18} color={c.good} />
+          <Text style={{ color: c.good, flex: 1, fontSize: 13.5 }}>{note}</Text>
+        </View>
+      ) : null}
+      <Button kind="primary" title={t('two_factor_button')} onPress={submit} busy={busy} disabled={code.length !== 6}
+        style={{ paddingVertical: 16, borderRadius: 16 }} />
+      <Pressable onPress={resend} hitSlop={8} style={{ alignSelf: 'center', marginTop: 16 }} disabled={busy}>
+        <Text style={{ color: c.brand, fontWeight: '700' }}>{t('two_factor_resend')}</Text>
+      </Pressable>
+    </AuthShell>
+  );
+}
+
+export function Login({ onForgot }) {
+  const { t, has, enter, signedOutIdle, c } = useKit();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [codeStep, setCodeStep] = useState(null); // { challenge, email, minutes } for staff
+
+  async function signIn() {
+    const { data, error: err } = await apiPost('/auth/login', { email: email.trim(), password });
+    if (err) return { error: errorText(t, has, err) };
+    return { data };
+  }
 
   async function submit() {
     if (!email.trim() || !password) return;
     setBusy(true);
     setError(null);
-    const { data, error: err } = await apiPost('/auth/login', { email: email.trim(), password });
+    const { data, error: err } = await signIn();
     setBusy(false);
-    if (err) return setError(errorText(t, has, err));
+    if (err) return setError(err);
+    if (data.twoFactor) return setCodeStep(data);
     enter(data);
   }
 
+  // logging in again with the same details emails a fresh code
+  async function resend() {
+    const { data, error: err } = await signIn();
+    if (err) return err;
+    if (data.twoFactor) setCodeStep(data);
+    return null;
+  }
+
+  if (codeStep) return <CodeStep step={codeStep} onResend={resend} onBack={() => { setCodeStep(null); setPassword(''); }} />;
+
   return (
     <AuthShell heading={t('login_title')} sub={t('login_subtitle')} footer={<NoAccount />}>
+      {signedOutIdle ? (
+        <View style={[styles.errorBox, { backgroundColor: c.brand + '1f' }]}>
+          <Ionicons name="time-outline" size={18} color={c.brand} />
+          <Text style={{ color: c.ink, flex: 1, fontSize: 13.5 }}>{t('idle_signed_out', { n: IDLE_MINUTES })}</Text>
+        </View>
+      ) : null}
       <AuthInput icon="person-outline" label={t('login_identifier_label')} value={email} onChangeText={setEmail}
         placeholder={t('login_identifier_placeholder')} autoCapitalize="none" autoComplete="username"
         textContentType="username" returnKeyType="next" />

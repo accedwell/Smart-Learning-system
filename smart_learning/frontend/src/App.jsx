@@ -3,12 +3,14 @@ import { useStore } from './store/AppStore.jsx'
 import { findAccount } from './services/accounts.js'
 import { apiGet, apiPost, errorText } from './services/api.js'
 import { savedToken, rememberToken, forgetToken } from './services/session.js'
+import { IDLE_MINUTES, idleTooLong, useIdleSignOut, forgetActivity } from './services/idle.js'
 import { useI18n } from './i18n/I18nContext.jsx'
 import Landing from './auth/Landing.jsx'
 import Login from './auth/Login.jsx'
 import ForgotPassword from './auth/ForgotPassword.jsx'
 import ResetPassword from './auth/ResetPassword.jsx'
 import FirstLoginPassword from './auth/FirstLoginPassword.jsx'
+import TwoFactorCode from './auth/TwoFactorCode.jsx'
 import AppShell from './layout/AppShell.jsx'
 import ChatWidget from './layout/ChatWidget.jsx'
 import { makeEmptyQuizDraft, makeEmptyPaperDraft } from '../teacher/drafts.js'
@@ -26,8 +28,11 @@ export default function App(){
   const { state, update } = useStore();
   const { t } = useI18n();
   const [resetToken, setResetToken] = useState(initialResetToken);
-  const [screen, setScreen] = useState(initialResetToken ? 'reset' : 'landing'); // 'landing' | 'login' | 'forgot' | 'reset' | 'first-login'
+  const [screen, setScreen] = useState(initialResetToken ? 'reset' : 'landing'); // 'landing' | 'login' | 'code' | 'forgot' | 'reset' | 'first-login'
   const [pendingLogin, setPendingLogin] = useState(null); // the backend session ({ token, user }) while a temporary password is being replaced
+  // staff sign-in waiting for the emailed code: { challenge, email, minutes, credentials }
+  const [codeLogin, setCodeLogin] = useState(null);
+  const [loginNotice, setLoginNotice] = useState(null); // e.g. why the person was signed out
   // true while a sign-in remembered from before a page refresh is being checked
   const [restoring, setRestoring] = useState(()=>Boolean(savedToken()));
   const loggedIn = state.auth.loggedIn;
@@ -37,6 +42,14 @@ export default function App(){
   useEffect(()=>{
     const token = savedToken();
     if(!token) return;
+    // left alone too long before the refresh: signed out, as if the page had stayed open
+    if(idleTooLong()){
+      forgetToken(); forgetActivity();
+      setLoginNotice(t('idle_signed_out',{ n:IDLE_MINUTES }));
+      setScreen('login');
+      setRestoring(false);
+      return;
+    }
     let cancelled = false;
     apiGet('/auth/me', token).then(({ data })=>{
       if(cancelled) return;
@@ -102,17 +115,43 @@ export default function App(){
     rememberToken(token);
   }
 
-  // email + password only: the account decides the role (and a learner's grade)
-  async function handleLogin({ email, password }){
-    const { data, error } = await apiPost('/auth/login', { email, password });
-    if(error) return { text:errorText(t, error) };
+  // a session from the backend: straight in, or first a new password
+  function startSession(data){
+    setCodeLogin(null);
+    setLoginNotice(null);
     if(data.mustChangePassword){
       setPendingLogin(data);
       setScreen('first-login');
-      return null;
+      return;
     }
     enterWithSession(data);
+  }
+
+  // email + password only: the account decides the role (and a learner's grade). Staff then
+  // get a code by email (the 'code' screen).
+  async function handleLogin({ email, password }){
+    const { data, error } = await apiPost('/auth/login', { email, password });
+    if(error) return { text:errorText(t, error) };
+    if(data.twoFactor){
+      setCodeLogin({ challenge:data.challenge, email:data.email, minutes:data.minutes, credentials:{ email, password } });
+      setScreen('code');
+      return null;
+    }
+    startSession(data);
     return null;
+  }
+
+  async function submitCode(code){
+    const { data, error } = await apiPost('/auth/login/verify', { challenge:codeLogin.challenge, code });
+    if(error) return errorText(t, error);
+    startSession(data);
+  }
+
+  // logging in again with the same details emails a fresh code
+  async function resendCode(){
+    const { data, error } = await apiPost('/auth/login', codeLogin.credentials);
+    if(error) return errorText(t, error);
+    if(data.twoFactor) setCodeLogin(c=>({ ...c, challenge:data.challenge }));
   }
 
   // resolves to an error message, or nothing once the new password is saved
@@ -125,23 +164,40 @@ export default function App(){
 
   function logout(){
     forgetToken();
+    forgetActivity();
     update(s=>{ s.auth = { loggedIn:false, name:'', role:'learner', grade:'10' }; });
     setScreen('landing');
   }
+
+  function idleLogout(){
+    logout();
+    setLoginNotice(t('idle_signed_out',{ n:IDLE_MINUTES }));
+    setScreen('login');
+  }
+  const idleSecondsLeft = useIdleSignOut(loggedIn, idleLogout);
 
   if(restoring) return null;
   if(loggedIn){
     return (
       <>
+        {idleSecondsLeft!=null && (
+          <div className="idle-warning" role="alert">
+            <span>{t('idle_warning',{ s:idleSecondsLeft })}</span>
+            <button className="btn">{t('idle_stay')}</button>
+          </div>
+        )}
         <AppShell onLogout={logout}/>
         <ChatWidget/>
       </>
     );
   }
-  const home = ()=>setScreen('landing');
-  const toLogin = ()=>{ setPendingLogin(null); setScreen('login'); };
+  const home = ()=>{ setLoginNotice(null); setScreen('landing'); };
+  const toLogin = ()=>{ setPendingLogin(null); setCodeLogin(null); setScreen('login'); };
   if(screen==='first-login' && pendingLogin) return <FirstLoginPassword account={pendingLogin.user} onSave={finishFirstLogin} onCancel={toLogin}/>;
-  if(screen==='login') return <Login onSubmit={handleLogin} onForgot={()=>setScreen('forgot')} onHome={home}/>;
+  if(screen==='code' && codeLogin){
+    return <TwoFactorCode email={codeLogin.email} minutes={codeLogin.minutes} onSubmit={submitCode} onResend={resendCode} onBack={toLogin}/>;
+  }
+  if(screen==='login') return <Login notice={loginNotice} onSubmit={handleLogin} onForgot={()=>setScreen('forgot')} onHome={home}/>;
   if(screen==='reset' && resetToken) return <ResetPassword token={resetToken} onLogin={toLogin} onForgot={()=>setScreen('forgot')}/>;
   if(screen==='forgot') return <ForgotPassword onLogin={toLogin} onHome={home}/>;
   return <Landing onLogin={toLogin}/>;

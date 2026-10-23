@@ -4,6 +4,7 @@ import { useI18n } from '../src/i18n/I18nContext.jsx'
 import { DEPARTMENTS } from '../src/data/seed.js'
 import { SectionHead, Icon } from '../src/components/ui.jsx'
 import { saveTextFile } from '../src/services/downloads.js'
+import { formatDateTime } from '../src/services/dates.js'
 import { apiGet, apiPatch, apiPost, errorText } from '../src/services/api.js'
 
 function WorkPill({ workDone }){
@@ -13,10 +14,6 @@ function WorkPill({ workDone }){
   return <span className="pill pill-warn">{t('principal_ask_pill')}</span>;
 }
 
-function formatTime(value){
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
-}
 
 // Every teacher, the HODs' department reports, oversight and feedback all come from the
 // backend (/api/principal), so they are saved in the database.
@@ -78,7 +75,7 @@ export default function PrincipalDashboard(){
     const lines = [
       'Smart Learning - Teacher Performance Report',
       'Teacher: '+teacher.name+(teachingText(teacher) ? ' ('+teachingText(teacher)+')' : ''),
-      'Generated: '+new Date().toLocaleString(),
+      'Generated: '+formatDateTime(new Date()),
       '',
       'Attendance: '+(teacher.attendance ?? '–')+'%',
       'Performance: '+(teacher.performance ?? '–')+'%',
@@ -130,7 +127,7 @@ export default function PrincipalDashboard(){
           <div key={rep.id} className="row" style={{ flexDirection:'column', alignItems:'stretch', gap:6 }}>
             <div>
               <b>{deptLabel(rep.dept)}</b>
-              <div className="meta">{t('principal_reports_caption',{ dept:rep.hodName || deptLabel(rep.dept), time:formatTime(rep.sentAt) })}</div>
+              <div className="meta">{t('principal_reports_caption',{ dept:rep.hodName || deptLabel(rep.dept), time:formatDateTime(rep.sentAt) })}</div>
             </div>
             {(rep.rows || []).map(row=>(
               <div key={row.teacherId || row.name} className="row" style={{ padding:'4px 0', border:'none', fontSize:12 }}>
@@ -157,14 +154,14 @@ export default function PrincipalDashboard(){
             )}
             {selected.workDone===false && (
               <>
-                <p className="pill pill-bad">{t('principal_reminder_pill')}</p>
+                <p><span className="pill pill-bad">{t('principal_reminder_pill')}</span></p>
                 <p className="muted">{t('principal_reminder_note')}</p>
                 <button className="btn btn-primary" style={{ marginTop:8 }} disabled={busy} onClick={()=>setWorkDone(true)}>{t('principal_yes')}</button>
               </>
             )}
             {selected.workDone===true && (
               <>
-                <p className="pill pill-good">{t('principal_work_done_pill')}</p>
+                <p><span className="pill pill-good">{t('principal_work_done_pill')}</span></p>
                 <button className="btn btn-primary" style={{ marginTop:8 }} onClick={()=>downloadReport(selected)}><Icon name="download"/>{' '+t('principal_download_btn')}</button>
               </>
             )}

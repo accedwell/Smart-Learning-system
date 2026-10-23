@@ -6,6 +6,7 @@ const { hashPassword } = require('./auth');
 const { catalog, deptForSubject } = require('./catalog');
 const { setSubjects } = require('./subjects');
 const { ensureLessons, refreshProgress } = require('./learners');
+const { syncRegisterClass } = require('./classes');
 
 const DEMO_PASSWORD = 'Demo@1234';
 const LESSON_KEYS = ['lesson_1', 'lesson_2', 'lesson_3'];
@@ -14,11 +15,11 @@ const LEARNERS = [
   // the ID numbers are made up, but valid in form (date and check digit), so learners can log in with them
   // 7 subjects each: two languages, a mathematics, Life Orientation and three more (including the
   // Mathematics, English and Life Sciences classes they are in)
-  { name: 'Thabo Mokoena', email: 'thabo@school.demo', idNumber: '1003155123089', grade: '10', lessons: [100, 60, 0], checkin: [5, 5],
+  { name: 'Thabo Mokoena', email: 'thabo@school.demo', idNumber: '1003155123089', grade: '10', className: '10A', lessons: [100, 60, 0], checkin: [5, 5],
     subjects: ['subject_2', 'subject_sesotho', 'subject_lo', 'subject_1', 'subject_physical_sciences', 'subject_3', 'subject_geography'] },
-  { name: 'Lindiwe Khoza', email: 'lindiwe@school.demo', idNumber: '0906110245089', grade: '11', lessons: [80, 40, 0], checkin: [2, 5],
+  { name: 'Lindiwe Khoza', email: 'lindiwe@school.demo', idNumber: '0906110245089', grade: '11', className: '11A', lessons: [80, 40, 0], checkin: [2, 5],
     subjects: ['subject_2', 'subject_isizulu', 'subject_lo', 'subject_1', 'subject_3', 'subject_accounting', 'subject_business'] },
-  { name: 'Sipho Ndlovu', email: 'sipho@school.demo', idNumber: '1008225067083', grade: '10', lessons: [100, 20, 0], checkin: [3, 5],
+  { name: 'Sipho Ndlovu', email: 'sipho@school.demo', idNumber: '1008225067083', grade: '10', className: '10B', lessons: [100, 20, 0], checkin: [3, 5],
     subjects: ['subject_2', 'subject_isizulu', 'subject_lo', 'subject_1', 'subject_3', 'subject_history', 'subject_geography'] },
 ];
 
@@ -41,15 +42,22 @@ const STAFF = [
 
 // classes (subject groups): Mrs. Dlamini teaches three Mathematics classes. Each quiz below
 // goes to its teacher's classes of that grade and subject.
+// Grade 10 runs as three register classes, 10A, 10B and 10C: each learner is in their own
+// class's group of every subject they take.
 const CLASSES = [
   { name: '10A', grade: '10', subjectKey: 'subject_1', teacher: 'dlamini@school.demo', learners: ['thabo@school.demo'] },
   { name: '10B', grade: '10', subjectKey: 'subject_1', teacher: 'dlamini@school.demo', learners: ['sipho@school.demo'] },
+  { name: '10C', grade: '10', subjectKey: 'subject_1', teacher: 'dlamini@school.demo', learners: [] },
   { name: '11A', grade: '11', subjectKey: 'subject_1', teacher: 'dlamini@school.demo', learners: ['lindiwe@school.demo'] },
   { name: '12A', grade: '12', subjectKey: 'subject_1', teacher: 'nkosi@school.demo', learners: [] },
-  { name: '10A', grade: '10', subjectKey: 'subject_2', teacher: 'khumalo@school.demo', learners: ['thabo@school.demo', 'sipho@school.demo'] },
+  { name: '10A', grade: '10', subjectKey: 'subject_2', teacher: 'khumalo@school.demo', learners: ['thabo@school.demo'] },
+  { name: '10B', grade: '10', subjectKey: 'subject_2', teacher: 'khumalo@school.demo', learners: ['sipho@school.demo'] },
+  { name: '10C', grade: '10', subjectKey: 'subject_2', teacher: 'khumalo@school.demo', learners: [] },
   { name: '11A', grade: '11', subjectKey: 'subject_2', teacher: 'khumalo@school.demo', learners: ['lindiwe@school.demo'] },
   { name: '12A', grade: '12', subjectKey: 'subject_2', teacher: 'khumalo@school.demo', learners: [] },
-  { name: '10A', grade: '10', subjectKey: 'subject_3', teacher: 'naidoo@school.demo', learners: ['thabo@school.demo', 'sipho@school.demo'] },
+  { name: '10A', grade: '10', subjectKey: 'subject_3', teacher: 'naidoo@school.demo', learners: ['thabo@school.demo'] },
+  { name: '10B', grade: '10', subjectKey: 'subject_3', teacher: 'naidoo@school.demo', learners: ['sipho@school.demo'] },
+  { name: '10C', grade: '10', subjectKey: 'subject_3', teacher: 'naidoo@school.demo', learners: [] },
   { name: '11A', grade: '11', subjectKey: 'subject_3', teacher: 'zulu@school.demo', learners: ['lindiwe@school.demo'] },
   { name: '12A', grade: '12', subjectKey: 'subject_3', teacher: 'naidoo@school.demo', learners: [] },
 ];
@@ -95,7 +103,7 @@ const QUIZ_RESULTS = [
 
 const SUBJECT_STATS = [['subject_1', 94, 71], ['subject_2', 91, 78], ['subject_3', 88, 65]];
 
-const PARENT_NOTIFICATIONS = ['notif_1', 'notif_2', 'notif_3'];
+const DEMO_NOTIFICATIONS = ['notif_1', 'notif_2', 'notif_3'];
 
 // lessons exist in every database, demo or not
 // One lesson per subject. Mathematics, English and Life Sciences have their own lesson topics
@@ -133,15 +141,27 @@ async function seedDemoData() {
     await ensureLessons(row.id);
     await refreshProgress(row.id);
   }
-  // demo parent notifications from before they named the child ("{child} completed ...")
-  await db.query(
-    `UPDATE notifications n
-       JOIN parent_children pc ON pc.parent_id = n.user_id
-       JOIN users l ON l.id = pc.learner_id
-        SET n.params = JSON_SET(COALESCE(n.params, JSON_OBJECT()), '$.child', l.name)
-      WHERE n.msg_key IN (?) AND JSON_EXTRACT(n.params, '$.child') IS NULL`,
-    [PARENT_NOTIFICATIONS],
-  );
+  // demo schools from before register classes: the demo learners get theirs (10A, 10B, 11A), the
+  // missing 10B/10C subject classes are added once, and the learners move into their classes
+  const unplaced = [];
+  for (const l of LEARNERS) {
+    const row = await db.one("SELECT id FROM users WHERE email = ? AND role = 'learner' AND class_name IS NULL", [l.email]);
+    if (row) unplaced.push({ id: row.id, className: l.className });
+  }
+  if (unplaced.length) {
+    for (const c of CLASSES) {
+      const teacher = await db.one("SELECT id FROM users WHERE email = ? AND role = 'teacher'", [c.teacher]);
+      if (!teacher) continue;
+      const exists = await db.one('SELECT 1 FROM classes WHERE name = ? AND grade = ? AND subject_key = ?', [c.name, c.grade, c.subjectKey]);
+      if (!exists) await db.query('INSERT INTO classes (name, grade, subject_key, teacher_id) VALUES (?, ?, ?, ?)', [c.name, c.grade, c.subjectKey, teacher.id]);
+    }
+    for (const l of unplaced) {
+      await db.query('UPDATE users SET class_name = ? WHERE id = ?', [l.className, l.id]);
+      await syncRegisterClass(l.id);
+    }
+  }
+  // the made-up parent notifications the first demo data had: parents now only get real ones
+  await db.query('DELETE FROM notifications WHERE msg_key IN (?)', [DEMO_NOTIFICATIONS]);
   const { n } = await db.one('SELECT COUNT(*) AS n FROM users');
   if (n > 0) return false;
   const hash = await hashPassword(DEMO_PASSWORD);
@@ -155,7 +175,7 @@ async function seedDemoData() {
     };
 
     for (const l of LEARNERS) {
-      const learnerId = await addUser({ name: l.name, email: l.email, id_number: l.idNumber, role: 'learner', grade: l.grade });
+      const learnerId = await addUser({ name: l.name, email: l.email, id_number: l.idNumber, role: 'learner', grade: l.grade, class_name: l.className });
       await setSubjects(learnerId, l.subjects, conn);
       await ensureLessons(learnerId, conn);
       for (const [i, progress] of l.lessons.entries()) {
@@ -189,13 +209,6 @@ async function seedDemoData() {
       const userId = await addUser({ name: s.name, email: s.email, role: s.role, dept: s.dept || null });
       for (const childEmail of s.children || []) {
         await db.query('INSERT INTO parent_children (parent_id, learner_id) VALUES (?, ?)', [userId, ids[childEmail]], conn);
-      }
-      if (s.role === 'parent') {
-        const child = LEARNERS.find((l) => l.email === (s.children || [])[0]);
-        for (const [i, key] of PARENT_NOTIFICATIONS.entries()) {
-          await db.query('INSERT INTO notifications (user_id, msg_key, params, is_read) VALUES (?, ?, ?, ?)',
-            [userId, key, JSON.stringify({ timeKey: 'time_' + (i + 1), child: child ? child.name : '' }), i === 2], conn);
-        }
       }
     }
 

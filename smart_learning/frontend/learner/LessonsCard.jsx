@@ -14,6 +14,7 @@ export default function LessonsCard(){
   const [lessons, setLessons] = useState(null); // null while loading
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
+  const [showDone, setShowDone] = useState(false); // finished lessons are folded away
 
   useEffect(()=>{
     let cancelled = false;
@@ -44,45 +45,71 @@ export default function LessonsCard(){
     else setLessons(data.lessons);
   }
 
+  const list = lessons || [];
+  const done = list.filter(l=>l.done);
+  const open = list.filter(l=>!l.done);
+  const pct = list.length ? Math.round(list.reduce((a,l)=>a+l.progress, 0)/list.length) : 0;
+  const firstName = (state.auth.name||'').trim().split(/\s+/)[0];
+  const needsViewing = open.some(l=>l.assessment && !l.assessmentViewed);
+
+  const lessonRow = (l)=>{
+    const assessment = l.assessment;
+    const subject = l.subjectKey ? t(l.subjectKey) : '';
+    const expanded = s.expandedAssessment===l.id;
+    return (
+      <div key={l.id} className="row" style={{ flexDirection:'column', alignItems:'stretch', gap:6 }}>
+        <div className="row" style={{ border:'none', padding:0 }}>
+          <div style={{ flex:1 }}>
+            {subject && <div className="lesson-subject">{subject}</div>}
+            <div>{t(l.key,{ subject })}</div>
+            <div className="bar"><span style={{ width:l.progress+'%', background:l.progress===100?'var(--good)':'var(--brand)' }}/></div>
+          </div>
+          {l.done
+            ? <span className="pill pill-good">{t('learner_completed')}</span>
+            : <button className="btn btn-primary" disabled={!l.assessmentViewed || busyId!=null} title={l.assessmentViewed ? undefined : t('assess_gate_note')}
+                onClick={()=>completeLesson(l)}>{t('learner_mark_complete')}</button>}
+        </div>
+        {assessment && (
+          <>
+            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              <button className="btn" style={{ fontSize:11.5, padding:'5px 10px' }} onClick={()=>toggleAssessment(l, expanded)}>
+                {expanded ? t('assess_hide_btn') : t('assess_view_btn')}
+              </button>
+              <span className="meta">{t(assessment.titleKey,{ subject })+' · '+t('assess_due',{ date:assessment.due })}</span>
+              {!l.done && l.assessmentViewed && <span className="meta"><Icon name="check"/></span>}
+            </div>
+            {expanded && <p className="muted" style={{ margin:'2px 0 0' }}>{t(assessment.descKey,{ subject })}</p>}
+          </>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="card card-learner">
+      {/* how far the learner is this term, like the phone app's banner */}
+      <div className="progress-hero">
+        <p className="hello">{t('m_hello',{ name:firstName })}</p>
+        <div className="caption">{t('m_my_progress')}</div>
+        <div className="pct">{pct}%</div>
+        <div className="bar"><span style={{ width:pct+'%' }}/></div>
+        <div className="caption" style={{ marginTop:6 }}>{t('m_lessons_done',{ done:done.length, total:list.length })}</div>
+      </div>
+
       <SectionHead icon="book" title={t('learner_lessons_title')} aside={t('grade_'+state.auth.grade)}/>
       {error && <p className="field-error">{error}</p>}
       {lessons===null && <p className="muted">{t('online_loading')}</p>}
-      {lessons && lessons.map(l=>{
-        const assessment = l.assessment;
-        const expanded = s.expandedAssessment===l.id;
-        return (
-          <div key={l.id} className="row" style={{ flexDirection:'column', alignItems:'stretch', gap:6 }}>
-            <div className="row" style={{ border:'none', padding:0 }}>
-              <div style={{ flex:1 }}>
-                {l.subjectKey && <div className="meta" style={{ fontWeight:700, color:'var(--learner)' }}>{t(l.subjectKey)}</div>}
-                <div>{t(l.key,{ subject:t(l.subjectKey) })}</div>
-                <div className="bar"><span style={{ width:l.progress+'%', background:l.progress===100?'var(--good)':'var(--learner)' }}/></div>
-              </div>
-              <button className={'btn'+(l.done?'':' btn-primary')} disabled={l.done || !l.assessmentViewed || busyId!=null} onClick={()=>completeLesson(l)}>
-                {l.done ? t('learner_completed') : t('learner_mark_complete')}
-              </button>
-            </div>
-            {assessment && (
-              <>
-                <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                  <button className="btn" style={{ fontSize:11.5, padding:'5px 10px' }} onClick={()=>toggleAssessment(l, expanded)}>
-                    {expanded ? t('assess_hide_btn') : t('assess_view_btn')}
-                  </button>
-                  <span className="meta">{t(assessment.titleKey,{ subject:t(assessment.subjectKey) })+' · '+t('assess_due',{ date:assessment.due })}</span>
-                </div>
-                {expanded && <p className="muted" style={{ margin:'2px 0 0' }}>{t(assessment.descKey,{ subject:t(assessment.subjectKey) })}</p>}
-                {!l.done && (
-                  <p className="muted" style={{ margin:'2px 0 0', fontSize:11 }}>
-                    <Icon name={l.assessmentViewed?'check':'lock'}/>{' '+(l.assessmentViewed ? t('assess_viewed_note') : t('assess_gate_note'))}
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-        );
-      })}
+      {/* said once, not under every lesson */}
+      {needsViewing && <p className="muted" style={{ margin:'0 0 6px', fontSize:12 }}><Icon name="lock"/>{' '+t('assess_gate_note')}</p>}
+      {open.map(lessonRow)}
+      {done.length>0 && (
+        <>
+          <button className="btn fold-toggle" onClick={()=>setShowDone(v=>!v)}>
+            {showDone ? t('learner_hide_completed') : t('learner_show_completed',{ n:done.length })}
+          </button>
+          {showDone && done.map(lessonRow)}
+        </>
+      )}
       {s.recommendation
         ? <AiNote label={t('learner_ai_prefix')}>{s.recommendation}</AiNote>
         : <p className="muted" style={{ marginTop:10 }}>{t('learner_ai_placeholder')}</p>}

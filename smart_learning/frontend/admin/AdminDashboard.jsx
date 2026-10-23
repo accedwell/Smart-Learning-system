@@ -4,6 +4,7 @@ import AdminOverview from './AdminOverview.jsx'
 import UserListCard from './UserListCard.jsx'
 import AddUserCard from './AddUserCard.jsx'
 import ClassesCard from './ClassesCard.jsx'
+import SecurityCard from './SecurityCard.jsx'
 
 export default function AdminDashboard(){
   const { state, update } = useStore();
@@ -14,6 +15,7 @@ export default function AdminDashboard(){
     { id:'users', icon:'users', labelKey:'nav_users' },
     { id:'add', icon:'edit', labelKey:'nav_add_user' },
     { id:'classes', icon:'cap', labelKey:'nav_classes' },
+    { id:'security', icon:'shield', labelKey:'nav_security' },
   ];
 
   return (
@@ -23,6 +25,7 @@ export default function AdminDashboard(){
       {s.tab==='users' && <UserListCard/>}
       {s.tab==='add' && <AddUserCard/>}
       {s.tab==='classes' && <ClassesCard/>}
+      {s.tab==='security' && <SecurityCard/>}
     </div>
   );
 }

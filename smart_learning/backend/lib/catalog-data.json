@@ -7,6 +7,7 @@
     "principal",
     "admin"
   ],
+  "classLetters": ["A", "B", "C"],
   "grades": [
     "10",
     "11",

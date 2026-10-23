@@ -40,6 +40,9 @@ const MIGRATIONS = [
   { table: 'online_attendance', column: 'seconds_attended', exists: false, sql: 'ADD COLUMN seconds_attended INT NOT NULL DEFAULT 0 AFTER last_joined_at' },
   { table: 'papers', column: 'extracted_text', exists: false, sql: 'ADD COLUMN extracted_text MEDIUMTEXT NULL AFTER size_bytes' },
   { table: 'lessons', column: 'subject_key', exists: false, sql: 'ADD COLUMN subject_key VARCHAR(60) NULL AFTER sort_order' },
+  { table: 'users', column: 'class_name', exists: false, sql: 'ADD COLUMN class_name VARCHAR(10) NULL AFTER grade' },
+  { table: 'users', column: 'failed_logins', exists: false, sql: 'ADD COLUMN failed_logins INT NOT NULL DEFAULT 0 AFTER token_version' },
+  { table: 'users', column: 'locked_until', exists: false, sql: 'ADD COLUMN locked_until DATETIME NULL AFTER failed_logins' },
 ];
 
 // Other changes to existing tables: `needed` is a query that returns a row while the change
@@ -54,6 +57,18 @@ const CHANGES = [
   {
     needed: "SELECT 1 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'id_number' AND NON_UNIQUE = 0)",
     sql: ["UPDATE users SET id_number = NULL WHERE id_number = ''", 'ALTER TABLE users ADD UNIQUE INDEX uq_users_id_number (id_number)'],
+  },
+  // sign-in codes: one per account, emailed again unchanged (its rows only live 10 minutes)
+  {
+    needed: "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_codes' AND NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_codes' AND COLUMN_NAME = 'seed')",
+    sql: ['DROP TABLE login_codes', `CREATE TABLE IF NOT EXISTS login_codes (
+        user_id INT PRIMARY KEY,          -- one code at a time per account
+        challenge_hash CHAR(64) NOT NULL UNIQUE,
+        seed CHAR(32) NOT NULL,           -- the code is worked out from this and JWT_SECRET, so it can be emailed again unchanged
+        attempts INT NOT NULL DEFAULT 0,
+        expires_at DATETIME NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB`],
   },
 ];
 

@@ -13,10 +13,8 @@ export function phaseOf(oc, now){
 
 export const PHASE_PILL = { upcoming:'pill-warn', open:'pill-good', ended:'' };
 
-export function formatWhen(value){
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString(undefined, { dateStyle:'medium', timeStyle:'short' });
-}
+// "20 Oct 2026, 18:28", the same everywhere (see services/dates.js)
+export { formatDateTime as formatWhen } from './dates.js'
 
 // the current time, refreshed every `everyMs`
 export function useNow(everyMs=30000){

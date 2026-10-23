@@ -3,6 +3,8 @@
 export const ROLES = ['learner','teacher','parent','hod','principal','admin'];
 
 export const GRADES = ['10','11','12'];
+// each grade's register classes: 10A, 10B, 10C...
+export const CLASS_LETTERS = ['A','B','C'];
 
 // every subject offered in Grades 10–12 (FET phase, CAPS), grouped by learning area.
 // subject_1/2/3 are Mathematics/English/Life Sciences (the keys the demo data uses).

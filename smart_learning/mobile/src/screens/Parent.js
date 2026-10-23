@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import {
-  Bar, Button, Card, Chips, Empty, Hero, Loaded, Note, Pill, Row, Screen, StatusPill, formatTime, scoreKind, useData, useKit,
+  Bar, Button, Card, Chips, Empty, Hero, Loaded, Note, Pill, Row, Screen, StatusPill, formatDate, formatTime, scoreKind, useData, useKit,
 } from '../ui';
 import { HeaderButtons, saveFile } from './Common';
 
@@ -60,7 +60,7 @@ function LessonLines({ t, c, l }) {
 }
 
 const STATUS_TEXT = { on_track: 'quiz_status_good', watch: 'quiz_status_watch', at_risk: 'quiz_status_bad' };
-const day = (d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+const day = formatDate;
 
 // The whole report on screen, as in the PDF, with the download button at the bottom.
 export function ChildReport({ childId }) {

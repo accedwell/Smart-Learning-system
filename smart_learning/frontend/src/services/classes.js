@@ -2,6 +2,13 @@
 // e.g. 10A Mathematics. The administrator sets them up (state.admin.classes). A teacher
 // sees only their own classes, and a learner gets only their classes' quizzes and papers.
 
+import { CLASS_LETTERS } from '../data/seed.js'
+
+// "10A", "10B", "10C": a grade's register classes (each learner is in one)
+export function registerClasses(grade){
+  return grade ? CLASS_LETTERS.map(letter=>grade+letter) : [];
+}
+
 // "10A Mathematics"
 export function classLabel(c, t){
   return c.name+' '+t(c.subjectKey);

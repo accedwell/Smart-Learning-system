@@ -6,6 +6,7 @@ const multer = require('multer');
 const config = require('./lib/config');
 const db = require('./lib/db');
 const { ensureLessonCatalog, seedDemoData, DEMO_PASSWORD } = require('./lib/seed');
+const { pruneEvents } = require('./lib/security');
 const { HttpError } = require('./lib/http');
 const mailer = require('./lib/mailer');
 
@@ -68,6 +69,7 @@ async function start() {
   if (!(await db.one("SELECT 1 FROM users WHERE role = 'admin' LIMIT 1"))) {
     console.warn('[setup] There is no administrator yet. Create one with: npm run create-admin -- --name "Jane Doe" --email jane@school.org');
   }
+  await pruneEvents(); // the security log keeps half a year
   await mailer.verify();
   const server = app.listen(config.port, () => {
     console.log(`Smart Learning API on http://localhost:${config.port}/api (database "${config.db.database}")`);

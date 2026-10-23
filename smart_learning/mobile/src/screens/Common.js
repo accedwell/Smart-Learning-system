@@ -9,7 +9,7 @@ import { API_URL, apiGet, apiPatch, apiPost, errorText } from '../api';
 import { LANGUAGES } from '../i18n';
 import {
   Avatar, Button, Card, ErrorText, Field, Icon, IconButton, Loaded, Row, Screen, Sheet,
-  formatTime, initials, useData, useKit,
+  formatTime, initials, timeAgo, useData, useKit,
 } from '../ui';
 import { LanguageSheet, NewPasswordForm } from './Auth';
 
@@ -40,7 +40,7 @@ export function HeaderButtons() {
 }
 
 export function NotificationList({ inPage }) {
-  const { t, has, token, c } = useKit();
+  const { t, has, token, lang, c } = useKit();
   const state = useData('/notifications');
   const [error, setError] = useState(null);
 
@@ -59,7 +59,7 @@ export function NotificationList({ inPage }) {
             {data.notifications.map((n, i) => (
               <Row key={n.id} first={i === 0}
                 left={<Avatar icon="notifications" color={c.brand} size={36} />}
-                meta={formatTime(n.createdAt)}>
+                meta={timeAgo(n.createdAt, lang)}>
                 <Text style={{ color: c.ink, fontWeight: n.read ? '400' : '700', fontSize: 14, lineHeight: 20 }}>
                   {n.key ? t(n.key, n.params || {}) : n.message}
                 </Text>

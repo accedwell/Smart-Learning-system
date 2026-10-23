@@ -13,9 +13,10 @@ function publicUser(u) {
     role: u.role,
     phone: u.phone || '',
     mustChangePassword: Boolean(u.must_change_password),
+    locked: Boolean(u.locked_until && new Date(u.locked_until) > new Date()), // after too many wrong passwords
     createdAt: u.created_at,
   };
-  if (u.role === 'learner') Object.assign(out, { grade: u.grade, idNumber: u.id_number || '', progress: u.progress });
+  if (u.role === 'learner') Object.assign(out, { grade: u.grade, className: u.class_name || '', idNumber: u.id_number || '', progress: u.progress });
   if (u.role === 'teacher') {
     Object.assign(out, {
       subjectKey: u.subject_key, dept: u.dept, staffNumber: u.staff_number || '',

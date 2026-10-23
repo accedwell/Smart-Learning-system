@@ -149,6 +149,8 @@ With no key at all, a built-in helper answers in the chat. It explains how to us
 
 In development the backend adds a demo school. Every demo account's password is `Demo@1234`.
 
+The administrator, principal and HOD also need the 6-digit sign-in code that is emailed to them (see [Security](#security)).
+
 | Role | Email |
 |---|---|
 | Administrator | `pillay@school.demo` |
@@ -166,6 +168,50 @@ npm run create-admin -- --name "Jane Doe" --email jane@school.org
 ```
 
 The administrator then adds everyone else from their dashboard.
+
+## Security
+
+### Protections in place
+
+| Protection | What it stops |
+|---|---|
+| Passwords hashed with bcrypt | Stolen database records don't reveal anyone's password |
+| Signed sign-in tokens (JWT) that expire after 8 hours | Faked logins, and sessions that stay open forever |
+| Tokens cancelled when a password changes or is reset | A stolen token stops working once the password is changed |
+| Role checks on every API route | Learners opening teacher or admin pages, or parents seeing children who aren't theirs |
+| Rate limit on sign-in and password reset (20 tries per 15 minutes) | Password guessing |
+| **Account lockout:** 5 wrong passwords (or sign-in codes) in a row lock the account for 15 minutes, and the owner is emailed (a learner's parent, for a learner). A password reset or the administrator's Unlock button ends it early | Guessing one account's password |
+| **Two-step sign-in for staff:** administrators, principals and HODs also type a 6-digit code emailed to them. The code lasts 10 minutes. Asking again in that time emails the same code, so any of those emails works. It works once, and only a random seed is stored (the code also needs the server's secret) | Someone who stole or guessed a staff password |
+| **Security log:** sign-ins, wrong passwords, lockouts, sign-in codes, password changes and resets, and accounts created or removed, with the time, IP address and device. The administrator reads it on the Security tab (web and phone) and can filter it | Attacks going unnoticed |
+| **Login alerts:** a sign-in from a device the account hasn't used before emails the owner (a learner's parents) the time, device and IP address, with what to do if it wasn't them. The website and phone app each keep a random device id for this | Someone signing in with a stolen password without the owner knowing |
+| **Automatic sign-out after 30 minutes without activity**, with a one-minute warning. A playing video (an online class) counts as activity, and a page refresh or reopening the phone app doesn't restart the clock | Someone using a shared school computer or a phone left signed in |
+| Rate limits on emails, chat, AI and quiz generation | Flooding the system or running up AI costs |
+| Parameterised SQL queries | SQL injection |
+| Helmet security headers | Common browser attacks such as clickjacking and content-type sniffing |
+| CORS allow-list | Websites other than Smart Learning calling the API |
+| Upload checks (size limit, allowed types, file contents checked, random file names) | Huge files, disguised files and path tricks |
+| Password length rules (8 to 128 characters) | Very short passwords |
+| Temporary passwords that must be changed at first sign-in | Emailed passwords staying in use |
+| Password reset links that last one hour, work once and are stored hashed | Old or leaked reset emails being reused |
+| The same "wrong email/ID number or password" message in every case | Finding out which accounts exist |
+| No self sign-up: only the administrator creates accounts | Strangers creating accounts |
+| Chatbot reachable only from the backend, with a shared secret | Direct use of the chatbot from outside |
+| Secrets kept in `.env`, which git ignores | Passwords and keys being published on GitHub |
+
+### Planned improvements
+
+1. **Stronger passwords:** require letters and numbers, and block common passwords such as `Password123`.
+2. **HTTPS** once the system runs on a server.
+3. **Dependency checks:** run `npm audit` and `pip-audit` regularly.
+4. **A MySQL user with limited rights:** it can read and write data but can't drop tables.
+5. **Regular database backups.**
+
+### Keeping your installation safe
+
+- Use long random values for `JWT_SECRET` and `CHATBOT_SECRET`, and never commit `.env`.
+- Turn the demo school off for real use (`SEED_DEMO_DATA=false` or `NODE_ENV=production`), because its password is public.
+- Staff sign-in codes need working email (`SMTP_*` in `.env`). Without SMTP the code is only written to the backend log. While the demo school is on, emails for the demo `@school.demo` addresses go to the school's sending mailbox (`SMTP_USER`), marked with the account they were for.
+- Use a Gmail app password for email, not your real password, and revoke it when you no longer need it.
 
 ## Scripts
 

@@ -41,6 +41,23 @@ export function TeacherClass() {
             .filter((l) => classId === 'all' || l.classIds.includes(classId))
             .sort((a, b) => ({ at_risk: 0, watch: 1, on_track: 2 }[a.status] ?? 3) - ({ at_risk: 0, watch: 1, on_track: 2 }[b.status] ?? 3));
           const risk = learners.filter((l) => l.status === 'at_risk').length;
+          // a card per class, in order (10A, 10B, 10C, 11A...), learners most in need of help first
+          const shownClasses = data.classes.filter((k) => classId === 'all' || k.id === classId);
+          const learnerRow = (l, i) => (
+            <Row key={l.id} first={i === 0} left={<Avatar text={initials(l.name)} color={c.brand} size={38} />}
+              title={l.shortName || l.name}
+              meta={<View>
+                <Text style={{ color: c.inkSoft, fontSize: 12, marginTop: 2 }}>{basis(l)}</Text>
+                <Bar pct={l.progress} color={l.status === 'at_risk' ? c.bad : l.status === 'watch' ? c.warn : c.good} />
+                {l.status === 'at_risk' || l.status === 'watch' ? (
+                  <Pressable onPress={() => suggest(l)} style={{ marginTop: 6 }}>
+                    <Text style={{ color: c.brand, fontWeight: '600', fontSize: 12.5 }}>{t('teacher_suggest_btn')}</Text>
+                  </Pressable>
+                ) : null}
+                {tips[l.id] ? <Note><Text style={{ color: c.ink, fontSize: 12.5 }}><Text style={{ fontWeight: '700' }}>{t('teacher_ai_prefix')}</Text>{tips[l.id]}</Text></Note> : null}
+              </View>}
+              right={<StatusPill status={l.status} />} />
+          );
           return (
             <View>
               <Grid2>
@@ -49,24 +66,15 @@ export function TeacherClass() {
               </Grid2>
               <Chips value={classId} onChange={setClassId}
                 items={[{ id: 'all', label: t('teacher_classes_filter_all') }, ...data.classes.map((k) => ({ id: k.id, label: className(t, k) }))]} />
-              <Card title={t('nav_my_class')} aside={t('m_first_try_basis')}>
-                {learners.length === 0 ? <Empty text={t('teacher_class_empty')} /> : learners.map((l, i) => (
-                  <Row key={l.id} first={i === 0} left={<Avatar text={initials(l.name)} color={c.brand} size={38} />}
-                    title={l.shortName || l.name}
-                    meta={<View>
-                      <Text style={{ color: c.inkSoft, fontSize: 12, marginTop: 2 }}>{basis(l)}</Text>
-                      <Bar pct={l.progress} color={l.status === 'at_risk' ? c.bad : l.status === 'watch' ? c.warn : c.good} />
-                      {l.status === 'at_risk' || l.status === 'watch' ? (
-                        <Pressable onPress={() => suggest(l)} style={{ marginTop: 6 }}>
-                          <Text style={{ color: c.brand, fontWeight: '600', fontSize: 12.5 }}>{t('teacher_suggest_btn')}</Text>
-                        </Pressable>
-                      ) : null}
-                      {tips[l.id] ? <Note><Text style={{ color: c.ink, fontSize: 12.5 }}><Text style={{ fontWeight: '700' }}>{t('teacher_ai_prefix')}</Text>{tips[l.id]}</Text></Note> : null}
-                    </View>}
-                    right={<StatusPill status={l.status} />} />
-                ))}
-                <Text style={{ color: c.inkSoft, fontSize: 12, marginTop: 6 }}>{t('teacher_status_hint')}</Text>
-              </Card>
+              {shownClasses.map((k) => {
+                const inClass = learners.filter((l) => l.classIds.includes(k.id));
+                return (
+                  <Card key={k.id} title={className(t, k)} aside={t('teacher_class_meta', { grade: t('grade_' + k.grade), n: inClass.length })}>
+                    {inClass.length === 0 ? <Empty text={t('teacher_class_empty')} /> : inClass.map(learnerRow)}
+                  </Card>
+                );
+              })}
+              <Text style={{ color: c.inkSoft, fontSize: 12, marginBottom: 12 }}>{t('m_first_try_basis')} · {t('teacher_status_hint')}</Text>
             </View>
           );
         }}
@@ -317,7 +325,7 @@ function dayOptions(t) {
   for (let i = 0; i < 7; i++) {
     const d = new Date();
     d.setDate(d.getDate() + i);
-    out.push({ id: i, label: i === 0 ? t('m_today') : i === 1 ? t('m_tomorrow') : d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' }) });
+    out.push({ id: i, label: i === 0 ? t('m_today') : i === 1 ? t('m_tomorrow') : d.toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric' }) });
   }
   return out;
 }

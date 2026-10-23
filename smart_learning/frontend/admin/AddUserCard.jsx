@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../src/store/AppStore.jsx'
 import { useI18n } from '../src/i18n/I18nContext.jsx'
 import { SectionHead, GradeSelect, SubjectSelect } from '../src/components/ui.jsx'
+import { registerClasses } from '../src/services/classes.js'
 import { RoleSelect, DeptSelect } from '../src/auth/authParts.jsx'
 import { isValidEmail } from '../src/services/accounts.js'
 import { apiGet, apiPost, errorText } from '../src/services/api.js'
@@ -54,7 +55,7 @@ export default function AddUserCard(){
     }
     setError(null);
     const details = role==='learner' ? {
-        grade:draft.grade, idNumber:draft.idNumber.trim(), subjects:draft.subjects,
+        grade:draft.grade, className:draft.className || '', idNumber:draft.idNumber.trim(), subjects:draft.subjects,
         ...(newParent ? { parent:{ name:draft.parentName.trim(), email:draft.parentEmail.trim() } } : { parentId:Number(draft.parentId) }),
       }
       : role==='teacher' ? { subjectKey:draft.subjectKey }
@@ -70,6 +71,7 @@ export default function AddUserCard(){
       a.newUser.name = '';
       a.newUser.email = '';
       a.newUser.idNumber = '';
+      a.newUser.className = '';
       a.newUser.childId = '';
       a.newUser.parentName = '';
       a.newUser.subjects = ['subject_lo'];
@@ -105,7 +107,16 @@ export default function AddUserCard(){
           {draft.role==='learner' && (
             <div className="field">
               <label>{t('login_grade_label')}</label>
-              <GradeSelect value={draft.grade} onChange={(v)=>editDraft(d=>{ d.grade = v; })}/>
+              <GradeSelect value={draft.grade} onChange={(v)=>editDraft(d=>{ d.grade = v; d.className = ''; })}/>
+            </div>
+          )}
+          {draft.role==='learner' && (
+            <div className="field">
+              <label htmlFor="newUserClass">{t('admin_class_label')}</label>
+              <select id="newUserClass" value={draft.className || ''} onChange={(e)=>{ const v = e.target.value; editDraft(d=>{ d.className = v; }); }}>
+                <option value="">{t('admin_class_none')}</option>
+                {registerClasses(draft.grade).map(n=><option key={n} value={n}>{n}</option>)}
+              </select>
             </div>
           )}
           {draft.role==='learner' && (

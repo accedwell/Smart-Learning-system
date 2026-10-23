@@ -1,9 +1,15 @@
 // Who is logged in, which tab and screen are showing, and short pop-up messages.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { apiGet, setUnauthorizedHandler } from './api';
 import { getItem, setItem, removeItem } from './storage';
 
 const TOKEN_KEY = 'smart-learning-token';
+// Automatic sign-out after 30 minutes without a touch, also when the app was in the
+// background or closed that long, so a phone left lying around doesn't stay signed in.
+export const IDLE_MINUTES = 30;
+const IDLE_MS = IDLE_MINUTES * 60 * 1000;
+const ACTIVE_KEY = 'smart-learning-last-active';
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
@@ -13,15 +19,45 @@ export function AppProvider({ children }) {
   const [tab, setTab] = useState(null);
   const [stack, setStack] = useState([]); // screens opened on top of the tab: [{ name, params }]
   const [toast, setToast] = useState(null);
+  const [signedOutIdle, setSignedOutIdle] = useState(false); // shows a note on the login screen
   const toastTimer = useRef(null);
+  const lastActive = useRef(Date.now());
+  const lastSaved = useRef(0);
 
   const logout = useCallback(() => {
     removeItem(TOKEN_KEY);
+    removeItem(ACTIVE_KEY);
     setSession(null);
     setPending(null);
     setStack([]);
     setTab(null);
   }, []);
+
+  // every touch counts as activity (saved at most once a minute, for a restart of the app)
+  const touch = useCallback(() => {
+    const now = Date.now();
+    lastActive.current = now;
+    if (now - lastSaved.current > 60 * 1000) {
+      lastSaved.current = now;
+      setItem(ACTIVE_KEY, String(now));
+    }
+  }, []);
+
+  const signedIn = Boolean(session);
+  useEffect(() => {
+    if (!signedIn) return undefined;
+    lastSaved.current = 0;
+    touch();
+    const checkIdle = () => {
+      if (Date.now() - lastActive.current < IDLE_MS) return;
+      logout();
+      setSignedOutIdle(true);
+    };
+    const timer = setInterval(checkIdle, 15 * 1000);
+    // coming back to the app after a long time away
+    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') checkIdle(); });
+    return () => { clearInterval(timer); sub.remove(); };
+  }, [signedIn, touch, logout]);
 
   useEffect(() => { setUnauthorizedHandler(logout); }, [logout]);
 
@@ -29,7 +65,13 @@ export function AppProvider({ children }) {
   useEffect(() => {
     (async () => {
       const token = await getItem(TOKEN_KEY);
-      if (token) {
+      const last = Number(await getItem(ACTIVE_KEY)) || 0;
+      if (token && last && Date.now() - last >= IDLE_MS) {
+        // closed and left alone too long: signed out, as if the app had stayed open
+        await removeItem(TOKEN_KEY);
+        await removeItem(ACTIVE_KEY);
+        setSignedOutIdle(true);
+      } else if (token) {
         const { data } = await apiGet('/auth/me', token);
         if (data && data.user.mustChangePassword) setPending({ token, user: data.user });
         else if (data) setSession({ token, user: data.user });
@@ -46,6 +88,7 @@ export function AppProvider({ children }) {
       return;
     }
     setItem(TOKEN_KEY, data.token);
+    setSignedOutIdle(false);
     setPending(null);
     setStack([]);
     setTab(null);
@@ -71,8 +114,8 @@ export function AppProvider({ children }) {
   const value = useMemo(() => ({
     session, token: session && session.token, user: session && session.user, pending, restoring,
     enter, logout, updateUser, replaceToken, cancelPending: () => setPending(null),
-    tab, switchTab, stack, push, pop, toast, showToast,
-  }), [session, pending, restoring, enter, logout, updateUser, replaceToken, tab, switchTab, stack, push, pop, toast, showToast]);
+    tab, switchTab, stack, push, pop, toast, showToast, touch, signedOutIdle,
+  }), [session, pending, restoring, enter, logout, updateUser, replaceToken, tab, switchTab, stack, push, pop, toast, showToast, touch, signedOutIdle]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

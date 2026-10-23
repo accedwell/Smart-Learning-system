@@ -9,6 +9,7 @@ const data = require('./catalog-data.json');
 const catalog = {
   ROLES: data.roles,
   GRADES: data.grades,
+  CLASS_LETTERS: data.classLetters,
   SUBJECT_GROUPS: data.subjectGroups,
   SUBJECT_OPTIONS: data.subjectGroups.flatMap((g) => g.subjects),
   DEPARTMENTS: data.subjectGroups.map((g) => ({ id: g.id, labelKey: g.labelKey })),

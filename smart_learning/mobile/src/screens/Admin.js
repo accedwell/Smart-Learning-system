@@ -2,15 +2,17 @@
 // and the classes.
 import { useState } from 'react';
 import { ScrollView, Share, Text, View } from 'react-native';
-import { apiDelete, apiPost, apiPut, errorText } from '../api';
+import { apiDelete, apiPatch, apiPost, apiPut, errorText } from '../api';
 import {
   Avatar, Bar, Button, Card, Chips, Choice, Empty, ErrorText, Field, Grid2, Loaded, Note, Pill, Row,
-  Screen, Sheet, Stat, initials, useData, useKit,
+  Screen, Sheet, Stat, formatTime, initials, timeAgo, useData, useKit,
 } from '../ui';
 import { HeaderButtons } from './Common';
 
 const ROLES = ['learner', 'teacher', 'parent', 'hod', 'principal', 'admin'];
 const ROLE_KEY = { learner: 'tab_learner', teacher: 'tab_teacher', parent: 'tab_parent', hod: 'tab_hod', principal: 'tab_principal', admin: 'tab_admin' };
+// each grade's register classes: 10A, 10B, 10C (as on the website)
+const registerClasses = (grade) => (grade ? ['A', 'B', 'C'].map((letter) => grade + letter) : []);
 
 export function AdminOverview() {
   const { t, c, switchTab } = useKit();
@@ -197,6 +199,7 @@ function AddUserSheet({ visible, onClose, onAdded }) {
   const [parentId, setParentId] = useState(null);
   const [subjects, setSubjects] = useState(['subject_lo']);
   const [grade, setGrade] = useState('10');
+  const [klass, setKlass] = useState('');
   const [group, setGroup] = useState(null);
   const [subjectKey, setSubjectKey] = useState(null);
   const [dept, setDept] = useState(null);
@@ -211,7 +214,7 @@ function AddUserSheet({ visible, onClose, onAdded }) {
     if (learner) {
       if (!/^\d{13}$/.test(idNumber.replace(/[\s-]/g, ''))) return setError(t('admin_error_id_number'));
       if (subjects.length !== SUBJECT_COUNT) return setError(t('admin_error_subject_count'));
-      Object.assign(body, { idNumber: idNumber.trim(), grade, subjects });
+      Object.assign(body, { idNumber: idNumber.trim(), grade, className: klass, subjects });
       if (parentMode === 'new') {
         if (!parentName.trim()) return setError(t('admin_error_name'));
         if (!isEmail(parentEmail)) return setError(t('admin_error_email'));
@@ -250,7 +253,9 @@ function AddUserSheet({ visible, onClose, onAdded }) {
         ) : (
           <Field label={t('signup_email_label')} value={email} onChangeText={setEmail} placeholder={t('admin_user_email_placeholder')} autoCapitalize="none" keyboardType="email-address" />
         )}
-        {learner ? <Choice label={t('login_grade_label')} value={grade} onChange={setGrade} options={['10', '11', '12'].map((g) => ({ id: g, label: t('grade_' + g) }))} /> : null}
+        {learner ? <Choice label={t('login_grade_label')} value={grade} onChange={(g) => { setGrade(g); setKlass(''); }} options={['10', '11', '12'].map((g) => ({ id: g, label: t('grade_' + g) }))} /> : null}
+        {learner ? <Choice label={t('admin_class_label')} value={klass} onChange={setKlass}
+          options={[{ id: '', label: t('admin_class_none') }, ...registerClasses(grade).map((n) => ({ id: n, label: n }))]} /> : null}
         {learner && catalog.data ? <SubjectPicker groups={catalog.data.subjectGroups} value={subjects} onChange={setSubjects} /> : null}
         {learner ? (
           <Card title={t('admin_learner_parent_title')}>
@@ -297,6 +302,16 @@ export function AdminUsers() {
   const [invite, setInvite] = useState(null);
   const [confirmRemove, setConfirmRemove] = useState(null);
   const [subjectsFor, setSubjectsFor] = useState(null);
+  const [classFor, setClassFor] = useState(null); // the learner whose class is being changed
+
+  // they move into that class's subject groups
+  async function setClass(u, className) {
+    setClassFor(null);
+    const { error } = await apiPatch(`/admin/users/${u.id}`, { className }, token);
+    if (error) return showToast(errorText(t, has, error));
+    showToast(t('admin_class_saved'));
+    state.reload();
+  }
 
   async function resetLogin(u) {
     const { data, error } = await apiPost(`/admin/users/${u.id}/reset-login`, {}, token);
@@ -317,13 +332,14 @@ export function AdminUsers() {
       <Button kind="primary" icon="person-add" title={t('nav_add_user')} onPress={() => setAdding(true)} style={{ marginBottom: 12 }} />
       <Field value={q} onChangeText={setQ} placeholder={t('admin_search_placeholder')} autoCapitalize="none" />
       <Chips value={role} onChange={setRole} items={[{ id: 'all', label: t('admin_filter_all') }, ...ROLES.map((r) => ({ id: r, label: t(ROLE_KEY[r]) }))]} />
-      <Card>
-        <Loaded state={state}>
-          {(data) => data.users.length === 0 ? <Empty text={t('admin_users_empty')} /> : data.users.map((u, i) => (
+      <Loaded state={state}>
+        {(data) => {
+          if (data.users.length === 0) return <Card><Empty text={t('admin_users_empty')} /></Card>;
+          const userRow = (u, i) => (
             <Row key={u.id} first={i === 0} left={<Avatar text={initials(u.name)} color={c.brand} size={38} />}
               title={u.name}
               meta={<View style={{ marginTop: 2, gap: 4 }}>
-                <Text style={{ color: c.inkSoft, fontSize: 12.5 }}>{t(ROLE_KEY[u.role])}{u.grade ? ' · ' + t('grade_' + u.grade) : ''} · {u.email || (u.idNumber ? t('login_id_label') + ' ' + u.idNumber : '—')}</Text>
+                <Text style={{ color: c.inkSoft, fontSize: 12.5 }}>{t(ROLE_KEY[u.role])}{u.grade ? ' · ' + t('grade_' + u.grade) : ''}{u.className ? ' · ' + t('admin_user_class', { name: u.className }) : ''} · {u.email || (u.idNumber ? t('login_id_label') + ' ' + u.idNumber : '—')}</Text>
                 {u.role === 'learner' ? (
                   <Text style={{ color: c.inkSoft, fontSize: 12 }}>
                     {t('profile_subjects_label')}: {(u.subjects || []).length ? u.subjects.map((s) => t(s)).join(', ') : t('admin_subjects_none')}
@@ -331,18 +347,60 @@ export function AdminUsers() {
                 ) : null}
                 {u.mustChangePassword ? <Pill kind="warn" text={t('admin_awaiting_login_pill')} /> : null}
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                  {u.role === 'learner' ? <Button small title={t('admin_class_label')} onPress={() => setClassFor(u)} /> : null}
                   {u.role === 'learner' ? <Button small title={t('admin_subjects_btn')} onPress={() => setSubjectsFor(u)} /> : null}
                   <Button small title={t('admin_resend_btn')} onPress={() => resetLogin(u)} />
                   <Button small kind="danger" title={t('admin_remove_user_btn')} onPress={() => setConfirmRemove(u)} />
                 </View>
               </View>} />
-          ))}
-        </Loaded>
-      </Card>
+          );
+          // learners: a card per class, by grade (10A, 10B, 10C... and those not in a class yet)
+          const learners = data.users.filter((u) => u.role === 'learner');
+          const others = data.users.filter((u) => u.role !== 'learner');
+          const grades = [...new Set(learners.map((u) => u.grade || ''))].sort();
+          const searching = Boolean(q.trim());
+          return (
+            <View>
+              {grades.map((g) => {
+                const inGrade = learners.filter((u) => (u.grade || '') === g);
+                const names = [...new Set([...(searching ? [] : registerClasses(g)), ...inGrade.map((u) => u.className).filter(Boolean)])].sort();
+                const unplaced = inGrade.filter((u) => !u.className);
+                return (
+                  <View key={'g' + g}>
+                    <Text style={{ color: c.ink, fontWeight: '800', fontSize: 17, marginBottom: 8 }}>
+                      {g ? t('grade_' + g) : t('tab_learner')} <Text style={{ color: c.inkSoft, fontSize: 13, fontWeight: '600' }}>· {t('admin_group_count', { n: inGrade.length })}</Text>
+                    </Text>
+                    {names.map((name) => {
+                      const inClass = inGrade.filter((u) => u.className === name);
+                      return (
+                        <Card key={name} title={name} aside={t('admin_group_count', { n: inClass.length })}>
+                          {inClass.length === 0 ? <Empty text={t('admin_class_empty')} /> : inClass.map(userRow)}
+                        </Card>
+                      );
+                    })}
+                    {unplaced.length ? (
+                      <Card title={t('admin_no_class_group')} aside={t('admin_group_count', { n: unplaced.length })}>{unplaced.map(userRow)}</Card>
+                    ) : null}
+                  </View>
+                );
+              })}
+              {others.length ? <Card>{others.map(userRow)}</Card> : null}
+            </View>
+          );
+        }}
+      </Loaded>
       <Text style={{ color: c.inkSoft, fontSize: 12, textAlign: 'center' }}>{t('admin_add_user_hint')}</Text>
 
       <AddUserSheet visible={adding} onClose={() => setAdding(false)} onAdded={(inv) => { setAdding(false); setInvite(inv); state.reload(); }} />
       <InviteSheet invite={invite} onClose={() => setInvite(null)} />
+      <Sheet visible={Boolean(classFor)} title={classFor ? classFor.name : ''} onClose={() => setClassFor(null)}>
+        {classFor ? (
+          <View style={{ padding: 16 }}>
+            <Choice label={t('admin_class_label')} value={classFor.className || ''} onChange={(v) => setClass(classFor, v)}
+              options={[{ id: '', label: t('admin_class_none') }, ...registerClasses(classFor.grade).map((n) => ({ id: n, label: n }))]} />
+          </View>
+        ) : null}
+      </Sheet>
       {subjectsFor ? <SubjectsSheet user={subjectsFor} onClose={() => setSubjectsFor(null)}
         onSaved={() => { setSubjectsFor(null); showToast(t('admin_subjects_saved')); state.reload(); }} /> : null}
       <Sheet visible={Boolean(confirmRemove)} title={t('admin_remove_user_btn')} onClose={() => setConfirmRemove(null)}>
@@ -381,3 +439,73 @@ export function AdminClasses() {
 }
 
 
+// The Security page: what happened at sign-in (newest first), the locked accounts with
+// Unlock, and counts for the last 24 hours (as on the website)
+const SEC_BAD = new Set(['login_failed', 'account_locked', 'login_blocked', 'code_failed']);
+const SEC_GOOD = new Set(['login_ok', 'account_unlocked', 'password_reset']);
+const SEC_FILTERS = ['', 'login_failed', 'account_locked', 'new_device', 'login_ok', 'code_failed', 'password_reset'];
+
+export function AdminSecurity() {
+  const { t, has, c, token, lang, showToast } = useKit();
+  const [filter, setFilter] = useState('');
+  const state = useData('/admin/security' + (filter ? '?event=' + filter : ''));
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState(null);
+
+  async function unlock(u) {
+    setBusyId(u.id);
+    setError(null);
+    const { error: err } = await apiPost(`/admin/users/${u.id}/unlock`, {}, token);
+    setBusyId(null);
+    if (err) return setError(errorText(t, has, err));
+    showToast(t('sec_ev_account_unlocked') + ': ' + u.name);
+    state.reload();
+  }
+
+  return (
+    <Screen title={t('nav_security')} sub={t('sec_subtitle')} right={<HeaderButtons />} onRefresh={state.reload} refreshing={state.loading}>
+      <Loaded state={state}>
+        {(d) => {
+          const n = (k) => d.last24h[k] || 0;
+          return (
+            <View>
+              <Grid2>
+                <Stat n={n('login_ok')} label={t('sec_stat_logins')} color={c.good} />
+                <Stat n={n('login_failed') + n('code_failed')} label={t('sec_stat_failed')} color={n('login_failed') ? c.warn : c.good} />
+              </Grid2>
+              <Grid2>
+                <Stat n={n('account_locked')} label={t('sec_stat_locked')} color={n('account_locked') ? c.bad : c.good} />
+                <Stat n={n('password_reset')} label={t('sec_stat_resets')} />
+              </Grid2>
+              <ErrorText>{error}</ErrorText>
+              <Card title={t('sec_locked_title')}>
+                {d.locked.length === 0 ? <Empty text={t('sec_locked_empty')} /> : null}
+                {d.locked.map((u, i) => (
+                  <Row key={u.id} first={i === 0} title={u.name}
+                    meta={[u.login, t(ROLE_KEY[u.role]), t('sec_locked_until', { time: formatTime(u.lockedUntil) })].filter(Boolean).join(' · ')}
+                    right={<Button small kind="primary" title={t('sec_unlock')} busy={busyId === u.id} onPress={() => unlock(u)} />} />
+                ))}
+              </Card>
+              <Chips items={SEC_FILTERS.map((id) => ({ id, label: id ? t('sec_ev_' + id) : t('sec_filter_all') }))} value={filter} onChange={setFilter} />
+              <Card title={t('sec_title')}>
+                {d.events.length === 0 ? <Empty text={t('sec_empty')} /> : null}
+                {d.events.map((e, i) => (
+                  <Row key={e.id} first={i === 0}
+                    title={e.userName || (e.login ? t('sec_unknown_account') : '—')}
+                    meta={[
+                      e.role ? t(ROLE_KEY[e.role]) : null,
+                      !e.userName && e.login ? t('sec_typed', { login: e.login }) : null,
+                      e.actorName ? t('sec_by', { name: e.actorName }) : null,
+                      e.ip ? 'IP ' + e.ip : null,
+                      timeAgo(e.createdAt, lang),
+                    ].filter(Boolean).join(' · ')}
+                    right={<Pill kind={SEC_BAD.has(e.event) ? 'bad' : SEC_GOOD.has(e.event) ? 'good' : e.event === 'new_device' ? 'warn' : 'soft'} text={t('sec_ev_' + e.event)} />} />
+                ))}
+              </Card>
+            </View>
+          );
+        }}
+      </Loaded>
+    </Screen>
+  );
+}

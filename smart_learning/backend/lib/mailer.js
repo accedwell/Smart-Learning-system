@@ -15,7 +15,16 @@ const transport = config.smtp.host
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// The demo accounts' @school.demo addresses have no inbox. While the demo school is on, their
+// emails (like sign-in codes) go to the school's own sending mailbox instead, marked with the
+// account they were for, so the demo can be shown with real emails.
+const DEMO_DOMAIN = '@school.demo';
+
 async function send({ to, subject, text, html }) {
+  if (config.seedDemoData && config.smtp.user && String(to).toLowerCase().endsWith(DEMO_DOMAIN)) {
+    subject = `[Demo: ${to}] ${subject}`;
+    to = config.smtp.user;
+  }
   if (!transport) {
     console.log(`[mail] SMTP is not configured; this email was not sent.\n  To: ${to}\n  Subject: ${subject}\n${text.replace(/^/gm, '  ')}`);
     return;
@@ -161,9 +170,84 @@ To choose a new password for them, use this link within ${ttlMinutes} minutes:</
   return send({ to: parent.email, subject: `Reset ${learner.name}'s Smart Learning password`, text, html });
 }
 
+// the 6-digit code that finishes a staff member's sign-in
+function sendLoginCode(user, code, ttlMinutes) {
+  const text = [
+    `Hello ${user.name},`,
+    '',
+    `Your Smart Learning sign-in code is: ${code}`,
+    '',
+    `It works once, for ${ttlMinutes} minutes.`,
+    'If you did not just try to sign in, someone knows your password: reset it straight away.',
+    '',
+    'Smart Learning',
+  ].join('\n');
+  const html = `<p>Hello ${escapeHtml(user.name)},</p>
+<p>Your Smart Learning sign-in code is:</p>
+<p style="font-size:28px;font-weight:700;letter-spacing:6px;font-family:monospace">${escapeHtml(code)}</p>
+<p>It works once, for ${ttlMinutes} minutes.</p>
+<p>If you did not just try to sign in, someone knows your password: reset it straight away.</p>
+<p>Smart Learning</p>`;
+  return send({ to: user.email, subject: `Smart Learning sign-in code: ${code}`, text, html });
+}
+
+// after too many wrong passwords; to the account's own email, or to a learner's parent
+function sendAccountLocked(user, to, minutes, parent = null) {
+  const whose = parent ? `${user.name}'s Smart Learning account` : 'your Smart Learning account';
+  const text = [
+    `Hello ${parent ? parent.name : user.name},`,
+    '',
+    `Someone entered a wrong password for ${whose} too many times, so it is locked for ${minutes} minutes.`,
+    '',
+    'If this was you, wait and try again, or use "Forgot password?" on the login page.',
+    'If it was not you, someone may be trying to get in: reset the password once the lock ends, or ask the school administrator.',
+    '',
+    'Smart Learning',
+  ].join('\n');
+  const html = `<p>Hello ${escapeHtml(parent ? parent.name : user.name)},</p>
+<p>Someone entered a wrong password for ${escapeHtml(whose)} too many times, so it is <b>locked for ${minutes} minutes</b>.</p>
+<p>If this was you, wait and try again, or use "Forgot password?" on the login page.</p>
+<p>If it was not you, someone may be trying to get in: reset the password once the lock ends, or ask the school administrator.</p>
+<p>Smart Learning</p>`;
+  return send({ to, subject: 'Smart Learning account locked', text, html });
+}
+
+// a sign-in from a device the account hasn't used before; to the account's own email, or to a
+// learner's parent
+function sendLoginAlert(user, to, { device, ip, time }, parent = null) {
+  const when = time.toLocaleString('en-ZA', { timeZone: 'Africa/Johannesburg', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+  const whose = parent ? `${user.name}'s Smart Learning account` : 'your Smart Learning account';
+  const text = [
+    `Hello ${parent ? parent.name : user.name},`,
+    '',
+    `Someone just signed in to ${whose} from a new device:`,
+    '',
+    `  When:   ${when}`,
+    `  Device: ${device}`,
+    `  IP:     ${ip}`,
+    '',
+    'If this was you, there is nothing to do.',
+    `If it was not you, change the password straight away with "Forgot password?" at ${config.appUrl}, and tell the school administrator.`,
+    '',
+    'Smart Learning',
+  ].join('\n');
+  const html = `<p>Hello ${escapeHtml(parent ? parent.name : user.name)},</p>
+<p>Someone just signed in to ${escapeHtml(whose)} from a <b>new device</b>:</p>
+<table style="border-collapse:collapse;font-size:14px">
+<tr><td style="padding:2px 12px 2px 0;color:#555">When</td><td>${escapeHtml(when)}</td></tr>
+<tr><td style="padding:2px 12px 2px 0;color:#555">Device</td><td>${escapeHtml(device)}</td></tr>
+<tr><td style="padding:2px 12px 2px 0;color:#555">IP address</td><td>${escapeHtml(ip)}</td></tr>
+</table>
+<p>If this was you, there is nothing to do.</p>
+<p>If it was <b>not</b> you, change the password straight away with "Forgot password?" on the <a href="${escapeHtml(config.appUrl)}">login page</a>, and tell the school administrator.</p>
+<p>Smart Learning</p>`;
+  return send({ to, subject: 'New sign-in to Smart Learning', text, html });
+}
+
 // whether emails really go out (SMTP set up) or are only written to the log
 const configured = () => Boolean(transport);
 
 module.exports = {
-  send, verify, sendPasswordReset, sendEmailChanged, sendLoginDetails, sendFamilyLoginDetails, sendLearnerPasswordReset, configured,
+  send, verify, sendPasswordReset, sendEmailChanged, sendLoginDetails, sendFamilyLoginDetails, sendLearnerPasswordReset,
+  sendLoginCode, sendAccountLocked, sendLoginAlert, configured,
 };

@@ -34,10 +34,43 @@ export function initials(name = '') {
   return name.replace(/^(Mr|Mrs|Ms|Dr)\.?\s+/i, '').split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 }
 
+// Dates the South African way, the same as the web app: "20 Oct 2026" and "20 Oct 2026, 18:28"
+export function formatDate(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value || '');
+  return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export function formatTime(value) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value || '');
-  return d.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+const LANG_CODES = {
+  English: 'en', Afrikaans: 'af', Zulu: 'zu', Xhosa: 'xh', Ndebele: 'nr', Sepedi: 'nso',
+  Sesotho: 'st', Setswana: 'tn', Swati: 'ss', Tshivenda: 've', Xitsonga: 'ts',
+};
+
+// "5 minutes ago", "yesterday"... for the last week (in the app's language where the phone knows it);
+// the date and time after that, or when the phone can't say it
+export function timeAgo(value, lang = 'English') {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value || '');
+  const seconds = (d.getTime() - Date.now()) / 1000;
+  if (-seconds > 7 * 24 * 3600 || seconds > 60 || typeof Intl === 'undefined' || !Intl.RelativeTimeFormat) return formatTime(d);
+  let rtf;
+  try {
+    const code = LANG_CODES[lang] || 'en';
+    const locale = Intl.RelativeTimeFormat.supportedLocalesOf([code]).length ? code : 'en';
+    rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+  } catch {
+    return formatTime(d);
+  }
+  for (const [unit, size] of [['day', 86400], ['hour', 3600], ['minute', 60]]) {
+    if (Math.abs(seconds) >= size) return rtf.format(Math.round(seconds / size), unit);
+  }
+  return rtf.format(0, 'second');
 }
 
 // ---- layout ----

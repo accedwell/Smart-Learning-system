@@ -6,7 +6,7 @@ import { AuthLangBar, LinkButton, PasswordInput } from './authParts.jsx'
 // LOG IN: email + password only. The role (and a learner's grade) come from the account
 // itself, which the school administrator created, so there is nothing else to pick.
 // onSubmit returns an error ({ key, vars }) or null when the login went through.
-export default function Login({ onSubmit, onForgot, onHome }){
+export default function Login({ notice, onSubmit, onForgot, onHome }){
   const { t } = useI18n();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,6 +32,7 @@ export default function Login({ onSubmit, onForgot, onHome }){
           <p>{t('login_subtitle')}</p>
         </div>
         <form className="login-body" onSubmit={submit}>
+          {notice && <p className="login-notice" role="status">{notice}</p>}
           <div className="field">
             <label htmlFor="loginEmail">{t('login_identifier_label')}</label>
             <input type="text" id="loginEmail" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder={t('login_identifier_placeholder')} autoComplete="username" required/>

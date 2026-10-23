@@ -4,6 +4,7 @@
 // that runs `npx expo start` — the phone already reaches it on the same Wi-Fi — on port 4001.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Constants from 'expo-constants';
+import { getItem, setItem } from './storage';
 
 function apiBase() {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
@@ -20,10 +21,24 @@ export function setUnauthorizedHandler(fn) {
   onUnauthorized = fn;
 }
 
+// A random id this phone keeps, sent with every request, so the backend can tell a sign-in
+// from a new device (and email a login alert). It identifies the phone, never the person.
+const DEVICE_KEY = 'smart-learning-device';
+let deviceId = null;
+async function getDeviceId() {
+  if (deviceId) return deviceId;
+  deviceId = await getItem(DEVICE_KEY).catch(() => null);
+  if (!deviceId) {
+    deviceId = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    await setItem(DEVICE_KEY, deviceId).catch(() => {});
+  }
+  return deviceId;
+}
+
 // resolves to { data } or { error: { code, message, vars? } }; never throws
 export async function apiRequest(method, path, { body, token } = {}) {
   try {
-    const headers = { Accept: 'application/json' };
+    const headers = { Accept: 'application/json', 'X-Device-Id': await getDeviceId() };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (token) headers.Authorization = 'Bearer ' + token;
     const res = await fetch(API_URL + path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });

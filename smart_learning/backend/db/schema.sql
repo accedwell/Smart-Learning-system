@@ -15,8 +15,11 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(100) NOT NULL,
   must_change_password TINYINT(1) NOT NULL DEFAULT 0,  -- 1 while on an administrator-issued temporary password
   token_version INT NOT NULL DEFAULT 0,                -- bumped on password change: logs out older sessions
+  failed_logins INT NOT NULL DEFAULT 0,                -- wrong passwords (or sign-in codes) in a row
+  locked_until DATETIME NULL,                          -- set after too many of them: no sign-in until then
   phone VARCHAR(30) NULL,
   grade VARCHAR(4) NULL,            -- learner: the grade they are in
+  class_name VARCHAR(10) NULL,      -- learner: their register class, e.g. 10A (they join its subject classes)
   id_number VARCHAR(30) NULL UNIQUE,  -- learner: their (South African) ID number, used to log in
   progress INT NOT NULL DEFAULT 0,  -- learner: overall progress this term (%)
   subject_key VARCHAR(60) NULL,     -- teacher: the subject they teach
@@ -253,6 +256,46 @@ CREATE TABLE IF NOT EXISTS password_resets (
   user_id INT NOT NULL,
   expires_at DATETIME NOT NULL,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- two-step sign-in for staff: after the right password, a 6-digit code is emailed. The browser
+-- holds the random challenge (only its hash is stored). Asking again within the 10 minutes
+-- emails the same code, so every code email from that time works.
+CREATE TABLE IF NOT EXISTS login_codes (
+  user_id INT PRIMARY KEY,          -- one code at a time per account
+  challenge_hash CHAR(64) NOT NULL UNIQUE,
+  seed CHAR(32) NOT NULL,           -- the code is worked out from this and JWT_SECRET, so it can be emailed again unchanged
+  attempts INT NOT NULL DEFAULT 0,
+  expires_at DATETIME NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- the devices each account has signed in from: a sign-in from a new one emails a login alert
+CREATE TABLE IF NOT EXISTS known_devices (
+  user_id INT NOT NULL,
+  device_hash CHAR(64) NOT NULL,    -- hash of the app's device id (or of the browser's user agent)
+  label VARCHAR(80) NULL,           -- e.g. "Chrome on Windows"
+  first_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, device_hash),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- the security log the administrator reads: sign-ins, failed sign-ins, lockouts, password
+-- changes and account changes. Rows outlive the account (the name is kept as it was).
+CREATE TABLE IF NOT EXISTS security_events (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  event VARCHAR(40) NOT NULL,
+  user_id INT NULL,                 -- the account it is about, when known
+  user_name VARCHAR(100) NULL,
+  login VARCHAR(254) NULL,          -- what was typed in the login box (for failed sign-ins)
+  actor_id INT NULL,                -- who did it, when it was another person (an administrator)
+  ip VARCHAR(64) NULL,
+  user_agent VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_security_events_time (created_at),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- online lessons a teacher schedules for one of their classes, held in the app's own live
