@@ -3,6 +3,7 @@
 // signalling messages between the teacher and each learner over it, and the room's chat.
 // Video and audio go browser to browser: the teacher to every learner, and each learner (when
 // they switch on their mic or camera) to the teacher only.
+const config = require('./config');
 const onlineClasses = require('./onlineClasses');
 
 const KEEPALIVE_MS = 25 * 1000;
@@ -68,6 +69,7 @@ async function enter(oc, user, req, res) {
     teacherId: oc.teacher_id,
     participants: [...room.people.values()].filter((p) => p.id !== user.id).map(person),
     chat: room.chat,
+    iceServers: config.iceServers, // for the video connections (a TURN relay when one is set)
   });
   // also after a refresh, so the teacher's side reconnects the video with the new page
   broadcast(room, 'joined', person(me), user.id);

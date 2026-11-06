@@ -58,7 +58,7 @@ export default function ProfilePage({ onBack }){
     );
   }
 
-  // learners added with their ID number have no email (their login details go to their parent)
+  // learners added with their learner number have no email (their login details go to their parent)
   const noEmail = person.role==='learner' && !person.email;
   const emailChanged = !noEmail && email.trim().toLowerCase()!==person.email;
 
@@ -141,7 +141,7 @@ export default function ProfilePage({ onBack }){
           <SectionHead icon="building" title={t('profile_school_title')}/>
           <DetailRow label={t('admin_role_label')}>{t('tab_'+person.role)}</DetailRow>
           {person.role==='learner' && <DetailRow label={t('login_grade_label')}>{t('grade_'+(person.grade||'10'))}</DetailRow>}
-          {person.role==='learner' && person.idNumber && <DetailRow label={t('login_id_label')}>{person.idNumber}</DetailRow>}
+          {person.role==='learner' && person.learnerNumber && <DetailRow label={t('login_learner_number_label')}>{person.learnerNumber}</DetailRow>}
           {person.role==='learner' && person.subjects && person.subjects.length>0 && <DetailRow label={t('profile_subjects_label')}>{person.subjects.map(s=>t(s)).join(', ')}</DetailRow>}
           {person.role==='learner' && <DetailRow label={t('profile_parents_label')}>{(person.parents||[]).join(', ') || '—'}</DetailRow>}
           {person.role==='teacher' && <DetailRow label={t('signup_subject_label')}>{person.subjectKey ? t(person.subjectKey) : '—'}</DetailRow>}

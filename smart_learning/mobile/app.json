@@ -14,10 +14,19 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "za.smartlearning.app"
+      "bundleIdentifier": "za.smartlearning.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Smart Learning uses the camera when you switch it on in an online class.",
+        "NSMicrophoneUsageDescription": "Smart Learning uses the microphone when you switch it on in an online class."
+      }
     },
     "android": {
       "package": "za.smartlearning.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#0f1a38",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -31,7 +40,9 @@
     "plugins": [
       "expo-secure-store",
       "expo-sharing",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-status-bar",
+      "expo-font"
     ]
   }
 }

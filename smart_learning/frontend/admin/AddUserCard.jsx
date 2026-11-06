@@ -12,7 +12,7 @@ import SubjectPicker, { SUBJECT_COUNT } from './SubjectPicker.jsx'
 // the administrator creates the account for every learner and staff member (nobody
 // signs up themselves). The backend saves it with a temporary password and hands back the
 // invite, which the administrator emails to the new person; they replace the password on
-// first login. A learner is added with their ID number (no email) and must be linked to a
+// first login. A learner is added with their learner number (no email) and must be linked to a
 // parent, an existing one or a new one added with them: their login details go to the
 // parent's email, with the parent's own when the parent is new too.
 export default function AddUserCard(){
@@ -47,7 +47,7 @@ export default function AddUserCard(){
     if(!name) return setError(t('admin_error_name'));
     if(role!=='learner' && !isValidEmail(email)) return setError(t('admin_error_email'));
     if(role==='learner'){
-      if(!/^\d{13}$/.test(draft.idNumber.replace(/[\s-]/g,''))) return setError(t('admin_error_id_number'));
+      if(!/^[A-Z0-9][A-Z0-9/-]{1,18}[A-Z0-9]$/.test(draft.learnerNumber.replace(/\s/g,'').toUpperCase())) return setError(t('admin_error_learner_number'));
       if((draft.subjects||[]).length!==SUBJECT_COUNT) return setError(t('admin_error_subject_count'));
       if(newParent && !draft.parentName.trim()) return setError(t('admin_error_name'));
       if(newParent && !isValidEmail(draft.parentEmail.trim())) return setError(t('admin_error_email'));
@@ -55,7 +55,7 @@ export default function AddUserCard(){
     }
     setError(null);
     const details = role==='learner' ? {
-        grade:draft.grade, className:draft.className || '', idNumber:draft.idNumber.trim(), subjects:draft.subjects,
+        grade:draft.grade, className:draft.className || '', learnerNumber:draft.learnerNumber.trim(), subjects:draft.subjects,
         ...(newParent ? { parent:{ name:draft.parentName.trim(), email:draft.parentEmail.trim() } } : { parentId:Number(draft.parentId) }),
       }
       : role==='teacher' ? { subjectKey:draft.subjectKey }
@@ -70,7 +70,7 @@ export default function AddUserCard(){
       a.lastInvite = data.invite;
       a.newUser.name = '';
       a.newUser.email = '';
-      a.newUser.idNumber = '';
+      a.newUser.learnerNumber = '';
       a.newUser.className = '';
       a.newUser.childId = '';
       a.newUser.parentName = '';
@@ -121,10 +121,10 @@ export default function AddUserCard(){
           )}
           {draft.role==='learner' && (
             <div className="field">
-              <label htmlFor="newUserIdNumber">{t('login_id_label')}</label>
-              <input type="text" inputMode="numeric" maxLength={17} id="newUserIdNumber" placeholder={t('login_id_placeholder')} value={draft.idNumber}
-                onChange={(e)=>{ const v = e.target.value; editDraft(d=>{ d.idNumber = v; }); }}/>
-              <p className="muted" style={{ margin:'4px 0 0', fontSize:11.5 }}>{t('admin_learner_id_hint')}</p>
+              <label htmlFor="newUserLearnerNumber">{t('login_learner_number_label')}</label>
+              <input type="text" autoCapitalize="characters" maxLength={24} id="newUserLearnerNumber" placeholder={t('login_learner_number_placeholder')} value={draft.learnerNumber}
+                onChange={(e)=>{ const v = e.target.value; editDraft(d=>{ d.learnerNumber = v; }); }}/>
+              <p className="muted" style={{ margin:'4px 0 0', fontSize:11.5 }}>{t('admin_learner_number_hint')}</p>
             </div>
           )}
           {draft.role==='teacher' && (

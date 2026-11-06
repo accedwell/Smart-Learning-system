@@ -46,7 +46,7 @@ async function childReport(child) {
   const testAverage = marks.length ? marks.reduce((a, m) => a + m.score / m.total, 0) / marks.length : null;
   const risk = riskFrom({ testAverage, checkinPct: checkin ? checkin.score / checkin.total : null });
   return {
-    child: { id: child.id, name: child.name, grade: child.grade, idNumber: child.id_number || '', progress: child.progress },
+    child: { id: child.id, name: child.name, grade: child.grade, learnerNumber: child.learner_number || '', progress: child.progress },
     status: risk.status,
     statusBasis: risk.basis,
     testAverage: testAverage == null ? null : Math.round(testAverage * 100),
@@ -89,7 +89,7 @@ function writePdf(report, parentName, out) {
   const facts = [
     ['Learner', report.child.name],
     ['Grade', report.child.grade ? t('grade_' + report.child.grade) : '–'],
-    ...(report.child.idNumber ? [['ID number', report.child.idNumber]] : []),
+    ...(report.child.learnerNumber ? [['Learner number', report.child.learnerNumber]] : []),
     ['Parent / guardian', parentName],
   ];
   for (const [label, value] of facts) {

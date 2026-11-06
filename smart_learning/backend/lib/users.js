@@ -1,6 +1,6 @@
 // Turning user rows into API objects, plus lookups several routers need.
 const db = require('./db');
-const { normalizeIdNumber, looksLikeIdNumber } = require('./idNumber');
+const { normalizeLearnerNumber, looksLikeLearnerNumber } = require('./learnerNumber');
 
 const bool = (v) => (v == null ? null : Boolean(v));
 
@@ -9,14 +9,14 @@ function publicUser(u) {
   const out = {
     id: u.id,
     name: u.name,
-    email: u.email || '', // learners added by ID number have none
+    email: u.email || '', // learners added by learner number have none
     role: u.role,
     phone: u.phone || '',
     mustChangePassword: Boolean(u.must_change_password),
     locked: Boolean(u.locked_until && new Date(u.locked_until) > new Date()), // after too many wrong passwords
     createdAt: u.created_at,
   };
-  if (u.role === 'learner') Object.assign(out, { grade: u.grade, className: u.class_name || '', idNumber: u.id_number || '', progress: u.progress });
+  if (u.role === 'learner') Object.assign(out, { grade: u.grade, className: u.class_name || '', learnerNumber: u.learner_number || '', progress: u.progress });
   if (u.role === 'teacher') {
     Object.assign(out, {
       subjectKey: u.subject_key, dept: u.dept, staffNumber: u.staff_number || '',
@@ -31,18 +31,18 @@ async function findByEmail(email, conn) {
   return db.one('SELECT * FROM users WHERE email = ?', [String(email).trim().toLowerCase()], conn);
 }
 
-async function findByIdNumber(idNumber, conn) {
-  return db.one('SELECT * FROM users WHERE id_number = ?', [idNumber], conn);
+async function findByLearnerNumber(learnerNumber, conn) {
+  return db.one('SELECT * FROM users WHERE learner_number = ?', [learnerNumber], conn);
 }
 
 // the account for what someone typed on the login screen: an email address, or (learners)
-// an ID number
+// a learner number
 async function findByLogin(value, conn) {
   const text = typeof value === 'string' ? value.trim() : '';
   if (!text) return null;
-  if (looksLikeIdNumber(text)) {
-    const idNumber = normalizeIdNumber(text);
-    return idNumber ? findByIdNumber(idNumber, conn) : null;
+  if (looksLikeLearnerNumber(text)) {
+    const learnerNumber = normalizeLearnerNumber(text);
+    return learnerNumber ? findByLearnerNumber(learnerNumber, conn) : null;
   }
   return findByEmail(text, conn);
 }
@@ -87,5 +87,5 @@ async function notify(userIds, { key = null, params = null, message = null }, co
 }
 
 module.exports = {
-  bool, publicUser, findByEmail, findByIdNumber, findByLogin, parentsWithEmail, findById, childIdsOf, parentIdsOf, shortName, notify,
+  bool, publicUser, findByEmail, findByLearnerNumber, findByLogin, parentsWithEmail, findById, childIdsOf, parentIdsOf, shortName, notify,
 };

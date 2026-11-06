@@ -54,6 +54,14 @@ module.exports = {
     from: env.MAIL_FROM || env.SMTP_USER || 'Smart Learning <no-reply@localhost>',
   },
 
+  // How the live classroom's video connections find a route between two devices: a public STUN
+  // server, plus a TURN relay when TURN_URLS is set. Without a relay, a learner on mobile data
+  // often can't reach a teacher on a school or office network (their routers block it).
+  iceServers: [
+    { urls: list(env.STUN_URLS || 'stun:stun.l.google.com:19302') },
+    ...(env.TURN_URLS ? [{ urls: list(env.TURN_URLS), username: env.TURN_USERNAME || '', credential: env.TURN_CREDENTIAL || '' }] : []),
+  ],
+
   uploadDir: path.resolve(ROOT, env.UPLOAD_DIR || 'uploads'),
   maxUploadBytes: 5 * 1024 * 1024,
 

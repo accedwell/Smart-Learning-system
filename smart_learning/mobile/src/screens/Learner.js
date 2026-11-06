@@ -7,7 +7,7 @@ import {
   Avatar, Bar, Button, Card, Chips, Empty, ErrorText, Field, Hero, Icon, Loaded, Note, Pill, Row,
   Screen, Sheet, formatTime, scoreKind, useData, useKit,
 } from '../ui';
-import { HeaderButtons, openPaper, openWebApp } from './Common';
+import { HeaderButtons, openPaper } from './Common';
 
 const SUBJECT_ICON = { subject_1: 'calculator', subject_2: 'book', subject_3: 'leaf' };
 const subjectIcon = (key) => SUBJECT_ICON[key] || 'school';
@@ -348,7 +348,7 @@ export function Checkin({ onDone }) {
 const STATUS_KIND = { present: 'good', late: 'warn', absent: 'bad' };
 
 export function LearnerOnline() {
-  const { t, c } = useKit();
+  const { t, c, push } = useKit();
   const state = useData('/learner/online-classes');
   return (
     <Screen title={t('learner_online_title')} sub={t('m_online_sub')} right={<HeaderButtons />} onRefresh={state.reload} refreshing={state.loading}>
@@ -364,10 +364,10 @@ export function LearnerOnline() {
                   {o.myStatus ? <Pill kind={STATUS_KIND[o.myStatus]} text={t('learner_online_my_status', { status: t('online_status_' + o.myStatus) })} /> : null}
                 </View>
               </View>}
-              right={o.phase === 'open' ? <Button small kind="primary" title={o.myStatus ? t('learner_online_rejoin_btn') : t('learner_online_join_btn')} onPress={openWebApp} /> : null} />
+              right={o.phase === 'open' ? <Button small kind="primary" title={o.myStatus ? t('learner_online_rejoin_btn') : t('learner_online_join_btn')} onPress={() => push('classroom', { onlineClass: o, onLeave: state.reload })} /> : null} />
           ))}
         </Loaded>
-        <Note>{t('m_online_web_note')}</Note>
+        <Note>{t('m_online_app_note')}</Note>
       </Card>
     </Screen>
   );

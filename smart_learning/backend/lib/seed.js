@@ -12,14 +12,15 @@ const DEMO_PASSWORD = 'Demo@1234';
 const LESSON_KEYS = ['lesson_1', 'lesson_2', 'lesson_3'];
 
 const LEARNERS = [
-  // the ID numbers are made up, but valid in form (date and check digit), so learners can log in with them
+  // the learner numbers are made up (year of admission + a number); learners log in with them.
+  // oldIdNumber: the made-up ID number they logged in with before, replaced in older databases
   // 7 subjects each: two languages, a mathematics, Life Orientation and three more (including the
   // Mathematics, English and Life Sciences classes they are in)
-  { name: 'Thabo Mokoena', email: 'thabo@school.demo', idNumber: '1003155123089', grade: '10', className: '10A', lessons: [100, 60, 0], checkin: [5, 5],
+  { name: 'Thabo Mokoena', email: 'thabo@school.demo', learnerNumber: '20250101', oldIdNumber: '1003155123089', grade: '10', className: '10A', lessons: [100, 60, 0], checkin: [5, 5],
     subjects: ['subject_2', 'subject_sesotho', 'subject_lo', 'subject_1', 'subject_physical_sciences', 'subject_3', 'subject_geography'] },
-  { name: 'Lindiwe Khoza', email: 'lindiwe@school.demo', idNumber: '0906110245089', grade: '11', className: '11A', lessons: [80, 40, 0], checkin: [2, 5],
+  { name: 'Lindiwe Khoza', email: 'lindiwe@school.demo', learnerNumber: '20240102', oldIdNumber: '0906110245089', grade: '11', className: '11A', lessons: [80, 40, 0], checkin: [2, 5],
     subjects: ['subject_2', 'subject_isizulu', 'subject_lo', 'subject_1', 'subject_3', 'subject_accounting', 'subject_business'] },
-  { name: 'Sipho Ndlovu', email: 'sipho@school.demo', idNumber: '1008225067083', grade: '10', className: '10B', lessons: [100, 20, 0], checkin: [3, 5],
+  { name: 'Sipho Ndlovu', email: 'sipho@school.demo', learnerNumber: '20250103', oldIdNumber: '1008225067083', grade: '10', className: '10B', lessons: [100, 20, 0], checkin: [3, 5],
     subjects: ['subject_2', 'subject_isizulu', 'subject_lo', 'subject_1', 'subject_3', 'subject_history', 'subject_geography'] },
 ];
 
@@ -125,9 +126,10 @@ async function ensureLessonCatalog() {
 }
 
 async function seedDemoData() {
-  // demo learners from before ID-number logins get their ID numbers (only where none is set)
+  // demo learners without a learner number, or still on their old ID number, get their learner number
   for (const l of LEARNERS) {
-    await db.query("UPDATE users SET id_number = ? WHERE email = ? AND role = 'learner' AND id_number IS NULL", [l.idNumber, l.email])
+    await db.query("UPDATE users SET learner_number = ? WHERE email = ? AND role = 'learner' AND (learner_number IS NULL OR learner_number = ?)",
+      [l.learnerNumber, l.email, l.oldIdNumber])
       .catch(() => {}); // the number is taken by another account: leave this one without
   }
   // demo learners from before learners had subjects get their 7 (their lesson marks are kept)
@@ -175,7 +177,7 @@ async function seedDemoData() {
     };
 
     for (const l of LEARNERS) {
-      const learnerId = await addUser({ name: l.name, email: l.email, id_number: l.idNumber, role: 'learner', grade: l.grade, class_name: l.className });
+      const learnerId = await addUser({ name: l.name, email: l.email, learner_number: l.learnerNumber, role: 'learner', grade: l.grade, class_name: l.className });
       await setSubjects(learnerId, l.subjects, conn);
       await ensureLessons(learnerId, conn);
       for (const [i, progress] of l.lessons.entries()) {

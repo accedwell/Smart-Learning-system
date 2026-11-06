@@ -33,6 +33,7 @@ export class LiveSession {
     this.sending = { audio:null, video:null }; // what goes out on every connection
     this.mediaError = null;
     this.preview = new MediaStream(); // my own video, for the self view
+    this.iceServers = ICE_SERVERS; // the server's, with its TURN relay, once it welcomes me
   }
 
   subscribe = (fn)=>{
@@ -92,6 +93,7 @@ export class LiveSession {
     if(name==='welcome'){
       this.me = data.you;
       this.teacherId = data.teacherId;
+      if(data.iceServers) this.iceServers = data.iceServers;
       this.participants = new Map(data.participants.map(p=>[p.id, p]));
       this.chat = data.chat;
       if(this.role==='teacher') for(const p of data.participants) if(p.role==='learner') this.call(p.id);
@@ -122,7 +124,7 @@ export class LiveSession {
 
   newPeer(id){
     this.closePeer(id);
-    const pc = new RTCPeerConnection({ iceServers:ICE_SERVERS });
+    const pc = new RTCPeerConnection({ iceServers:this.iceServers });
     const peer = { pc, audio:null, video:null };
     pc.onicecandidate = (e)=>{
       if(e.candidate) sendSignal(this.ocId, this.token, id, { candidate:e.candidate.toJSON() });
@@ -224,7 +226,7 @@ export class LiveSession {
         const [track] = (await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true } })).getAudioTracks();
         this.mic = this.keepTrack(track, this.mic);
       } catch(err){
-        this.mediaError = { code: err && err.name==='NotAllowedError' ? 'live_mic_denied' : 'live_no_mic' };
+        this.mediaError = { code:mediaProblem(err, 'mic') };
       }
     } else if(!on && this.mic){
       this.mic.stop();
@@ -242,7 +244,7 @@ export class LiveSession {
         const [track] = (await navigator.mediaDevices.getUserMedia({ video:{ width:{ ideal:1280 }, height:{ ideal:720 } } })).getVideoTracks();
         this.cam = this.keepTrack(track, this.cam);
       } catch(err){
-        this.mediaError = { code: err && err.name==='NotAllowedError' ? 'live_camera_denied' : 'live_no_camera' };
+        this.mediaError = { code:mediaProblem(err, 'camera') };
       }
     } else if(!on && this.cam){
       this.cam.stop();
@@ -260,8 +262,10 @@ export class LiveSession {
         this.screen = this.keepTrack(track, this.screen);
         // the browser's own "Stop sharing" button
         if(this.screen) this.screen.onended = ()=>this.setScreenShare(false);
-      } catch{
-        this.screen = null; // the teacher closed the picker
+      } catch(err){
+        this.screen = null;
+        // closing the picker without choosing is no problem
+        if(!err || err.name!=='NotAllowedError') this.mediaError = { code:mediaProblem(err, 'screen') };
       }
     } else if(!on && this.screen){
       this.screen.onended = null;
@@ -283,6 +287,24 @@ export class LiveSession {
   sendChat(text){
     return sendChat(this.ocId, this.token, text);
   }
+}
+
+// The message key for why a microphone, camera or screen share ('mic' | 'camera' | 'screen')
+// couldn't start. Browsers only allow them on https:// pages (and http://localhost).
+function mediaProblem(err, kind){
+  if(!window.isSecureContext || !navigator.mediaDevices) return 'live_media_insecure';
+  const name = err && err.name;
+  if(kind==='screen') return 'live_screen_failed';
+  if(name==='NotAllowedError' || name==='SecurityError') return `live_${kind}_denied`;
+  if(name==='NotFoundError' || name==='OverconstrainedError') return `live_no_${kind}`;
+  if(name==='NotReadableError' || name==='AbortError') return `live_${kind}_busy`;
+  return `live_${kind}_failed`;
+}
+
+// whether a video connection to that person could not be made (their network blocks it)
+export function cantConnect(session, id){
+  const peer = session.peers.get(id);
+  return Boolean(peer) && peer.pc.connectionState==='failed';
 }
 
 // whether a remote stream has live video to show (not switched off on the other side)

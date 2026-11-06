@@ -9,7 +9,7 @@ import { AppProvider } from './src/AppContext';
 import { I18nProvider } from './src/i18n';
 import { useKit } from './src/ui';
 import { FirstLogin, Forgot, Login } from './src/screens/Auth';
-import { ChatSheet, NotificationsScreen, ProfileScreen } from './src/screens/Common';
+import { ChatSheet, Classroom, NotificationsScreen, ProfileScreen } from './src/screens/Common';
 import { Checkin, LearnerHome, LearnerOnline, LearnerPapers, LearnerQuizzes, QuizTake, RateTeachers } from './src/screens/Learner';
 import { PaperQuiz, QuizBuilder, QuizResults, Register, TeacherClass, TeacherOnline, TeacherPapers, TeacherQuizzes } from './src/screens/Teacher';
 import { ChildReport, ParentChild } from './src/screens/Parent';
@@ -52,7 +52,7 @@ const TABS = {
 // screens opened on top of a tab
 const ROUTES = {
   quiz: QuizTake, checkin: Checkin, quizBuilder: QuizBuilder, quizResults: QuizResults, paperQuiz: PaperQuiz, register: Register,
-  childReport: ChildReport,
+  childReport: ChildReport, classroom: Classroom,
 };
 
 function Signed() {

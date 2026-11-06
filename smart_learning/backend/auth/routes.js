@@ -63,7 +63,7 @@ async function session(user) {
   return { token: auth.signToken(user), user: out, mustChangePassword: Boolean(user.must_change_password) };
 }
 
-// `email` is what was typed in the login box: an email address, or a learner's ID number.
+// `email` is what was typed in the login box: an email address, or a learner's learner number.
 // `role` is optional; when sent it must match the account, as on the login screen.
 router.post('/login', credentialLimiter, async (req, res) => {
   const b = http.body(req);
@@ -80,7 +80,7 @@ router.post('/login', credentialLimiter, async (req, res) => {
     wrongGuess(req, login);
     if (user) await security.failedAttempt(req, user, 'login_failed', login);
     else await security.logEvent(req, 'login_failed', { login });
-    throw http.unauthorized('login_error_password', 'Wrong email/ID number or password');
+    throw http.unauthorized('login_error_password', 'Wrong email/learner number or password');
   }
   if (b.role && b.role !== user.role) {
     throw http.forbidden('login_error_role', `This account is a ${user.role} account`, { role: user.role });
@@ -197,7 +197,7 @@ router.patch('/me', auth.requireAuth(), async (req, res) => {
   const updates = {};
   if ('name' in b) updates.name = http.text(b.name, 'name', { max: 100 });
   if ('phone' in b) updates.phone = http.text(b.phone, 'phone', { max: 30, required: false }) || null;
-  // learners added with an ID number have no email: their login details go to their parent
+  // learners added with a learner number have no email: their login details go to their parent
   if ('email' in b && !(user.role === 'learner' && !user.email)) {
     const email = http.email(b.email);
     if (email !== user.email) {

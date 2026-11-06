@@ -35,6 +35,8 @@ async function init() {
 // Changes to tables an older version already created (CREATE TABLE IF NOT EXISTS leaves
 // those as they were). Each runs only while it is still needed.
 const MIGRATIONS = [
+  // learners log in with the learner number the school gave them, not their ID number
+  { table: 'users', column: 'id_number', exists: true, sql: 'RENAME COLUMN id_number TO learner_number' },
   { table: 'online_classes', column: 'meeting_url', exists: true, sql: 'DROP COLUMN meeting_url' },
   { table: 'online_attendance', column: 'last_joined_at', exists: false, sql: 'ADD COLUMN last_joined_at DATETIME NULL AFTER joined_at' },
   { table: 'online_attendance', column: 'seconds_attended', exists: false, sql: 'ADD COLUMN seconds_attended INT NOT NULL DEFAULT 0 AFTER last_joined_at' },
@@ -48,15 +50,15 @@ const MIGRATIONS = [
 // Other changes to existing tables: `needed` is a query that returns a row while the change
 // still has to be made, and `sql` the statements that make it.
 const CHANGES = [
-  // learners are added with their ID number and need no email address of their own
+  // learners are added with their learner number and need no email address of their own
   {
     needed: "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'email' AND IS_NULLABLE = 'NO'",
     sql: ['ALTER TABLE users MODIFY email VARCHAR(254) NULL'],
   },
-  // one account per ID number (empty values become NULL first, which the index allows many of)
+  // one account per learner number (empty values become NULL first, which the index allows many of)
   {
-    needed: "SELECT 1 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'id_number' AND NON_UNIQUE = 0)",
-    sql: ["UPDATE users SET id_number = NULL WHERE id_number = ''", 'ALTER TABLE users ADD UNIQUE INDEX uq_users_id_number (id_number)'],
+    needed: "SELECT 1 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'learner_number' AND NON_UNIQUE = 0)",
+    sql: ["UPDATE users SET learner_number = NULL WHERE learner_number = ''", 'ALTER TABLE users ADD UNIQUE INDEX uq_users_learner_number (learner_number)'],
   },
   // sign-in codes: one per account, emailed again unchanged (its rows only live 10 minutes)
   {

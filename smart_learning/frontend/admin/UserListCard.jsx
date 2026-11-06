@@ -49,7 +49,7 @@ export default function UserListCard(){
   const parentsOf = (learnerId)=>all.filter(u=>u.role==='parent' && (u.childIds||[]).includes(learnerId));
   const q = query.trim().toLowerCase();
   const shown = all.filter(u=>(s.userFilter==='all' || u.role===s.userFilter)
-    && (!q || u.name.toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q) || (u.idNumber||'').includes(q)));
+    && (!q || u.name.toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q) || (u.learnerNumber||'').includes(q)));
   const setFilter = (f)=>update(st=>{ st.admin.userFilter = f; });
 
   // puts a parent as the backend now has it into the list (and their children's parent lists)
@@ -110,7 +110,7 @@ export default function UserListCard(){
             <RolePill role={u.role}/>
             {u.mustChangePassword && <span className="pill pill-warn">{t('admin_awaiting_login_pill')}</span>}
           </div>
-          <div className="meta">{u.email || (u.idNumber ? t('login_id_label')+': '+u.idNumber : '—')}{u.role==='learner' && u.grade ? ' · '+t('grade_'+u.grade) : ''}{u.role==='learner' && u.className ? ' · '+t('admin_user_class',{ name:u.className }) : ''}{u.role==='teacher' && u.subjectKey ? ' · '+t(u.subjectKey) : ''}
+          <div className="meta">{u.email || (u.learnerNumber ? t('login_learner_number_label')+': '+u.learnerNumber : '—')}{u.role==='learner' && u.grade ? ' · '+t('grade_'+u.grade) : ''}{u.role==='learner' && u.className ? ' · '+t('admin_user_class',{ name:u.className }) : ''}{u.role==='teacher' && u.subjectKey ? ' · '+t(u.subjectKey) : ''}
             {(u.role==='learner' || u.role==='teacher') && classNamesOf(u) && classNamesOf(u)!==u.className ? ' · '+t('admin_user_classes',{ classes:classNamesOf(u) }) : ''}</div>
           {u.role==='learner' && (
             <div className="meta">{t('profile_subjects_label')+': '}{(u.subjects||[]).length ? u.subjects.map(x=>t(x)).join(', ') : <span className="pill pill-warn">{t('admin_subjects_none')}</span>}</div>

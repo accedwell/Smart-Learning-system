@@ -7,7 +7,7 @@ import { apiPost, errorText } from '../src/services/api.js'
 
 // preview of the login-details email for a newly added (or reset) user. "Send email" has the
 // server send it straight away (POST /admin/users/:id/email-login). A learner added with their
-// ID number has no email: theirs go to their parent (invite.parent), with the parent's own login
+// learner number has no email: theirs go to their parent (invite.parent), with the parent's own login
 // too when the parent's account is new.
 export default function InviteEmailCard({ invite, onClose }){
   const { t } = useI18n();
@@ -15,7 +15,7 @@ export default function InviteEmailCard({ invite, onClose }){
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null); // { kind:'sent'|'logged'|'error', text }
-  const family = Boolean(invite.idNumber);
+  const family = Boolean(invite.learnerNumber);
   const parent = invite.parent;
   const { subject, body } = family ? familyEmail(invite, t) : buildInviteEmail(invite, t);
 
@@ -73,7 +73,7 @@ function familyEmail(invite, t){
     t('invite_family_intro',{ name:invite.name }),
     '',
     t('admin_invite_learner_login',{ name:invite.name }),
-    t('login_id_label')+': '+invite.idNumber,
+    t('login_learner_number_label')+': '+invite.learnerNumber,
     t('m_temp_password')+': '+invite.tempPassword,
   ];
   if(parent && parent.tempPassword){

@@ -193,7 +193,7 @@ The administrator then adds everyone else from their dashboard.
 | Password length rules (8 to 128 characters) | Very short passwords |
 | Temporary passwords that must be changed at first sign-in | Emailed passwords staying in use |
 | Password reset links that last one hour, work once and are stored hashed | Old or leaked reset emails being reused |
-| The same "wrong email/ID number or password" message in every case | Finding out which accounts exist |
+| The same "wrong email/learner number or password" message in every case | Finding out which accounts exist |
 | No self sign-up: only the administrator creates accounts | Strangers creating accounts |
 | Chatbot reachable only from the backend, with a shared secret | Direct use of the chatbot from outside |
 | Secrets kept in `.env`, which git ignores | Passwords and keys being published on GitHub |

@@ -400,7 +400,7 @@ export function TeacherOnline() {
 const MARKS = [['present', 'good'], ['late', 'warn'], ['absent', 'bad']];
 
 export function Register({ onlineClass, onChange }) {
-  const { t, has, token, c, pop, showToast } = useKit();
+  const { t, has, token, c, pop, push, showToast } = useKit();
   const state = useData(`/teacher/online-classes/${onlineClass.id}/register`);
   const [busy, setBusy] = useState(false);
 
@@ -425,6 +425,10 @@ export function Register({ onlineClass, onChange }) {
     <Screen back={t('nav_online_classes')} title={onlineClass.title}
       sub={t('online_meta', { class: onlineClass.className, time: formatTime(onlineClass.startsAt), n: onlineClass.durationMin })}
       onRefresh={state.reload} refreshing={state.loading}>
+      {onlineClass.phase === 'open' ? (
+        <Button kind="primary" title={t('online_start_btn')} style={{ marginBottom: 12 }}
+          onPress={() => push('classroom', { onlineClass, onLeave: () => { state.reload(); if (onChange) onChange(); } })} />
+      ) : null}
       <Card title={t('online_register_btn')}>
         <Loaded state={state}>
           {(data) => data.register.length === 0 ? <Empty text={t('online_register_empty')} /> : data.register.map((r, i) => (

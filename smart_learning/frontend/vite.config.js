@@ -9,6 +9,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: {
+      // reachable from phones on the same network too: the mobile app's "Join class" opens the
+      // online classroom here, in the phone's browser
+      host: true,
       proxy: { '/api': env.API_URL || 'http://localhost:4000' },
     },
   }

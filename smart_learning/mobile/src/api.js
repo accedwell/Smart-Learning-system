@@ -2,15 +2,20 @@
 //
 // Where the backend is: EXPO_PUBLIC_API_URL if set (e.g. in mobile/.env), otherwise the computer
 // that runs `npx expo start` — the phone already reaches it on the same Wi-Fi — on port 4001.
+// Through a tunnel (`npm run tunnel`) it is the tunnel's https address, where Metro passes
+// /api on to the backend (metro.config.js).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Constants from 'expo-constants';
 import { getItem, setItem } from './storage';
 
+const HOST = (Constants.expoConfig?.hostUri || '').split(':')[0];
+export const TUNNEL = HOST.endsWith('.exp.direct');
+
 function apiBase() {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
   if (fromEnv) return fromEnv.replace(/\/+$/, '');
-  const host = (Constants.expoConfig?.hostUri || '').split(':')[0];
-  return `http://${host || 'localhost'}:4001/api`;
+  if (TUNNEL) return `https://${HOST}/api`;
+  return `http://${HOST || 'localhost'}:4001/api`;
 }
 
 export const API_URL = apiBase();

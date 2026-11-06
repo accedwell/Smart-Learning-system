@@ -10,7 +10,7 @@ USE smart_learning;
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
-  email VARCHAR(254) NULL UNIQUE,  -- learners have none: they log in with their ID number
+  email VARCHAR(254) NULL UNIQUE,  -- learners have none: they log in with their learner number
   role ENUM('learner','teacher','parent','hod','principal','admin') NOT NULL,
   password_hash VARCHAR(100) NOT NULL,
   must_change_password TINYINT(1) NOT NULL DEFAULT 0,  -- 1 while on an administrator-issued temporary password
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone VARCHAR(30) NULL,
   grade VARCHAR(4) NULL,            -- learner: the grade they are in
   class_name VARCHAR(10) NULL,      -- learner: their register class, e.g. 10A (they join its subject classes)
-  id_number VARCHAR(30) NULL UNIQUE,  -- learner: their (South African) ID number, used to log in
+  learner_number VARCHAR(30) NULL UNIQUE,  -- learner: the number the school gave them (admission number), used to log in
   progress INT NOT NULL DEFAULT 0,  -- learner: overall progress this term (%)
   subject_key VARCHAR(60) NULL,     -- teacher: the subject they teach
   teach_grade VARCHAR(4) NULL,      -- teacher: the grade they mainly teach

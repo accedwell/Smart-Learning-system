@@ -59,17 +59,17 @@ function InviteSheet({ invite, onClose }) {
 
 // "Send email" has the server email the login details straight away; "Share" uses the
 // phone's share menu (WhatsApp, email…)
-// A learner (added with their ID number) has no email: their login goes to their parent, with the
+// A learner (added with their learner number) has no email: their login goes to their parent, with the
 // parent's own when the parent's account is new too (invite.parent.tempPassword).
 function InviteDetails({ invite, onClose }) {
   const { t, has, token, c } = useKit();
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null); // { kind: 'sent' | 'logged' | 'error', text }
-  const family = Boolean(invite.idNumber);
+  const family = Boolean(invite.learnerNumber);
   const parent = invite.parent;
   const big = (value) => <Text selectable style={{ color: c.ink, fontSize: 20, fontWeight: '800', letterSpacing: 1, marginTop: 4 }}>{value}</Text>;
   const text = family
-    ? [`Smart Learning – ${invite.name}`, `${t('login_id_label')}: ${invite.idNumber}`, `${t('m_temp_password')}: ${invite.tempPassword}`,
+    ? [`Smart Learning – ${invite.name}`, `${t('login_learner_number_label')}: ${invite.learnerNumber}`, `${t('m_temp_password')}: ${invite.tempPassword}`,
       ...(parent && parent.tempPassword ? ['', `${parent.name}`, `${t('login_email_label')}: ${parent.email}`, `${t('m_temp_password')}: ${parent.tempPassword}`] : []),
       invite.loginUrl].join('\n')
     : `Smart Learning\n${invite.name}\n${t('login_email_label')}: ${invite.email}\n${t('m_temp_password')}: ${invite.tempPassword}\n${invite.loginUrl}`;
@@ -92,7 +92,7 @@ function InviteDetails({ invite, onClose }) {
         {family ? (
           <>
             <Card title={t('admin_invite_learner_login', { name: invite.name })}>
-              <Row first title={t('login_id_label')} meta={big(invite.idNumber)} />
+              <Row first title={t('login_learner_number_label')} meta={big(invite.learnerNumber)} />
               <Row title={t('m_temp_password')} meta={big(invite.tempPassword)} />
             </Card>
             {parent && parent.tempPassword ? (
@@ -182,7 +182,7 @@ function SubjectsSheet({ user, onClose, onSaved }) {
   );
 }
 
-// A learner is added with their ID number (no email) and linked to a parent: a new one, added
+// A learner is added with their learner number (no email) and linked to a parent: a new one, added
 // with them, or one already in the system.
 function AddUserSheet({ visible, onClose, onAdded }) {
   const { t, has, token } = useKit();
@@ -192,7 +192,7 @@ function AddUserSheet({ visible, onClose, onAdded }) {
   const [role, setRole] = useState('learner');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [idNumber, setIdNumber] = useState('');
+  const [learnerNumber, setLearnerNumber] = useState('');
   const [parentMode, setParentMode] = useState('new');
   const [parentName, setParentName] = useState('');
   const [parentEmail, setParentEmail] = useState('');
@@ -212,9 +212,9 @@ function AddUserSheet({ visible, onClose, onAdded }) {
     if (!name.trim()) return setError(t('admin_error_name'));
     const body = { role, name: name.trim() };
     if (learner) {
-      if (!/^\d{13}$/.test(idNumber.replace(/[\s-]/g, ''))) return setError(t('admin_error_id_number'));
+      if (!/^[A-Z0-9][A-Z0-9/-]{1,18}[A-Z0-9]$/.test(learnerNumber.replace(/\s/g, '').toUpperCase())) return setError(t('admin_error_learner_number'));
       if (subjects.length !== SUBJECT_COUNT) return setError(t('admin_error_subject_count'));
-      Object.assign(body, { idNumber: idNumber.trim(), grade, className: klass, subjects });
+      Object.assign(body, { learnerNumber: learnerNumber.trim(), grade, className: klass, subjects });
       if (parentMode === 'new') {
         if (!parentName.trim()) return setError(t('admin_error_name'));
         if (!isEmail(parentEmail)) return setError(t('admin_error_email'));
@@ -235,7 +235,7 @@ function AddUserSheet({ visible, onClose, onAdded }) {
     const { data, error: err } = await apiPost('/admin/users', body, token);
     setBusy(false);
     if (err) return setError(errorText(t, has, err));
-    setName(''); setEmail(''); setIdNumber(''); setParentName(''); setParentEmail(''); setSubjects(['subject_lo']);
+    setName(''); setEmail(''); setLearnerNumber(''); setParentName(''); setParentEmail(''); setSubjects(['subject_lo']);
     if (data.parent) parents.reload();
     onAdded(data.invite);
   }
@@ -248,8 +248,8 @@ function AddUserSheet({ visible, onClose, onAdded }) {
         <Choice label={t('admin_role_label')} value={role} onChange={setRole} options={ROLES.map((r) => ({ id: r, label: t(ROLE_KEY[r]) }))} />
         <Field label={t('signup_name_label')} value={name} onChangeText={setName} placeholder={t('admin_user_name_placeholder')} maxLength={100} />
         {learner ? (
-          <Field label={t('login_id_label')} value={idNumber} onChangeText={setIdNumber} placeholder={t('login_id_placeholder')}
-            keyboardType="number-pad" maxLength={17} hint={t('admin_learner_id_hint')} />
+          <Field label={t('login_learner_number_label')} value={learnerNumber} onChangeText={setLearnerNumber} placeholder={t('login_learner_number_placeholder')}
+            autoCapitalize="characters" maxLength={24} hint={t('admin_learner_number_hint')} />
         ) : (
           <Field label={t('signup_email_label')} value={email} onChangeText={setEmail} placeholder={t('admin_user_email_placeholder')} autoCapitalize="none" keyboardType="email-address" />
         )}
@@ -339,7 +339,7 @@ export function AdminUsers() {
             <Row key={u.id} first={i === 0} left={<Avatar text={initials(u.name)} color={c.brand} size={38} />}
               title={u.name}
               meta={<View style={{ marginTop: 2, gap: 4 }}>
-                <Text style={{ color: c.inkSoft, fontSize: 12.5 }}>{t(ROLE_KEY[u.role])}{u.grade ? ' · ' + t('grade_' + u.grade) : ''}{u.className ? ' · ' + t('admin_user_class', { name: u.className }) : ''} · {u.email || (u.idNumber ? t('login_id_label') + ' ' + u.idNumber : '—')}</Text>
+                <Text style={{ color: c.inkSoft, fontSize: 12.5 }}>{t(ROLE_KEY[u.role])}{u.grade ? ' · ' + t('grade_' + u.grade) : ''}{u.className ? ' · ' + t('admin_user_class', { name: u.className }) : ''} · {u.email || (u.learnerNumber ? t('login_learner_number_label') + ' ' + u.learnerNumber : '—')}</Text>
                 {u.role === 'learner' ? (
                   <Text style={{ color: c.inkSoft, fontSize: 12 }}>
                     {t('profile_subjects_label')}: {(u.subjects || []).length ? u.subjects.map((s) => t(s)).join(', ') : t('admin_subjects_none')}

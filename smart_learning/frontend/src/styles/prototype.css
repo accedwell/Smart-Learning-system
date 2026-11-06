@@ -513,6 +513,9 @@ img{max-width:100%}
   [hidden]{ display:none !important; }
 
 /* ---- live classroom (src/live/LiveClassroom.jsx) ---- */
+/* the live classroom alone, inside the mobile app (EmbeddedClassroom) */
+.embedded-classroom{ padding:10px; min-height:100vh; box-sizing:border-box; }
+.embedded-classroom .live-room{ padding:12px; }
 .live-room{ background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:var(--shadow); }
 .live-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
 .live-head .meta{ font-size:12px; color:var(--ink-soft); margin-top:2px; }

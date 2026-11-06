@@ -1,11 +1,11 @@
 // Screens every role shares: the language / notification buttons, notifications, the chat
 // assistant, opening a question paper, and My Profile.
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, PermissionsAndroid, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import * as WebBrowser from 'expo-web-browser';
-import { API_URL, apiGet, apiPatch, apiPost, errorText } from '../api';
+import { WebView } from 'react-native-webview';
+import { API_URL, TUNNEL, apiGet, apiPatch, apiPost, errorText } from '../api';
 import { LANGUAGES } from '../i18n';
 import {
   Avatar, Button, Card, ErrorText, Field, Icon, IconButton, Loaded, Row, Screen, Sheet,
@@ -230,7 +230,7 @@ export function ProfileScreen({ extra }) {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
-  // learners added with their ID number have no email (their login details go to their parent)
+  // learners added with their learner number have no email (their login details go to their parent)
   const noEmail = user.role === 'learner' && !user.email;
   const emailChanged = !noEmail && email.trim().toLowerCase() !== user.email;
 
@@ -281,7 +281,7 @@ export function ProfileScreen({ extra }) {
       <Card title={t('profile_school_title')}>
         <Row first title={t('admin_role_label')} right={<Text style={{ color: c.ink, fontWeight: '600' }}>{t(ROLE_KEY[user.role])}</Text>} />
         {p.grade ? <Row title={t('login_grade_label')} right={<Text style={{ color: c.ink, fontWeight: '600' }}>{t('grade_' + p.grade)}</Text>} /> : null}
-        {p.idNumber ? <Row title={t('login_id_label')} right={<Text style={{ color: c.ink, fontWeight: '600' }}>{p.idNumber}</Text>} /> : null}
+        {p.learnerNumber ? <Row title={t('login_learner_number_label')} right={<Text style={{ color: c.ink, fontWeight: '600' }}>{p.learnerNumber}</Text>} /> : null}
         {p.subjects && p.subjects.length ? <Row title={t('profile_subjects_label')} meta={p.subjects.map((s) => t(s)).join(', ')} /> : null}
         {p.subjectKey ? <Row title={t('signup_subject_label')} right={<Text style={{ color: c.ink, fontWeight: '600' }}>{t(p.subjectKey)}</Text>} /> : null}
         {p.parents ? <Row title={t('profile_parents_label')} right={<Text style={{ color: c.ink, fontWeight: '600' }}>{p.parents.join(', ') || '—'}</Text>} /> : null}
@@ -303,11 +303,74 @@ export function ProfileScreen({ extra }) {
   );
 }
 
-// The live classroom (camera, microphone, screen sharing) runs in the web app: "Join" opens it
-// in the phone's browser. EXPO_PUBLIC_WEB_URL says where the web app is; by default the same
-// computer as the backend, on the web app's port.
-export const WEB_URL = (process.env.EXPO_PUBLIC_WEB_URL || API_URL.replace(/:\d+\/api$/, ':5173')).replace(/\/+$/, '');
+// The live classroom (camera, microphone, screen sharing, chat) is the website's classroom
+// page, shown right here in the app and already signed in with the app's login: no browser,
+// no second login. EXPO_PUBLIC_WEB_URL says where the website is; by default the same computer
+// as the backend, on the website's port, or through a tunnel the page Metro serves under /web.
+export const WEB_URL = (process.env.EXPO_PUBLIC_WEB_URL
+  || (TUNNEL ? API_URL.replace(/\/api$/, '/web') : API_URL.replace(/:\d+\/api$/, ':5173'))).replace(/\/+$/, '');
 
-export function openWebApp() {
-  return WebBrowser.openBrowserAsync(WEB_URL);
+// `onlineClass` from the learner's or teacher's online-classes list; `onLeave` runs after leaving
+export function Classroom({ onlineClass, onLeave }) {
+  const { token, lang, touch, pop, t, c } = useKit();
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0); // a new attempt reloads the page
+  // Android: the classroom page can only use the camera and microphone once the app may, so the
+  // app asks first (an iPhone asks by itself when the page switches one on)
+  const [asked, setAsked] = useState(Platform.OS !== 'android');
+
+  useEffect(() => {
+    if (asked) return;
+    const { CAMERA, RECORD_AUDIO } = PermissionsAndroid.PERMISSIONS;
+    PermissionsAndroid.requestMultiple([CAMERA, RECORD_AUDIO]).catch(() => {}).finally(() => setAsked(true));
+  }, [asked]);
+
+  // being in class counts as activity, so the automatic sign-out doesn't end it
+  useEffect(() => {
+    const timer = setInterval(touch, 30 * 1000);
+    return () => clearInterval(timer);
+  }, [touch]);
+
+  function leave() {
+    pop();
+    if (onLeave) onLeave();
+  }
+
+  // runs before the page's own code: the sign-in for the classroom page, and the app's language
+  const setup = `window.SMART_LEARNING_EMBED = ${JSON.stringify({ token })};
+    try { localStorage.setItem('smart-learning-language', ${JSON.stringify(lang)}); } catch (e) {}
+    true;`;
+
+  return (
+    <Screen back={t('nav_online_classes')} title={onlineClass.title} scroll={false}>
+      <View style={{ flex: 1, marginHorizontal: -16 }}>
+        {!asked ? (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={c.brand} size="large" /></View>
+        ) : failed ? (
+          <View style={{ padding: 16, gap: 12 }}>
+            <ErrorText>{t('m_classroom_unreachable')}</ErrorText>
+            <Button kind="primary" title={t('m_try_again')} onPress={() => { setFailed(false); setAttempt((n) => n + 1); }} />
+          </View>
+        ) : (
+          <WebView key={attempt} source={{ uri: `${WEB_URL}/#classroom=${onlineClass.id}` }}
+            style={{ flex: 1, backgroundColor: c.bg }}
+            injectedJavaScriptBeforeContentLoaded={setup}
+            // the sign-in only ever goes to the Smart Learning website
+            originWhitelist={[WEB_URL]}
+            onShouldStartLoadWithRequest={(req) => req.url === WEB_URL || req.url.startsWith(WEB_URL + '/')}
+            onMessage={(e) => { if (e.nativeEvent.data === 'leave') leave(); }}
+            onError={() => setFailed(true)}
+            onHttpError={() => setFailed(true)}
+            startInLoadingState
+            renderLoading={() => <View style={{ ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg }}><ActivityIndicator color={c.brand} size="large" /></View>}
+            allowsInlineMediaPlayback
+            mediaPlaybackRequiresUserAction={false}
+            mediaCapturePermissionGrantType="grantIfSameHostElsePrompt"
+            javaScriptEnabled
+            domStorageEnabled
+          />
+        )}
+      </View>
+    </Screen>
+  );
 }

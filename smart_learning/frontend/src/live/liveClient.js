@@ -5,7 +5,8 @@ import { apiPost } from '../services/api.js'
 // reconnects by itself after a dropped connection, but not after the class ended, the page
 // opened elsewhere ('replaced') or an error answer such as "this class has ended".
 
-// public STUN server: lets two browsers on different networks find a route to each other
+// public STUN server: lets two browsers on different networks find a route to each other.
+// The server's list (with its TURN relay, if one is set) replaces it when the classroom opens.
 export const ICE_SERVERS = [{ urls:'stun:stun.l.google.com:19302' }];
 
 const RETRY_MS = [1000, 2000, 5000, 10000];

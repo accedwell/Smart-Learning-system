@@ -89,7 +89,7 @@ function ReportBody({ r, t, c }) {
 
       <Card>
         {r.child.grade ? <Row first title={t('login_grade_label')} right={<Text style={{ color: c.ink, fontWeight: '700' }}>{t('grade_' + r.child.grade)}</Text>} /> : null}
-        {r.child.idNumber ? fact(t('login_id_label'), r.child.idNumber) : null}
+        {r.child.learnerNumber ? fact(t('login_learner_number_label'), r.child.learnerNumber) : null}
         {fact(t('parent_progress_title'), `${r.child.progress || 0}%`)}
         <Row title={t('m_status')} right={<StatusPill status={r.status} />} />
         {r.status ? <Text style={{ color: c.inkSoft, fontSize: 12.5, marginTop: 6 }}>{t(STATUS_TEXT[r.status])}</Text> : null}

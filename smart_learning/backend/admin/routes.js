@@ -8,8 +8,8 @@ const auth = require('../lib/auth');
 const { catalog, deptForSubject } = require('../lib/catalog');
 const { ensureLessons, refreshProgress } = require('../lib/learners');
 const { checkLearnerSubjects, subjectsOf, subjectsByLearner, setSubjects } = require('../lib/subjects');
-const { publicUser, findByEmail, findById, findByIdNumber, parentsWithEmail } = require('../lib/users');
-const { normalizeIdNumber } = require('../lib/idNumber');
+const { publicUser, findByEmail, findById, findByLearnerNumber, parentsWithEmail } = require('../lib/users');
+const { normalizeLearnerNumber } = require('../lib/learnerNumber');
 const { classView, registerClasses, syncRegisterClass } = require('../lib/classes');
 const mailer = require('../lib/mailer');
 const { rateLimit } = require('../lib/rateLimit');
@@ -26,9 +26,9 @@ function roleDetails(role, b, { partial = false, grade = null } = {}) {
   const d = {};
   if (role === 'learner') {
     if (has('grade')) d.grade = http.oneOf(String(b.grade), catalog.GRADES, 'grade');
-    if ('idNumber' in b) {
-      d.id_number = normalizeIdNumber(b.idNumber);
-      if (!d.id_number) throw http.badRequest('admin_error_id_number', 'Enter a valid 13-digit South African ID number', { field: 'idNumber' });
+    if ('learnerNumber' in b) {
+      d.learner_number = normalizeLearnerNumber(b.learnerNumber);
+      if (!d.learner_number) throw http.badRequest('admin_error_learner_number', 'Enter the learner number: 3 to 20 letters and digits', { field: 'learnerNumber' });
     }
     // their register class, e.g. 10B ('' = none yet)
     if ('className' in b) {
@@ -66,13 +66,13 @@ async function withLinks(users) {
   });
 }
 
-// one account per ID number
-async function checkIdNumberFree(idNumber, exceptId) {
-  const other = await findByIdNumber(idNumber);
-  if (other && other.id !== exceptId) throw http.conflict('admin_error_id_taken', 'Another learner already has this ID number');
+// one account per learner number
+async function checkLearnerNumberFree(learnerNumber, exceptId) {
+  const other = await findByLearnerNumber(learnerNumber);
+  if (other && other.id !== exceptId) throw http.conflict('admin_error_learner_number_taken', 'Another learner already has this learner number');
 }
 
-// The login details to pass on. A learner added with their ID number has no email: their
+// The login details to pass on. A learner added with their learner number has no email: their
 // details go to their parent's email (`email`), together with the parent's own login when the
 // parent's account is new too (`newParent` = { user, tempPassword }).
 async function invite(user, tempPassword, newParent) {
@@ -81,7 +81,7 @@ async function invite(user, tempPassword, newParent) {
   const parent = newParent ? newParent.user : (await parentsWithEmail(user.id))[0];
   return {
     ...out,
-    idNumber: user.id_number,
+    learnerNumber: user.learner_number,
     email: parent ? parent.email : null,
     parent: parent ? { userId: parent.id, name: parent.name, email: parent.email, tempPassword: newParent ? newParent.tempPassword : null } : null,
   };
@@ -103,7 +103,7 @@ router.get('/users', async (req, res) => {
   }
   const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   if (q) {
-    where.push('(name LIKE ? OR email LIKE ? OR id_number LIKE ?)');
+    where.push('(name LIKE ? OR email LIKE ? OR learner_number LIKE ?)');
     const like = '%' + q.replace(/[\\%_]/g, (c) => '\\' + c) + '%';
     params.push(like, like, like);
   }
@@ -114,7 +114,7 @@ router.get('/users', async (req, res) => {
 });
 
 // Creates the account with a temporary password; the response carries the invite to email them.
-// A learner is added with their ID number (no email) and must be linked to a parent: one already
+// A learner is added with their learner number (no email) and must be linked to a parent: one already
 // in the system (`parentId`), or a new one created with them (`parent: { name, email }`). Their
 // login details then go to that parent's email.
 router.post('/users', async (req, res) => {
@@ -126,9 +126,9 @@ router.post('/users', async (req, res) => {
   let newParent = null;
   let subjects = null;
   if (learner) {
-    if (!fields.id_number) throw http.badRequest('admin_error_id_number', 'Enter a valid 13-digit South African ID number', { field: 'idNumber' });
+    if (!fields.learner_number) throw http.badRequest('admin_error_learner_number', 'Enter the learner number: 3 to 20 letters and digits', { field: 'learnerNumber' });
     subjects = checkLearnerSubjects(b.subjects);
-    await checkIdNumberFree(fields.id_number);
+    await checkLearnerNumberFree(fields.learner_number);
     if (b.parentId) {
       parentId = (await requireUser(http.id(b.parentId, 'parentId'), 'parent')).id;
     } else if (b.parent && typeof b.parent === 'object') {
@@ -182,7 +182,7 @@ router.patch('/users/:id', async (req, res) => {
   const updates = roleDetails(user.role, b, { partial: true, grade: user.grade });
   // a learner moved to another grade can't keep a class of the old one
   if (updates.grade && updates.grade !== user.grade && !('class_name' in updates)) updates.class_name = null;
-  if (updates.id_number) await checkIdNumberFree(updates.id_number, user.id);
+  if (updates.learner_number) await checkLearnerNumberFree(updates.learner_number, user.id);
   if ('name' in b) updates.name = http.text(b.name, 'name', { max: 100 });
   if ('phone' in b) updates.phone = http.text(b.phone, 'phone', { max: 30, required: false }) || null;
   if ('email' in b) {
@@ -260,7 +260,7 @@ router.get('/security', async (req, res) => {
     event ? [event] : [],
   );
   const locked = await db.query(
-    "SELECT id, name, email, id_number, role, locked_until FROM users WHERE locked_until > UTC_TIMESTAMP() ORDER BY locked_until DESC");
+    "SELECT id, name, email, learner_number, role, locked_until FROM users WHERE locked_until > UTC_TIMESTAMP() ORDER BY locked_until DESC");
   const counts = {};
   for (const row of await db.query(
     'SELECT event, COUNT(*) AS n FROM security_events WHERE created_at > UTC_TIMESTAMP() - INTERVAL 1 DAY GROUP BY event')) {
@@ -271,7 +271,7 @@ router.get('/security', async (req, res) => {
       id: e.id, event: e.event, userId: e.user_id, userName: e.user_name || '', role: e.role || null,
       login: e.login || '', actorName: e.actor_name || '', ip: e.ip || '', userAgent: e.user_agent || '', createdAt: e.created_at,
     })),
-    locked: locked.map((u) => ({ id: u.id, name: u.name, login: u.email || u.id_number || '', role: u.role, lockedUntil: u.locked_until })),
+    locked: locked.map((u) => ({ id: u.id, name: u.name, login: u.email || u.learner_number || '', role: u.role, lockedUntil: u.locked_until })),
     last24h: counts,
   });
 });

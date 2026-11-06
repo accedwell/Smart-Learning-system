@@ -4,7 +4,7 @@ import { useI18n } from '../i18n/I18nContext.jsx'
 import { Icon } from '../components/ui.jsx'
 import { apiPost, errorText } from '../services/api.js'
 import { formatWhen, useNow } from '../services/onlineClasses.js'
-import { LiveSession, hasVideo, hasAudio } from './LiveSession.js'
+import { LiveSession, hasVideo, hasAudio, cantConnect } from './LiveSession.js'
 
 // plays a MediaStream; `muted` for my own preview (no echo)
 function MediaView({ stream, muted, className }){
@@ -130,6 +130,8 @@ export default function LiveClassroom({ onlineClass, onLeave }){
             )}
           </div>
           {session.mediaError && <p className="field-error" style={{ marginTop:8 }}>{t(session.mediaError.code)}</p>}
+          {!isTeacher && teacherHere && cantConnect(session, teacherHere.id) && <p className="field-error" style={{ marginTop:8 }}>{t('live_connect_failed_teacher')}</p>}
+          {isTeacher && learnersHere.some(p=>cantConnect(session, p.id)) && <p className="field-error" style={{ marginTop:8 }}>{t('live_connect_failed_learners')}</p>}
           {!isTeacher && <p className="muted" style={{ fontSize:11.5, marginTop:6 }}>{t('live_learner_hint')}</p>}
 
           {isTeacher && (
@@ -140,7 +142,7 @@ export default function LiveClassroom({ onlineClass, onLeave }){
                   <div key={p.id} className="live-tile">
                     {hasVideo(stream) ? <MediaView stream={stream} className="live-video"/> : <div className="live-tile-name">{p.name}</div>}
                     {stream && !hasVideo(stream) && <MediaView stream={stream} className="live-hidden"/>}
-                    <div className="live-tile-label">{p.name}{hasAudio(stream) ? ' · '+t('live_speaking_on') : ''}</div>
+                    <div className="live-tile-label">{p.name}{cantConnect(session, p.id) ? ' · '+t('live_not_connected') : hasAudio(stream) ? ' · '+t('live_speaking_on') : ''}</div>
                   </div>
                 );
               })}
