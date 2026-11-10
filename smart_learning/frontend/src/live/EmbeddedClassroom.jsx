@@ -9,15 +9,26 @@ import LiveClassroom from './LiveClassroom.jsx'
 // window.SMART_LEARNING_EMBED = { token } before the page loads. Leaving tells the app to
 // close the classroom.
 
+// The app's sign-in: set on this page by the phone app, or, when the app runs as a web page and
+// shows this page in a frame of the same site, on the page around it.
+function embedInfo(){
+  if(window.SMART_LEARNING_EMBED) return window.SMART_LEARNING_EMBED;
+  try{
+    if(window.parent!==window && window.parent.SMART_LEARNING_EMBED) return window.parent.SMART_LEARNING_EMBED;
+  } catch{ /* a frame on another site: no sign-in from it */ }
+  return null;
+}
+
 // the online class to open, when this page was opened by the mobile app
 export function embeddedClassroomId(){
-  const embed = window.SMART_LEARNING_EMBED;
+  const embed = embedInfo();
   const id = Number(new URLSearchParams(window.location.hash.slice(1)).get('classroom'));
   return embed && embed.token && Number.isInteger(id) && id > 0 ? id : null;
 }
 
 function backToApp(){
   if(window.ReactNativeWebView) window.ReactNativeWebView.postMessage('leave');
+  else if(window.parent!==window) window.parent.postMessage('leave', window.location.origin);
 }
 
 export default function EmbeddedClassroom({ id }){
@@ -28,7 +39,7 @@ export default function EmbeddedClassroom({ id }){
 
   // who is signed in, and the online class from their list (as the dashboards' cards have it)
   useEffect(()=>{
-    const { token } = window.SMART_LEARNING_EMBED;
+    const { token } = embedInfo();
     let cancelled = false;
     (async ()=>{
       const me = await apiGet('/auth/me', token);
@@ -59,7 +70,7 @@ export default function EmbeddedClassroom({ id }){
           <button className="btn btn-primary" onClick={backToApp}>{t('live_back_btn')}</button>
         </div>
       ) : onlineClass ? (
-        <LiveClassroom onlineClass={onlineClass} onLeave={backToApp}/>
+        <LiveClassroom compact onlineClass={onlineClass} onLeave={backToApp}/>
       ) : (
         <p className="muted">{t('live_status_connecting')}</p>
       )}

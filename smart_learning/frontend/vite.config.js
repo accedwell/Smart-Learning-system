@@ -12,7 +12,11 @@ export default defineConfig(({ mode }) => {
       // reachable from phones on the same network too: the mobile app's "Join class" opens the
       // online classroom here, in the phone's browser
       host: true,
-      proxy: { '/api': env.API_URL || 'http://localhost:4000' },
+      proxy: {
+        '/api': env.API_URL || 'http://localhost:4000',
+        // the LiveKit video server of the online classroom (its WebSocket too)
+        '/livekit': { target: env.LIVEKIT_PROXY || 'http://localhost:7880', ws: true, rewrite: (p) => p.replace(/^\/livekit/, '') || '/' },
+      },
     },
   }
 })

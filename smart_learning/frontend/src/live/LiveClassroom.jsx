@@ -1,18 +1,48 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useStore } from '../store/AppStore.jsx'
 import { useI18n } from '../i18n/I18nContext.jsx'
 import { Icon } from '../components/ui.jsx'
 import { apiPost, errorText } from '../services/api.js'
 import { formatWhen, useNow } from '../services/onlineClasses.js'
 import { LiveSession, hasVideo, hasAudio, cantConnect } from './LiveSession.js'
+// the meeting layout (with the LiveKit library) loads only when a class opens
+const Meeting = lazy(()=>import('./Meeting.jsx'))
+import { apiGet } from '../services/api.js'
 
-// plays a MediaStream; `muted` for my own preview (no echo)
+// Plays a MediaStream; `muted` for my own preview (no echo). Browsers only start a video with
+// sound by themselves once the person has tapped the page; until then it plays without sound
+// (so the picture isn't stuck black) and offers a button to turn the sound on.
 function MediaView({ stream, muted, className }){
+  const { t } = useI18n();
   const ref = useRef(null);
+  const [silenced, setSilenced] = useState(false);
   useEffect(()=>{
-    if(ref.current && ref.current.srcObject!==stream) ref.current.srcObject = stream || null;
-  }, [stream]);
-  return <video ref={ref} className={className} autoPlay playsInline muted={muted}/>;
+    const video = ref.current;
+    if(!video) return;
+    if(video.srcObject!==stream) video.srcObject = stream || null;
+    if(!stream) return;
+    video.play().catch((err)=>{
+      if(muted || !err || err.name!=='NotAllowedError') return;
+      video.muted = true;
+      video.play().catch(()=>{});
+      setSilenced(true);
+    });
+  }, [stream, muted]);
+
+  function soundOn(){
+    const video = ref.current;
+    if(!video) return;
+    video.muted = false;
+    video.play().then(()=>setSilenced(false)).catch(()=>{});
+  }
+
+  if(!silenced) return <video ref={ref} className={className} autoPlay playsInline muted={muted}/>;
+  return (
+    <>
+      <video ref={ref} className={className} autoPlay playsInline muted/>
+      <button className="btn btn-primary live-sound-btn" onClick={soundOn}>{t('live_tap_for_sound')}</button>
+    </>
+  );
 }
 
 function Placeholder({ text }){
@@ -22,7 +52,25 @@ function Placeholder({ text }){
 // The live classroom of an online class: the teacher's video (or screen) for everyone, the
 // learners who switched their camera or mic on (for the teacher), who is here, and the chat.
 // `onlineClass` comes from the teacher's or learner's online-classes list.
-export default function LiveClassroom({ onlineClass, onLeave }){
+// The classroom goes through the LiveKit video server when the backend has one (everyone sees
+// everyone, like a meeting app); without it, video goes straight between devices as before.
+export default function LiveClassroom(props){
+  const { state } = useStore();
+  const { t } = useI18n();
+  const [mode, setMode] = useState(null);
+  useEffect(()=>{
+    let cancelled = false;
+    apiGet('/live/media-server', state.auth.token).then(({ data })=>{
+      if(!cancelled) setMode(data && data.livekit ? 'meeting' : 'direct');
+    });
+    return ()=>{ cancelled = true; };
+  }, [state.auth.token]);
+  if(!mode) return <p className="muted">{t('live_status_connecting')}</p>;
+  if(mode==='direct') return <DirectClassroom {...props}/>;
+  return <Suspense fallback={<p className="muted">{t('live_status_connecting')}</p>}><Meeting {...props}/></Suspense>;
+}
+
+function DirectClassroom({ onlineClass, onLeave }){
   const { state } = useStore();
   const { t } = useI18n();
   const role = state.auth.role;
@@ -34,6 +82,7 @@ export default function LiveClassroom({ onlineClass, onLeave }){
   const [chatError, setChatError] = useState(null);
   const [ending, setEnding] = useState(false);
   const chatEnd = useRef(null);
+  const pictureInput = useRef(null);
 
   useEffect(()=>{
     session.start();
@@ -50,6 +99,9 @@ export default function LiveClassroom({ onlineClass, onLeave }){
   const teacherHere = people.find(p=>p.role==='teacher');
   const teacherStream = session.remote.get(session.teacherId);
   const minutesLeft = Math.max(0, Math.round((new Date(onlineClass.endsAt).getTime()-now)/60000));
+  // screen sharing needs a computer: phone browsers (and the app's web view) can't share a screen
+  const canShare = Boolean(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+  const presenting = session.spotlight; // learner: who is presenting ({ id, name }), if anyone
 
   async function send(e){
     e.preventDefault();
@@ -87,7 +139,7 @@ export default function LiveClassroom({ onlineClass, onLeave }){
     <div className="live-room">
       <div className="live-head">
         <div>
-          <h2 style={{ margin:0 }}>{onlineClass.title}</h2>
+          <h2 className="live-title" style={{ margin:0 }}>{onlineClass.title}</h2>
           <div className="meta">
             {onlineClass.className+' '+t(onlineClass.subjectKey)+' · '+formatWhen(onlineClass.startsAt)+' · '+t('live_minutes_left',{ n:minutesLeft })}
           </div>
@@ -101,6 +153,15 @@ export default function LiveClassroom({ onlineClass, onLeave }){
 
       <div className="live-body">
         <div className="live-main">
+          {!isTeacher && session.cameraAsked && !session.cam && (
+            <div className="live-presenting live-camera-ask">
+              <span>{t('live_camera_request')}</span>
+              <button className="btn btn-primary" onClick={()=>session.setCamera(true)}>{t('live_camera_off')}</button>
+            </div>
+          )}
+          {!isTeacher && presenting && (
+            <p className="live-presenting">{presenting.id===state.auth.apiUserId ? t('live_you_presenting') : t('live_presenting',{ name:presenting.name })}</p>
+          )}
           <div className="live-stage">
             {isTeacher
               ? (session.sending.video
@@ -123,26 +184,50 @@ export default function LiveClassroom({ onlineClass, onLeave }){
             <button className={'btn'+(session.cam ? ' btn-primary' : '')} onClick={()=>session.setCamera(!session.cam)}>
               {t(session.cam ? 'live_camera_on' : 'live_camera_off')}
             </button>
-            {isTeacher && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia && (
+            {canShare ? (
               <button className={'btn'+(session.screen ? ' btn-primary' : '')} onClick={()=>session.setScreenShare(!session.screen)}>
                 {t(session.screen ? 'live_share_stop' : 'live_share_start')}
               </button>
+            ) : (
+              // phones: share a screenshot or photo from the gallery instead of the screen
+              <>
+                <button className={'btn'+(session.screen ? ' btn-primary' : '')}
+                  onClick={()=>session.screen ? session.setScreenShare(false) : pictureInput.current.click()}>
+                  {t(session.screen ? 'live_share_stop' : 'live_share_picture')}
+                </button>
+                <input ref={pictureInput} type="file" accept="image/*" hidden
+                  onChange={(e)=>{ const file = e.target.files[0]; e.target.value = ''; if(file) session.sharePicture(file); }}/>
+              </>
             )}
           </div>
           {session.mediaError && <p className="field-error" style={{ marginTop:8 }}>{t(session.mediaError.code)}</p>}
           {!isTeacher && teacherHere && cantConnect(session, teacherHere.id) && <p className="field-error" style={{ marginTop:8 }}>{t('live_connect_failed_teacher')}</p>}
           {isTeacher && learnersHere.some(p=>cantConnect(session, p.id)) && <p className="field-error" style={{ marginTop:8 }}>{t('live_connect_failed_learners')}</p>}
-          {!isTeacher && <p className="muted" style={{ fontSize:11.5, marginTop:6 }}>{t('live_learner_hint')}</p>}
+          {!isTeacher && <p className="muted" style={{ fontSize:11.5, marginTop:6 }}>{t('live_learner_hint')+(canShare ? '' : ' '+t('live_share_picture_hint'))}</p>}
 
           {isTeacher && (
             <div className="live-grid">
               {learnersHere.map(p=>{
                 const stream = session.remote.get(p.id);
+                const onShow = session.spotlight===p.id;
+                const picture = !hasVideo(stream) && session.snapshots.get(p.id); // through the server
                 return (
-                  <div key={p.id} className="live-tile">
-                    {hasVideo(stream) ? <MediaView stream={stream} className="live-video"/> : <div className="live-tile-name">{p.name}</div>}
+                  <div key={p.id} className={'live-tile'+(onShow ? ' on-show' : '')}>
+                    {hasVideo(stream) ? <MediaView stream={stream} className="live-video"/>
+                      : picture ? <img src={picture} alt={p.name} className="live-video"/>
+                      : <div className="live-tile-name">{p.name}</div>}
                     {stream && !hasVideo(stream) && <MediaView stream={stream} className="live-hidden"/>}
-                    <div className="live-tile-label">{p.name}{cantConnect(session, p.id) ? ' · '+t('live_not_connected') : hasAudio(stream) ? ' · '+t('live_speaking_on') : ''}</div>
+                    <div className="live-tile-label">{p.name}{picture ? ' · '+t('live_camera_on_label') : cantConnect(session, p.id) ? ' · '+t('live_not_connected') : hasAudio(stream) ? ' · '+t('live_speaking_on') : ''}</div>
+                    {!hasVideo(stream) && !picture && (
+                      <button className="live-tile-show btn" disabled={session.askedCamera.has(p.id)} onClick={()=>session.askCamera(p.id)}>
+                        {session.askedCamera.has(p.id) ? t('live_camera_asked') : t('live_ask_camera')}
+                      </button>
+                    )}
+                    {(onShow || hasVideo(stream)) && (
+                      <button className={'live-tile-show btn'+(onShow ? ' btn-primary' : '')} onClick={()=>session.setSpotlight(onShow ? null : p.id)}>
+                        {onShow ? t('live_stop_showing') : t('live_show_to_class')}
+                      </button>
+                    )}
                   </div>
                 );
               })}

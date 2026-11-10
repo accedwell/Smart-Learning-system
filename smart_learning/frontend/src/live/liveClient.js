@@ -74,6 +74,11 @@ export function sendSignal(ocId, token, to, data){
   return apiPost(`/live/${ocId}/signal`, { to, data }, token);
 }
 
+// a still picture from my camera for the teacher (null: my camera went off)
+export function sendSnapshot(ocId, token, image){
+  return apiPost(`/live/${ocId}/snapshot`, { image }, token);
+}
+
 export function sendChat(ocId, token, text){
   return apiPost(`/live/${ocId}/chat`, { text }, token);
 }

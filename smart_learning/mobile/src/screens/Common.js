@@ -307,8 +307,10 @@ export function ProfileScreen({ extra }) {
 // page, shown right here in the app and already signed in with the app's login: no browser,
 // no second login. EXPO_PUBLIC_WEB_URL says where the website is; by default the same computer
 // as the backend, on the website's port, or through a tunnel the page Metro serves under /web.
-export const WEB_URL = (process.env.EXPO_PUBLIC_WEB_URL
-  || (TUNNEL ? API_URL.replace(/\/api$/, '/web') : API_URL.replace(/:\d+\/api$/, ':5173'))).replace(/\/+$/, '');
+// (worked out when the classroom opens, since the server address can be changed on the phone)
+// (in a browser, Metro serves the page itself under /web of the same site)
+export const webUrl = () => (process.env.EXPO_PUBLIC_WEB_URL
+  || (Platform.OS === 'web' ? window.location.origin + '/web' : TUNNEL ?API_URL.replace(/\/api$/, '/web') : API_URL.replace(/:\d+\/api$/, ':5173'))).replace(/\/+$/, '');
 
 // `onlineClass` from the learner's or teacher's online-classes list; `onLeave` runs after leaving
 export function Classroom({ onlineClass, onLeave }) {
@@ -336,6 +338,31 @@ export function Classroom({ onlineClass, onLeave }) {
     if (onLeave) onLeave();
   }
 
+  // In a browser (the app opened as a web page) there is no WebView: the classroom page goes in
+  // a frame of the same site, allowed to use the camera and microphone. It reads the sign-in
+  // from this page (window.SMART_LEARNING_EMBED) and says 'leave' with a message.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return undefined;
+    window.SMART_LEARNING_EMBED = { token };
+    try { window.localStorage.setItem('smart-learning-language', lang); } catch { /* the page's own default then */ }
+    const onMessage = (e) => { if (e.origin === window.location.origin && e.data === 'leave') leave(); };
+    window.addEventListener('message', onMessage);
+    return () => { window.removeEventListener('message', onMessage); delete window.SMART_LEARNING_EMBED; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, lang]);
+
+  if (Platform.OS === 'web') {
+    return (
+      <Screen back={t('nav_online_classes')} title={onlineClass.title} scroll={false}>
+        <View style={{ flex: 1, marginHorizontal: -16 }}>
+          <iframe key={attempt} title={onlineClass.title} src={`${webUrl()}/#classroom=${onlineClass.id}`}
+            allow="camera; microphone; display-capture; autoplay; fullscreen"
+            style={{ flex: 1, width: '100%', height: '100%', border: 0, backgroundColor: c.bg }} />
+        </View>
+      </Screen>
+    );
+  }
+
   // runs before the page's own code: the sign-in for the classroom page, and the app's language
   const setup = `window.SMART_LEARNING_EMBED = ${JSON.stringify({ token })};
     try { localStorage.setItem('smart-learning-language', ${JSON.stringify(lang)}); } catch (e) {}
@@ -352,20 +379,25 @@ export function Classroom({ onlineClass, onLeave }) {
             <Button kind="primary" title={t('m_try_again')} onPress={() => { setFailed(false); setAttempt((n) => n + 1); }} />
           </View>
         ) : (
-          <WebView key={attempt} source={{ uri: `${WEB_URL}/#classroom=${onlineClass.id}` }}
+          <WebView key={attempt} source={{ uri: `${webUrl()}/#classroom=${onlineClass.id}` }}
             style={{ flex: 1, backgroundColor: c.bg }}
             injectedJavaScriptBeforeContentLoaded={setup}
             // the sign-in only ever goes to the Smart Learning website
-            originWhitelist={[WEB_URL]}
-            onShouldStartLoadWithRequest={(req) => req.url === WEB_URL || req.url.startsWith(WEB_URL + '/')}
+            originWhitelist={[webUrl()]}
+            onShouldStartLoadWithRequest={(req) => req.url === webUrl() || req.url.startsWith(webUrl() + '/')}
             onMessage={(e) => { if (e.nativeEvent.data === 'leave') leave(); }}
             onError={() => setFailed(true)}
             onHttpError={() => setFailed(true)}
             startInLoadingState
             renderLoading={() => <View style={{ ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: c.bg }}><ActivityIndicator color={c.brand} size="large" /></View>}
             allowsInlineMediaPlayback
+            // lay the page out at the phone's own width (Android otherwise may use a wide
+            // desktop-sized page and enlarge its text), so the classroom uses its phone layout
+            scalesPageToFit={false}
+            setBuiltInZoomControls={false}
             mediaPlaybackRequiresUserAction={false}
             mediaCapturePermissionGrantType="grantIfSameHostElsePrompt"
+            webviewDebuggingEnabled={__DEV__}
             javaScriptEnabled
             domStorageEnabled
           />

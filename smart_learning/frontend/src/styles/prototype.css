@@ -514,8 +514,40 @@ img{max-width:100%}
 
 /* ---- live classroom (src/live/LiveClassroom.jsx) ---- */
 /* the live classroom alone, inside the mobile app (EmbeddedClassroom) */
-.embedded-classroom{ padding:10px; min-height:100vh; box-sizing:border-box; }
-.embedded-classroom .live-room{ padding:12px; }
+/* the classroom inside the phone app: full width, the app's header already names the class,
+   compact controls, and the chat filling the rest of the screen with its message box in view */
+.embedded-classroom{ padding:0; min-height:100vh; box-sizing:border-box; display:flex; flex-direction:column; background:var(--bg); }
+.embedded-classroom .live-room{
+  flex:1; display:flex; flex-direction:column; min-height:0;
+  padding:10px 12px 12px; border:none; border-radius:0; box-shadow:none; background:var(--bg);
+}
+.embedded-classroom .live-title{ display:none; }
+.embedded-classroom .live-head{ flex-wrap:wrap; align-items:center; margin-bottom:10px; gap:6px 8px; }
+/* the class details share the row with the buttons, or get their own line when the buttons need it */
+.embedded-classroom .live-head > div:first-child{ min-width:0; flex:1 1 190px; }
+.embedded-classroom .live-head .meta{ margin:0; font-size:12px; line-height:1.35; }
+.embedded-classroom .live-head > div:last-child{ flex:none; flex-wrap:nowrap !important; gap:6px !important; }
+.embedded-classroom .btn{ padding:7px 12px; font-size:12.5px; }
+.embedded-classroom .live-body{ flex:1; display:flex; flex-direction:column; gap:10px; min-height:0; }
+.embedded-classroom .live-stage{ border-radius:12px; }
+.embedded-classroom .live-controls{ display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:6px; margin-top:8px; }
+.embedded-classroom .live-controls .btn{ width:100%; padding:9px 6px; white-space:normal; line-height:1.2; }
+.embedded-classroom .live-main > .muted{ margin:6px 0 0; }
+.embedded-classroom .live-grid{ grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:6px; margin-top:8px; }
+.embedded-classroom .live-tile-label{ white-space:normal; line-height:1.25; }
+.embedded-classroom .live-tile-show{ left:6px; right:6px; white-space:normal; line-height:1.2; }
+.embedded-classroom .live-side{ flex:1; gap:8px; min-height:0; }
+.embedded-classroom .live-people{ display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 10px; padding:8px 12px; background:var(--surface); }
+.embedded-classroom .live-people b{ font-size:13px; }
+.embedded-classroom .live-people .meta{ margin:0; }
+.embedded-classroom .live-chat{ flex:1; min-height:190px; padding:10px 12px; background:var(--surface); }
+.embedded-classroom .live-chat-list{ max-height:none; font-size:13px; }
+.embedded-classroom .live-chat-form{ position:sticky; bottom:0; padding-top:8px; background:var(--surface); }
+.live-chat-form input{
+  border:1px solid var(--border); border-radius:999px; padding:9px 14px; background:var(--bg);
+  color:var(--ink); font:inherit; font-size:13px;
+}
+.live-chat-form input:focus{ outline:2px solid var(--brand); outline-offset:1px; }
 .live-room{ background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:var(--shadow); }
 .live-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
 .live-head .meta{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
@@ -543,6 +575,18 @@ img{max-width:100%}
 .live-chat-form{ display:flex; gap:6px; margin-top:8px; }
 .live-chat-form input{ flex:1; min-width:0; }
 .live-closed{ text-align:center; padding:28px 16px; }
+/* presenting: the teacher's button on a learner's tile, and the learners' banner */
+/* shown over a video the browser would only start without sound */
+.live-sound-btn{ position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:2; }
+.live-tile .live-sound-btn{ bottom:24px; padding:4px 10px; font-size:11px; }
+.live-tile-show{ position:absolute; top:6px; right:6px; padding:4px 10px !important; font-size:11px !important; }
+.live-camera-ask{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.live-camera-ask .btn{ flex:none; }
+.live-tile.on-show{ outline:3px solid var(--brand); outline-offset:-3px; }
+.live-presenting{
+  margin:0 0 8px; padding:8px 12px; border-radius:10px; font-size:12.5px; font-weight:700;
+  background:var(--brand-tint); color:var(--ink); border:1px solid color-mix(in srgb, var(--brand) 40%, transparent);
+}
 
 /* the learner's progress banner (navy with a gold glow, as in the phone app) */
 .progress-hero{
@@ -596,3 +640,171 @@ img{max-width:100%}
 .class-group-head b{ font-size:14px; color:var(--brand); }
 .class-select{ width:auto; font-size:12px; padding:5px 8px; }
 
+
+/* ---- online class through the video server: meeting layout (live/Meeting.jsx) ---- */
+.meet{ display:flex; flex-direction:column; gap:8px; min-height:min(760px, calc(100vh - 140px)); position:relative; }
+.meet .btn-sm{ padding:5px 10px; font-size:12px; }
+.meet .btn-danger{ color:#fff; background:var(--bad); border-color:var(--bad); }
+.meet-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.meet-head-info{ display:flex; flex-direction:column; min-width:0; }
+.meet-title{ font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.meet-head .meta{ margin:0; font-size:12px; }
+.meet-banner{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; padding:8px 12px; border-radius:10px; background:var(--brand-tint); color:var(--ink); font-size:13px; }
+.meet-banner.bad{ background:color-mix(in srgb, var(--bad) 14%, var(--surface)); }
+.meet-body{ flex:1; display:flex; gap:10px; min-height:0; }
+.meet-stage{ flex:1; min-width:0; display:flex; border-radius:14px; background:#0b0f0c; padding:8px; min-height:320px; }
+.meet-grid{ flex:1; display:grid; grid-template-columns:repeat(var(--cols), minmax(0, 1fr)); gap:8px; align-content:center; position:relative; }
+.meet-alone{ position:absolute; left:0; right:0; bottom:8px; text-align:center; color:#c9d4cb !important; font-size:13px; margin:0; }
+.meet-tile{ position:relative; background:#1b221d; border-radius:12px; overflow:hidden; aspect-ratio:16/9; min-height:0; outline:2px solid transparent; outline-offset:-2px; transition:outline-color .15s; }
+.meet-tile.speaking{ outline-color:var(--good); }
+.meet-tile.screen{ aspect-ratio:auto; height:100%; background:#000; }
+.meet-video{ width:100%; height:100%; object-fit:cover; display:block; background:#000; }
+.meet-video.fit{ object-fit:contain; }
+.meet-video.mirror{ transform:scaleX(-1); }
+.meet-avatar{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+.meet-avatar span{ min-width:56px; height:56px; padding:0 12px; border-radius:28px; display:flex; align-items:center; justify-content:center; background:var(--brand); color:#fff; font-weight:800; font-size:20px; }
+.meet-prejoin-preview .meet-avatar span{ min-width:0; height:auto; padding:8px 14px; font-size:14px; font-weight:600; background:rgba(255,255,255,.08); }
+.meet-tile-label{ position:absolute; left:6px; bottom:6px; right:6px; display:flex; align-items:center; gap:5px; min-width:0; }
+.meet-tile-name{ background:rgba(0,0,0,.55); color:#fff; font-size:12px; padding:2px 8px; border-radius:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.meet-host{ margin-left:6px; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:6px; background:var(--teacher-tint); color:var(--teacher); }
+.meet-tile-label .meet-host{ margin-left:0; flex:none; }
+.meet-badge{ flex:none; width:24px; height:24px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.55); color:#fff; }
+.meet-badge svg{ width:14px; height:14px; }
+.meet-badge.off{ background:var(--bad); }
+.meet-badge.hand{ background:var(--warn); color:#1b1b1b; }
+.meet-presenting{ flex:1; display:flex; gap:8px; min-width:0; min-height:0; }
+.meet-screen{ flex:1; position:relative; min-width:0; min-height:0; }
+.meet-strip{ width:200px; flex:none; display:flex; flex-direction:column; gap:8px; overflow-y:auto; }
+.meet-presenting.full{ position:fixed; inset:0; z-index:60; background:#000; padding:0; }
+.meet-presenting.full .meet-tile{ border-radius:0; }
+.meet-full-btn{ position:absolute; top:8px; right:8px; width:36px; height:36px; border-radius:18px; border:0; background:rgba(0,0,0,.6); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.meet-panel{ width:320px; flex:none; display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:14px; min-height:0; }
+.meet-panel-head{ display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--border); }
+.meet-panel-body{ flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:8px; min-height:0; }
+.meet-icon-btn{ border:0; background:transparent; color:var(--ink); cursor:pointer; padding:4px; border-radius:8px; display:flex; }
+.meet-icon-btn:hover{ background:var(--chip-bg); }
+.meet-person{ display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap; padding:6px 0; border-bottom:1px solid var(--border); }
+.meet-person-avatar{ width:34px; height:34px; border-radius:17px; flex:none; display:flex; align-items:center; justify-content:center; background:var(--brand-tint); color:var(--brand-ink); font-weight:800; font-size:13px; }
+.meet-person-main{ flex:1; min-width:0; }
+.meet-person-name{ font-weight:700; font-size:13.5px; }
+.meet-person-icons{ display:flex; gap:6px; margin-top:3px; }
+.meet-person-icons span{ display:flex; }
+.meet-person-icons svg{ width:16px; height:16px; }
+.meet-person-icons .on{ color:var(--good); }
+.meet-person-icons .off{ color:var(--ink-soft); }
+.meet-person-icons .hand{ color:var(--warn); }
+.meet-person-actions{ display:flex; gap:6px; flex-wrap:wrap; width:100%; padding-left:44px; }
+.meet-chat{ padding:0; gap:0; }
+.meet-chat-list{ flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:8px; min-height:0; }
+.meet-chat-msg{ font-size:13px; background:var(--chip-bg); border-radius:10px; padding:6px 10px; }
+.meet-chat-msg.from-teacher{ background:var(--teacher-tint); }
+.meet-chat-head{ display:flex; justify-content:space-between; gap:8px; font-size:12px; margin-bottom:2px; }
+.meet-chat-head span{ color:var(--ink-soft); }
+.meet-chat-form{ display:flex; gap:6px; padding:10px 12px; border-top:1px solid var(--border); }
+.meet-chat-form input{ flex:1; min-width:0; border:1px solid var(--border); border-radius:999px; padding:8px 14px; background:var(--bg); color:var(--ink); font:inherit; }
+.meet-field{ display:flex; flex-direction:column; gap:4px; font-size:12.5px; font-weight:600; margin-top:8px; }
+.meet-field select{ border:1px solid var(--border); border-radius:10px; padding:8px 10px; background:var(--surface); color:var(--ink); font:inherit; font-weight:400; }
+.meet-toolbar{ display:flex; justify-content:center; gap:6px; flex-wrap:wrap; padding:8px; background:var(--surface); border:1px solid var(--border); border-radius:14px; position:sticky; bottom:0; z-index:5; }
+.meet-tool{ position:relative; display:flex; flex-direction:column; align-items:center; gap:3px; min-width:64px; padding:6px 8px; border:0; border-radius:10px; background:transparent; color:var(--ink); font:inherit; font-size:11.5px; font-weight:600; cursor:pointer; }
+.meet-tool:hover{ background:var(--chip-bg); }
+.meet-tool.off{ color:var(--bad); }
+.meet-tool.on, .meet-tool.active{ background:var(--brand-tint); color:var(--brand-ink); }
+.meet-tool.leave{ background:var(--bad); color:#fff; }
+.meet-tool.end{ color:var(--bad); }
+.meet-tool:disabled{ opacity:.5; cursor:default; }
+.meet-dot{ position:absolute; top:2px; right:10px; min-width:16px; height:16px; padding:0 4px; border-radius:8px; background:var(--bad); color:#fff; font-size:10px; font-style:normal; line-height:16px; }
+.meet-more-wrap{ position:relative; }
+.meet-more{ position:absolute; bottom:calc(100% + 8px); right:0; min-width:200px; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); padding:6px; display:flex; flex-direction:column; z-index:20; }
+.meet-more button{ display:flex; align-items:center; gap:10px; padding:10px; border:0; background:transparent; color:var(--ink); font:inherit; font-size:13.5px; text-align:left; border-radius:8px; cursor:pointer; }
+.meet-more button:hover{ background:var(--chip-bg); }
+.meet-more button.danger{ color:var(--bad); }
+.meet-toasts{ position:absolute; left:50%; transform:translateX(-50%); bottom:84px; display:flex; flex-direction:column; align-items:center; gap:6px; z-index:30; pointer-events:none; }
+.meet-toast{ background:rgba(20,24,21,.9); color:#fff; font-size:13px; padding:7px 14px; border-radius:999px; box-shadow:var(--shadow); max-width:90vw; }
+.meet .narrow-only{ display:none; }
+.meet-prejoin{ display:grid; grid-template-columns:minmax(0, 1.4fr) minmax(0, 1fr); gap:18px; align-items:start; }
+.meet-prejoin-preview{ position:relative; aspect-ratio:16/9; background:#0b0f0c; border-radius:14px; overflow:hidden; }
+.meet-prejoin-toggles{ position:absolute; left:0; right:0; bottom:12px; display:flex; justify-content:center; gap:12px; }
+.meet-round{ width:48px; height:48px; border-radius:24px; border:0; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.9); color:#1b1b1b; cursor:pointer; }
+.meet-round.off{ background:var(--bad); color:#fff; }
+
+/* phone layout: on .compact (set by Meeting.jsx for phones and inside the app) */
+  .compact .meet{ min-height:calc(100vh - 24px); }
+  .compact .meet .wide-only{ display:none; }
+  .compact .meet .narrow-only{ display:flex; }
+  .compact .meet-body{ flex-direction:column; }
+  .compact .meet-stage{ min-height:260px; padding:6px; }
+  .compact .meet-grid{ grid-template-columns:repeat(min(var(--cols), 2), minmax(0, 1fr)); }
+  .compact .meet-tile{ aspect-ratio:3/4; }
+  .compact .meet-presenting{ flex-direction:column; }
+  .compact .meet-screen{ min-height:220px; }
+  .compact .meet-strip{ width:auto; flex-direction:row; overflow-x:auto; overflow-y:hidden; }
+  .compact .meet-strip .meet-tile{ width:110px; flex:none; aspect-ratio:3/4; }
+  .compact .meet-panel{ position:fixed; left:0; right:0; bottom:0; height:min(75vh, 560px); width:auto; z-index:40; border-radius:16px 16px 0 0; box-shadow:var(--shadow); padding-bottom:env(safe-area-inset-bottom); }
+  .compact .meet-toolbar{ flex-wrap:nowrap; justify-content:space-between; gap:2px; padding:6px 4px calc(6px + env(safe-area-inset-bottom)); }
+  .compact .meet-tool{ min-width:0; flex:1; padding:6px 2px; font-size:10.5px; }
+  .compact .meet-tool span{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+  .compact .meet-more-wrap{ flex:1; }
+  .compact .meet-more-wrap .meet-tool{ width:100%; }
+  .compact .meet-prejoin{ grid-template-columns:1fr; }
+  .compact .meet-prejoin-preview{ aspect-ratio:3/4; max-height:55vh; }
+/* phone layout: on .compact (set by Meeting.jsx for phones and inside the app) */
+@media (orientation: landscape){
+  .compact .meet-tile, .compact .meet-strip .meet-tile{ aspect-ratio:16/9; }
+  .compact .meet-prejoin-preview{ aspect-ratio:16/9; }
+}
+.embedded-classroom .meet{ min-height:100vh; padding:8px 8px 0; }
+.embedded-classroom .meet-prejoin{ padding:10px; }
+.meet-prejoin-preview{ width:100%; margin:0 auto; }
+
+/* meeting: shared pieces added for the phone layout */
+.meet-tool .short{ display:none; }
+.meet-empty{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; }
+.meet-empty .meet-avatar{ position:static; }
+.meet-empty .meet-avatar span{ width:84px; height:84px; border-radius:42px; font-size:28px; }
+.meet-empty p{ margin:0; color:#c9d4cb; font-size:13.5px; text-align:center; padding:0 16px; }
+.meet-alone{ color:#c9d4cb; }
+.meet-grid.solo{ grid-template-columns:minmax(0, 1fr); }
+.meet-backdrop{ display:none; }
+.meet-backdrop.clear{ display:block; position:fixed; inset:0; z-index:15; background:transparent; }
+.meet-more{ z-index:25; }
+
+/* meeting on a phone: the video fills the screen, round buttons at the bottom like a call */
+/* phone layout: on .compact (set by Meeting.jsx for phones and inside the app) */
+  .compact .meet{ gap:6px; min-height:100dvh; }
+  .compact .meet-head{ padding:0 2px; }
+  .compact .meet-title{ font-size:15px; }
+  .compact .meet-banner{ padding:8px 10px; font-size:12.5px; gap:8px; flex-wrap:nowrap; }
+  .compact .meet-banner > span:first-child{ flex:1; min-width:0; }
+  .compact .meet-banner .btn{ flex:none; }
+  .compact .meet-stage{ flex:1; min-height:0; border-radius:16px; padding:6px; }
+  .compact .meet-grid{ align-content:stretch; grid-auto-rows:1fr; }
+  .compact .meet-grid.solo .meet-tile{ aspect-ratio:auto; height:100%; }
+  .compact .meet-grid .meet-tile{ aspect-ratio:auto; min-height:140px; }
+  .compact .meet-alone{ bottom:14px; }
+  .compact .meet-tile-name{ font-size:12.5px; }
+  .compact .meet-toolbar{ border:0; border-radius:18px; padding:8px 6px calc(8px + env(safe-area-inset-bottom)); background:var(--surface); box-shadow:var(--shadow); gap:0; }
+  .compact .meet-tool{ background:transparent !important; color:var(--ink) !important; gap:4px; padding:0 2px; font-size:10.5px; font-weight:600; }
+  .compact .meet-tool .long{ display:none; }
+  .compact .meet-tool .short{ display:block; }
+  .compact .meet-tool svg{ width:46px; height:46px; padding:12px; border-radius:23px; background:var(--chip-bg); color:var(--ink); transition:background .15s; }
+  .compact .meet-tool.on svg{ background:var(--brand-tint); color:var(--brand-ink); }
+  .compact .meet-tool.off svg{ background:var(--bad); color:#fff; }
+  .compact .meet-tool.active svg{ background:var(--brand); color:#fff; }
+  .compact .meet-tool.leave svg{ background:var(--bad); color:#fff; }
+  .compact .meet-tool.leave{ color:var(--bad) !important; }
+  .compact .meet-dot{ top:-2px; right:calc(50% - 26px); }
+  .compact .meet-more{ bottom:calc(100% + 10px); right:0; min-width:220px; border-radius:16px; }
+  .compact .meet-more button{ padding:12px; font-size:14px; }
+  .compact .meet-backdrop{ display:block; position:fixed; inset:0; z-index:35; background:rgba(0,0,0,.35); }
+  .compact .meet-panel{ border:0; border-radius:20px 20px 0 0; }
+  .compact .meet-panel::before{ content:''; display:block; width:40px; height:4px; border-radius:2px; background:var(--border); margin:8px auto 0; }
+  .compact .meet-panel-head{ padding:8px 14px 10px; }
+  .compact .meet-chat-form{ padding:10px 12px calc(10px + env(safe-area-inset-bottom)); }
+  .compact .meet-prejoin{ gap:14px; }
+  .compact .meet-prejoin-preview{ border-radius:18px; }
+  .compact .meet-prejoin-side .btn-primary{ flex:1; padding:12px; font-size:15px; }
+/* inside the phone app the screen's own header already shows the class name */
+.embedded-classroom .meet-title{ display:none; }
+.embedded-classroom .meet-prejoin-side h2{ display:none; }
+.embedded-classroom .meet{ padding:8px 8px 6px; }
+.meet-prejoin-preview .meet-avatar{ padding-bottom:64px; }

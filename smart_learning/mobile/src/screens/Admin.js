@@ -346,7 +346,7 @@ export function AdminUsers() {
                   </Text>
                 ) : null}
                 {u.mustChangePassword ? <Pill kind="warn" text={t('admin_awaiting_login_pill')} /> : null}
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
                   {u.role === 'learner' ? <Button small title={t('admin_class_label')} onPress={() => setClassFor(u)} /> : null}
                   {u.role === 'learner' ? <Button small title={t('admin_subjects_btn')} onPress={() => setSubjectsFor(u)} /> : null}
                   <Button small title={t('admin_resend_btn')} onPress={() => resetLogin(u)} />
@@ -428,7 +428,7 @@ export function AdminClasses() {
             <Row key={k.id} first={i === 0} left={<Avatar text={k.name} color={c.brand} size={40} />}
               title={`${t(k.subjectKey)} · ${t('grade_' + k.grade)}`}
               meta={<Text style={{ color: k.teacherName ? c.inkSoft : c.bad, fontSize: 12.5, marginTop: 2 }}>
-                {(k.teacherName || t('admin_class_no_teacher')) + ' · ' + t('m_learners_n', { n: k.learnerIds.length })}
+                {(k.teacherName || t('admin_class_no_teacher')) + ' · ' + t('admin_group_count', { n: k.learnerIds.length })}
               </Text>} />
           ))}
         </Loaded>
@@ -492,14 +492,16 @@ export function AdminSecurity() {
                 {d.events.map((e, i) => (
                   <Row key={e.id} first={i === 0}
                     title={e.userName || (e.login ? t('sec_unknown_account') : '—')}
-                    meta={[
-                      e.role ? t(ROLE_KEY[e.role]) : null,
-                      !e.userName && e.login ? t('sec_typed', { login: e.login }) : null,
-                      e.actorName ? t('sec_by', { name: e.actorName }) : null,
-                      e.ip ? 'IP ' + e.ip : null,
-                      timeAgo(e.createdAt, lang),
-                    ].filter(Boolean).join(' · ')}
-                    right={<Pill kind={SEC_BAD.has(e.event) ? 'bad' : SEC_GOOD.has(e.event) ? 'good' : e.event === 'new_device' ? 'warn' : 'soft'} text={t('sec_ev_' + e.event)} />} />
+                    meta={<View style={{ marginTop: 3, gap: 4, alignItems: 'flex-start' }}>
+                      <Pill kind={SEC_BAD.has(e.event) ? 'bad' : SEC_GOOD.has(e.event) ? 'good' : e.event === 'new_device' ? 'warn' : 'soft'} text={t('sec_ev_' + e.event)} />
+                      <Text style={{ color: c.inkSoft, fontSize: 12.5 }}>{[
+                        e.role ? t(ROLE_KEY[e.role]) : null,
+                        !e.userName && e.login ? t('sec_typed', { login: e.login }) : null,
+                        e.actorName ? t('sec_by', { name: e.actorName }) : null,
+                        e.ip ? 'IP ' + e.ip : null,
+                        timeAgo(e.createdAt, lang),
+                      ].filter(Boolean).join(' · ')}</Text>
+                    </View>} />
                 ))}
               </Card>
             </View>

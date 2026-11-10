@@ -1,7 +1,7 @@
 // Who is logged in, which tab and screen are showing, and short pop-up messages.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
-import { apiGet, setUnauthorizedHandler } from './api';
+import { apiGet, loadServer, setUnauthorizedHandler } from './api';
 import { getItem, setItem, removeItem } from './storage';
 
 const TOKEN_KEY = 'smart-learning-token';
@@ -64,6 +64,7 @@ export function AppProvider({ children }) {
   // the login kept from last time, if the backend still accepts it
   useEffect(() => {
     (async () => {
+      await loadServer();
       const token = await getItem(TOKEN_KEY);
       const last = Number(await getItem(ACTIVE_KEY)) || 0;
       if (token && last && Date.now() - last >= IDLE_MS) {

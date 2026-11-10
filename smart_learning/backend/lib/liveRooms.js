@@ -5,6 +5,8 @@
 // they switch on their mic or camera) to the teacher only.
 const config = require('./config');
 const onlineClasses = require('./onlineClasses');
+const livekit = require('./livekit');
+const http = require('./http');
 
 const KEEPALIVE_MS = 25 * 1000;
 const CHECK_ENDED_MS = 30 * 1000;
@@ -12,6 +14,8 @@ const MAX_CHAT_HISTORY = 100;
 
 // online class id -> { oc, people: Map(userId -> { id, name, role, res }), chat: [], timer }
 const rooms = new Map();
+// online class id -> ids of the people the teacher sent out (they can't come back in that class)
+const removed = new Map();
 
 function send(res, event, data) {
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
@@ -47,6 +51,9 @@ function roomFor(oc) {
 // stream of the same person (another tab) replaces the first. The register is written before
 // the stream opens, so a database error still answers as a normal error.
 async function enter(oc, user, req, res) {
+  if (removed.has(oc.id) && removed.get(oc.id).has(user.id)) {
+    throw http.forbidden('live_removed', 'The teacher removed you from this class');
+  }
   if (user.role === 'learner') {
     if (inRoom(oc.id, user.id)) await onlineClasses.learnerLeft(oc.id, user.id);
     await onlineClasses.learnerEntered(oc, user.id);
@@ -70,6 +77,7 @@ async function enter(oc, user, req, res) {
     participants: [...room.people.values()].filter((p) => p.id !== user.id).map(person),
     chat: room.chat,
     iceServers: config.iceServers, // for the video connections (a TURN relay when one is set)
+    livekit: livekit.enabled(), // video goes through the LiveKit server (ask for a pass at /media-token)
   });
   // also after a refresh, so the teacher's side reconnects the video with the new page
   broadcast(room, 'joined', person(me), user.id);
@@ -112,6 +120,20 @@ function signal(ocId, from, toId, data) {
   return true;
 }
 
+// A still picture from a learner's camera (about one a second while it is on), for the teacher
+// only: it goes through the server, so the teacher can see who is in class even when the
+// direct video connection can't be made (different networks, no TURN relay). `image` is a
+// small JPEG data URL, or null when the learner's camera went off.
+function snapshot(ocId, from, image) {
+  const room = rooms.get(ocId);
+  const sender = room && room.people.get(from.id);
+  if (!sender || sender.role !== 'learner') return false;
+  for (const p of room.people.values()) {
+    if (p.role === 'teacher') send(p.res, 'snapshot', { from: from.id, image });
+  }
+  return true;
+}
+
 function chat(ocId, from, text) {
   const room = rooms.get(ocId);
   if (!room || !room.people.has(from.id)) return null;
@@ -128,9 +150,32 @@ function presentIds(ocId) {
   return room ? [...room.people.keys()] : [];
 }
 
+// The teacher sends a learner out of the class: their classroom closes ('removed') and they
+// can't come back in for the rest of this class.
+function remove(ocId, teacher, learnerId) {
+  const room = rooms.get(ocId);
+  const host = room && room.people.get(teacher.id);
+  if (!host || host.role !== 'teacher') return false;
+  if (!removed.has(ocId)) removed.set(ocId, new Set());
+  removed.get(ocId).add(learnerId);
+  const target = room.people.get(learnerId);
+  if (target && target.role === 'learner') {
+    send(target.res, 'removed', {});
+    target.res.end();
+  }
+  if (target) broadcast(room, 'notice', { removed: person(target) }, learnerId);
+  if (livekit.enabled()) livekit.removeParticipant(ocId, learnerId).catch((err) => console.error('[live] LiveKit remove failed', err.message));
+  return true;
+}
+
+function isRemoved(ocId, userId) {
+  return Boolean(removed.has(ocId) && removed.get(ocId).has(userId));
+}
+
 // the class ended or was cancelled: everyone is told, and their streams close (which records
 // each learner's time)
 function end(ocId) {
+  endMedia(ocId);
   const room = rooms.get(ocId);
   if (!room) return;
   for (const p of room.people.values()) {
@@ -139,4 +184,11 @@ function end(ocId) {
   }
 }
 
-module.exports = { enter, inRoom, signal, chat, presentIds, end };
+// (also when nobody was in the classroom page any more)
+function endMedia(ocId) {
+  removed.delete(ocId);
+  if (livekit.enabled()) livekit.closeRoom(ocId).catch((err) => console.error('[live] LiveKit close failed', err.message));
+}
+
+module.exports = {
+  snapshot, enter, inRoom, signal, chat, presentIds, end, endMedia, remove, isRemoved };

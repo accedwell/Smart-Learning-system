@@ -3,10 +3,12 @@
 // Where the backend is: EXPO_PUBLIC_API_URL if set (e.g. in mobile/.env), otherwise the computer
 // that runs `npx expo start` — the phone already reaches it on the same Wi-Fi — on port 4001.
 // Through a tunnel (`npm run tunnel`) it is the tunnel's https address, where Metro passes
-// /api on to the backend (metro.config.js).
+// /api on to the backend (metro.config.js). In the installed app (APK) the person can also type
+// the server's address on the login screen (setServer), which is kept on the phone.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { getItem, setItem } from './storage';
+import { getItem, removeItem, setItem } from './storage';
 
 const HOST = (Constants.expoConfig?.hostUri || '').split(':')[0];
 export const TUNNEL = HOST.endsWith('.exp.direct');
@@ -14,11 +16,61 @@ export const TUNNEL = HOST.endsWith('.exp.direct');
 function apiBase() {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
   if (fromEnv) return fromEnv.replace(/\/+$/, '');
+  // opened in a browser: Metro, which served the page, passes /api on to the backend
+  // (metro.config.js), so the same address works on the computer and through the tunnel
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) return window.location.origin + '/api';
   if (TUNNEL) return `https://${HOST}/api`;
   return `http://${HOST || 'localhost'}:4001/api`;
 }
 
-export const API_URL = apiBase();
+export let API_URL = apiBase();
+
+const SERVER_KEY = 'smart-learning-server';
+
+// the address typed on the login screen, if any, replaces the built-in one
+export async function loadServer() {
+  const saved = await getItem(SERVER_KEY).catch(() => null);
+  if (saved) API_URL = saved;
+  return API_URL;
+}
+
+// "192.168.1.20" or "192.168.1.20:4001" or "http://192.168.1.20:4001/api" -> the API address
+export function serverFromInput(text) {
+  let v = String(text || '').trim().replace(/\/+$/, '');
+  if (!v) return null;
+  if (!/^https?:\/\//i.test(v)) v = 'http://' + v;
+  if (!/\/api$/i.test(v)) {
+    const hostPart = v.replace(/^https?:\/\//i, '').split('/')[0];
+    if (/^http:/i.test(v) && !/:\d+$/.test(hostPart)) v += ':4001';
+    v += '/api';
+  }
+  return /^https?:\/\/[^/\s]+\/(.+\/)?api$/i.test(v) ? v : null;
+}
+
+// `url` from serverFromInput, or null for the built-in address again
+export async function setServer(url) {
+  if (url) {
+    API_URL = url;
+    await setItem(SERVER_KEY, url);
+  } else {
+    API_URL = apiBase();
+    await removeItem(SERVER_KEY);
+  }
+}
+
+// whether Smart Learning answers at `url` (within a few seconds)
+export async function checkServer(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 6000);
+  try {
+    const res = await fetch(url + '/catalog', { signal: ctrl.signal });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 let onUnauthorized = null;
 // called when the backend no longer accepts the token (expired, or the password changed)

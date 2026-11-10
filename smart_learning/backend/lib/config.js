@@ -62,6 +62,15 @@ module.exports = {
     ...(env.TURN_URLS ? [{ urls: list(env.TURN_URLS), username: env.TURN_USERNAME || '', credential: env.TURN_CREDENTIAL || '' }] : []),
   ],
 
+  // The LiveKit video server of the online classroom (see lib/livekit.js). Without a key and
+  // secret the classroom sends video browser to browser instead (and needs TURN across networks).
+  livekit: {
+    url: (env.LIVEKIT_URL || 'http://127.0.0.1:7880').replace(/\/+$/, ''),
+    publicUrl: (env.LIVEKIT_PUBLIC_URL || '').replace(/\/+$/, ''),
+    apiKey: env.LIVEKIT_API_KEY || '',
+    apiSecret: env.LIVEKIT_API_SECRET || '',
+  },
+
   uploadDir: path.resolve(ROOT, env.UPLOAD_DIR || 'uploads'),
   maxUploadBytes: 5 * 1024 * 1024,
 

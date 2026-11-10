@@ -4,10 +4,10 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { apiPost, errorText } from '../api';
+import { API_URL, apiPost, checkServer, errorText, serverFromInput, setServer } from '../api';
 import { IDLE_MINUTES } from '../AppContext';
 import { LANGUAGES } from '../i18n';
-import { Button, ErrorText, PasswordField, Sheet, useKit } from '../ui';
+import { Button, ErrorText, Field, PasswordField, Sheet, useKit } from '../ui';
 
 const MIN_PASSWORD = 8;
 const NAVY = '#0f1a38';
@@ -106,6 +106,55 @@ function AuthInput({ icon, label, secure, value, onChangeText, ...input }) {
   );
 }
 
+// The computer Smart Learning runs on. The installed app has it built in; when the phone is on
+// another network (e.g. a hotspot) the address changes, and it can be typed in here.
+function ServerSetting() {
+  const { t } = useKit();
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState('');
+  const [shown, setShown] = useState(API_URL);
+  const [result, setResult] = useState(null); // 'ok' | 'fail' | 'bad'
+  const [busy, setBusy] = useState(false);
+  const host = (url) => url.replace(/^https?:\/\//i, '').replace(/\/api$/i, '');
+
+  async function save() {
+    const url = serverFromInput(value);
+    if (!url) return setResult('bad');
+    setBusy(true);
+    const ok = await checkServer(url);
+    setBusy(false);
+    if (!ok) return setResult('fail');
+    await setServer(url);
+    setShown(url);
+    setResult('ok');
+  }
+  async function reset() {
+    await setServer(null);
+    setShown(API_URL);
+    setValue(host(API_URL));
+    setResult(null);
+  }
+
+  return (
+    <>
+      <Pressable onPress={() => { setValue(host(shown)); setResult(null); setOpen(true); }} style={styles.footer} hitSlop={8}>
+        <Ionicons name="server-outline" size={16} color="#ffffffa0" />
+        <Text style={styles.footerText}>{t('m_server_label')}: {host(shown)} · <Text style={{ color: GOLD, fontWeight: '700' }}>{t('m_server_change')}</Text></Text>
+      </Pressable>
+      <Sheet visible={open} title={t('m_server_title')} onClose={() => setOpen(false)}>
+        <View style={{ padding: 16 }}>
+          <Field label={t('m_server_label')} value={value} onChangeText={(v) => { setValue(v); setResult(null); }}
+            placeholder="192.168.1.20:4001" autoCapitalize="none" autoCorrect={false} keyboardType="url" hint={t('m_server_hint')} />
+          {result === 'ok' ? <Text style={{ color: '#2e8b57', fontWeight: '700', marginBottom: 10 }}>{t('m_server_ok')}</Text> : null}
+          <ErrorText>{result === 'fail' ? t('m_server_fail') : result === 'bad' ? t('m_server_bad') : null}</ErrorText>
+          <Button kind="primary" title={t('m_server_save')} onPress={save} busy={busy} disabled={!value.trim()} />
+          <Button title={t('m_server_reset')} onPress={reset} style={{ marginTop: 10 }} />
+        </View>
+      </Sheet>
+    </>
+  );
+}
+
 const NoAccount = () => {
   const { t } = useKit();
   return (
@@ -115,6 +164,13 @@ const NoAccount = () => {
     </View>
   );
 };
+
+const LoginFooter = () => (
+  <View>
+    <NoAccount />
+    <ServerSetting />
+  </View>
+);
 
 // Administrators, principals and HODs finish signing in with the 6-digit code emailed to them.
 function CodeStep({ step, onResend, onBack }) {
@@ -210,7 +266,7 @@ export function Login({ onForgot }) {
   if (codeStep) return <CodeStep step={codeStep} onResend={resend} onBack={() => { setCodeStep(null); setPassword(''); }} />;
 
   return (
-    <AuthShell heading={t('login_title')} sub={t('login_subtitle')} footer={<NoAccount />}>
+    <AuthShell heading={t('login_title')} sub={t('login_subtitle')} footer={<LoginFooter />}>
       {signedOutIdle ? (
         <View style={[styles.errorBox, { backgroundColor: c.brand + '1f' }]}>
           <Ionicons name="time-outline" size={18} color={c.brand} />

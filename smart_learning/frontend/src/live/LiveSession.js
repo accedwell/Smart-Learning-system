@@ -1,4 +1,4 @@
-import { ICE_SERVERS, openStream, sendSignal, sendChat } from './liveClient.js'
+import { ICE_SERVERS, openStream, sendSignal, sendChat, sendSnapshot } from './liveClient.js'
 
 // One person's side of a live classroom: the event stream, the video connections and their
 // own camera, microphone and (teacher) screen.
@@ -8,6 +8,20 @@ import { ICE_SERVERS, openStream, sendSignal, sendChat } from './liveClient.js'
 // one audio and one video transceiver both ways, so turning a camera, microphone or screen
 // share on or off is a replaceTrack on those, with no renegotiation. Learners see and hear the
 // teacher; the teacher also sees and hears any learner who switches their camera or mic on.
+//
+// A learner can present (their screen, or their camera on a phone): the teacher puts them on
+// show for the class ("spotlight"), and then sends that learner's video, and their voice mixed
+// with the teacher's own, to every other learner in place of the teacher's camera. The
+// presenter keeps getting the teacher's own video. Learners are told who is presenting.
+//
+// So the teacher can always see who is in class, a learner's camera also sends a small still
+// picture about once a second through the server (it goes where the direct video can't, e.g.
+// between different networks). The teacher shows it when the live video isn't coming through,
+// and can ask a learner to turn their camera on.
+//
+// Every call has its own id, carried by its offer, its answer and its ICE candidates. When a
+// learner rejoins (a reload, a dropped network) the teacher calls again; a late answer or
+// candidate from the earlier call is then ignored instead of breaking the new connection.
 //
 // React reads it through subscribe() and `version`, which goes up on every change.
 export class LiveSession {
@@ -25,7 +39,7 @@ export class LiveSession {
     this.participants = new Map(); // id -> { id, name, role }, not counting me
     this.chat = [];
     this.peers = new Map(); // other person's id -> { pc, audio, video } (transceivers)
-    this.pendingIce = new Map(); // id -> ICE candidates that came before their offer/answer
+    this.pendingIce = new Map(); // id -> ICE candidates ({ call, candidate }) that came before their offer/answer
     this.remote = new Map(); // id -> MediaStream from that person
     this.mic = null;
     this.cam = null;
@@ -33,6 +47,12 @@ export class LiveSession {
     this.sending = { audio:null, video:null }; // what goes out on every connection
     this.mediaError = null;
     this.preview = new MediaStream(); // my own video, for the self view
+    this.spotlight = null; // teacher: the learner on show for the class (their id); learner: { id, name } or null
+    this.mixer = null; // teacher: the AudioContext mixing my mic with the presenter's voice
+    this.snapshots = new Map(); // teacher: learner id -> the latest still picture from their camera
+    this.askedCamera = new Set(); // teacher: learners asked to turn their camera on
+    this.cameraAsked = false; // learner: the teacher asked me to turn my camera on
+    this.snapTimer = null; // learner: sends my camera's still pictures
     this.iceServers = ICE_SERVERS; // the server's, with its TURN relay, once it welcomes me
   }
 
@@ -81,8 +101,13 @@ export class LiveSession {
 
   teardown(){
     for(const id of [...this.peers.keys()]) this.closePeer(id);
+    this.stopPicture();
     for(const track of [this.mic, this.cam, this.screen]) if(track) track.stop();
     this.mic = this.cam = this.screen = null;
+    this.spotlight = null;
+    this.closeMixer();
+    this.stopSnapshots(false);
+    this.snapshots.clear();
     this.sending = { audio:null, video:null };
     this.refreshPreview();
   }
@@ -99,15 +124,25 @@ export class LiveSession {
       if(this.role==='teacher') for(const p of data.participants) if(p.role==='learner') this.call(p.id);
     } else if(name==='joined'){
       this.participants.set(data.id, data);
-      if(this.role==='teacher' && data.role==='learner') this.call(data.id);
+      if(this.role==='teacher' && data.role==='learner'){
+        this.call(data.id);
+        if(this.spotlight) this.tellSpotlight(data.id);
+      }
       // the teacher came back: their offer is on its way
       if(this.role==='learner' && data.role==='teacher') this.closePeer(data.id);
     } else if(name==='left'){
       this.participants.delete(data.id);
       this.pendingIce.delete(data.id);
       this.closePeer(data.id);
+      // the presenter left: back to the teacher's own video for everyone
+      if(this.role==='teacher' && this.spotlight===data.id) this.setSpotlight(null);
+      this.snapshots.delete(data.id);
+      this.askedCamera.delete(data.id);
     } else if(name==='signal'){
       this.onSignal(data.from, data.data);
+    } else if(name==='snapshot'){
+      if(data.image) this.snapshots.set(data.from, data.image);
+      else this.snapshots.delete(data.from);
     } else if(name==='chat'){
       this.chat = [...this.chat, data];
     } else if(name==='ended'){
@@ -122,12 +157,13 @@ export class LiveSession {
 
   // ---- video connections ----
 
-  newPeer(id){
+  // `call`: the id of the call this connection belongs to
+  newPeer(id, call){
     this.closePeer(id);
     const pc = new RTCPeerConnection({ iceServers:this.iceServers });
-    const peer = { pc, audio:null, video:null };
+    const peer = { pc, call, audio:null, video:null };
     pc.onicecandidate = (e)=>{
-      if(e.candidate) sendSignal(this.ocId, this.token, id, { candidate:e.candidate.toJSON() });
+      if(e.candidate) sendSignal(this.ocId, this.token, id, { call, candidate:e.candidate.toJSON() });
     };
     pc.ontrack = (e)=>{
       const stream = this.remote.get(id) || new MediaStream();
@@ -154,14 +190,19 @@ export class LiveSession {
 
   // teacher: opens a connection to a learner
   async call(learnerId){
-    const peer = this.newPeer(learnerId);
+    const call = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    this.pendingIce.delete(learnerId); // candidates of an earlier call
+    const peer = this.newPeer(learnerId, call);
     peer.audio = peer.pc.addTransceiver('audio', { direction:'sendrecv' });
     peer.video = peer.pc.addTransceiver('video', { direction:'sendrecv' });
     try{
-      await peer.audio.sender.replaceTrack(this.sending.audio);
-      await peer.video.sender.replaceTrack(this.sending.video);
+      await peer.audio.sender.replaceTrack(this.sendingFor(learnerId, 'audio'));
+      await peer.video.sender.replaceTrack(this.sendingFor(learnerId, 'video'));
       await peer.pc.setLocalDescription(await peer.pc.createOffer());
-      await sendSignal(this.ocId, this.token, learnerId, { sdp:peer.pc.localDescription.toJSON() });
+      if(this.peers.get(learnerId)!==peer) return; // called again meanwhile
+      // the presenter came back: the class now gets their video and voice from this new connection
+      if(this.spotlight===learnerId){ this.updateVideo(); this.updateAudio(); }
+      await sendSignal(this.ocId, this.token, learnerId, { call, sdp:peer.pc.localDescription.toJSON() });
     } catch(err){
       console.warn('[live] could not call', learnerId, err);
     }
@@ -169,9 +210,16 @@ export class LiveSession {
 
   async onSignal(from, data){
     try{
-      if(data.sdp && data.sdp.type==='offer'){
-        // learner: the teacher calls
-        const peer = this.newPeer(from);
+      if(data.askCamera){
+        // learner: the teacher wants to see me
+        if(this.role==='learner' && !this.cam){ this.cameraAsked = true; this.emit(); }
+      } else if(data.spotlight!==undefined){
+        // learner: the teacher says who is presenting (null: nobody)
+        if(this.role==='learner') this.spotlight = data.spotlight;
+        this.emit();
+      } else if(data.sdp && data.sdp.type==='offer'){
+        // learner: the teacher calls (again, after a rejoin: the new call replaces the old one)
+        const peer = this.newPeer(from, data.call);
         await peer.pc.setRemoteDescription(data.sdp);
         for(const tr of peer.pc.getTransceivers()){
           const kind = tr.receiver.track.kind;
@@ -180,43 +228,146 @@ export class LiveSession {
           await tr.sender.replaceTrack(this.sending[kind]);
         }
         await peer.pc.setLocalDescription(await peer.pc.createAnswer());
-        await sendSignal(this.ocId, this.token, from, { sdp:peer.pc.localDescription.toJSON() });
+        if(this.peers.get(from)!==peer) return; // a newer call came in meanwhile
+        await sendSignal(this.ocId, this.token, from, { call:data.call, sdp:peer.pc.localDescription.toJSON() });
         await this.flushIce(from);
       } else if(data.sdp && data.sdp.type==='answer'){
+        // teacher: only the answer to the call this connection made
         const peer = this.peers.get(from);
-        if(peer){
+        if(peer && peer.call===data.call && peer.pc.signalingState==='have-local-offer'){
           await peer.pc.setRemoteDescription(data.sdp);
           await this.flushIce(from);
         }
       } else if(data.candidate){
+        // for the current call once it is set up; otherwise kept until its offer or answer comes
+        // (flushIce then uses only the ones of that call, so an earlier call's are dropped)
         const peer = this.peers.get(from);
-        if(peer && peer.pc.remoteDescription) await peer.pc.addIceCandidate(data.candidate);
-        else this.pendingIce.set(from, [...(this.pendingIce.get(from) || []), data.candidate]);
+        if(peer && peer.call===data.call && peer.pc.remoteDescription) await peer.pc.addIceCandidate(data.candidate);
+        else this.pendingIce.set(from, [...(this.pendingIce.get(from) || []), { call:data.call, candidate:data.candidate }]);
       }
     } catch(err){
       console.warn('[live] signal from', from, err);
     }
   }
 
+  // the candidates that came early, for this connection's call only
   async flushIce(id){
     const peer = this.peers.get(id);
     const list = this.pendingIce.get(id) || [];
     this.pendingIce.delete(id);
-    for(const c of list) await peer.pc.addIceCandidate(c).catch(()=>{});
+    if(!peer) return;
+    for(const c of list) if(c.call===peer.call) await peer.pc.addIceCandidate(c.candidate).catch(()=>{});
   }
 
   // ---- my camera, microphone and screen ----
 
+  // what goes out to one person: the same for everyone, except that a presenting learner gets
+  // the teacher's own camera and mic rather than their own screen and voice back
+  sendingFor(id, kind){
+    if(this.role==='teacher' && this.spotlight===id) return kind==='audio' ? this.mic : (this.screen || this.cam);
+    return this.sending[kind];
+  }
+
   // puts what I send now on every connection
   applySending(kind){
-    for(const peer of this.peers.values()){
-      if(peer[kind]) peer[kind].sender.replaceTrack(this.sending[kind]).catch(()=>{});
+    for(const [id, peer] of this.peers){
+      if(peer[kind]) peer[kind].sender.replaceTrack(this.sendingFor(id, kind)).catch(()=>{});
     }
+  }
+
+  // ---- presenting (teacher) ----
+
+  // the presenter's video or voice as it arrives here
+  presenterTrack(kind){
+    const peer = this.spotlight && this.peers.get(this.spotlight);
+    const track = peer && peer[kind] && peer[kind].receiver.track;
+    return track && track.readyState==='live' ? track : null;
+  }
+
+  // puts a learner on show for the class (null: nobody), and tells every learner
+  setSpotlight(learnerId){
+    if(this.role!=='teacher') return;
+    this.spotlight = learnerId;
+    this.updateVideo();
+    this.updateAudio();
+    for(const p of this.participants.values()) if(p.role==='learner') this.tellSpotlight(p.id);
+  }
+
+  tellSpotlight(learnerId){
+    const p = this.spotlight && this.participants.get(this.spotlight);
+    sendSignal(this.ocId, this.token, learnerId, { spotlight: p ? { id:p.id, name:p.name } : null }).catch(()=>{});
+  }
+
+  // teacher: asks a learner to turn their camera on (they get a message with the button)
+  askCamera(learnerId){
+    if(this.role!=='teacher') return;
+    this.askedCamera.add(learnerId);
+    sendSignal(this.ocId, this.token, learnerId, { askCamera:true }).catch(()=>{});
+    this.emit();
+  }
+
+  // ---- still pictures from my camera (learner) ----
+
+  // sends one about every second while my camera is on; stops (and tells the teacher) when it goes off
+  syncSnapshots(){
+    if(this.role!=='learner') return;
+    if(this.cam && !this.snapTimer) this.startSnapshots();
+    else if(!this.cam && this.snapTimer) this.stopSnapshots(true);
+  }
+
+  startSnapshots(){
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.srcObject = new MediaStream([this.cam]);
+    video.play().catch(()=>{});
+    const canvas = document.createElement('canvas');
+    let busy = false;
+    this.snapTimer = setInterval(async ()=>{
+      if(busy || !video.videoWidth || this.stopped) return;
+      const width = 240;
+      canvas.width = width;
+      canvas.height = Math.round(width * video.videoHeight / video.videoWidth);
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      busy = true;
+      await sendSnapshot(this.ocId, this.token, canvas.toDataURL('image/jpeg', 0.6)).catch(()=>{});
+      busy = false;
+    }, 1000);
+    this.snapVideo = video;
+  }
+
+  stopSnapshots(tell){
+    if(!this.snapTimer) return;
+    clearInterval(this.snapTimer);
+    this.snapTimer = null;
+    if(this.snapVideo){ this.snapVideo.srcObject = null; this.snapVideo = null; }
+    if(tell) sendSnapshot(this.ocId, this.token, null).catch(()=>{});
+  }
+
+  closeMixer(){
+    if(this.mixer){ this.mixer.close().catch(()=>{}); this.mixer = null; }
+  }
+
+  // what everyone hears from me: my mic, mixed with the presenter's voice while someone presents
+  updateAudio(){
+    this.closeMixer();
+    const theirs = this.role==='teacher' ? this.presenterTrack('audio') : null;
+    if(theirs && window.AudioContext){
+      const ctx = new AudioContext();
+      const out = ctx.createMediaStreamDestination();
+      for(const track of [this.mic, theirs]) if(track) ctx.createMediaStreamSource(new MediaStream([track])).connect(out);
+      this.mixer = ctx;
+      this.sending.audio = out.stream.getAudioTracks()[0];
+    } else {
+      this.sending.audio = this.mic;
+    }
+    this.applySending('audio');
   }
 
   refreshPreview(){
     for(const track of this.preview.getTracks()) this.preview.removeTrack(track);
-    if(this.sending.video) this.preview.addTrack(this.sending.video);
+    const own = this.screen || this.cam;
+    if(own) this.preview.addTrack(own);
   }
 
   async setMic(on){
@@ -232,8 +383,7 @@ export class LiveSession {
       this.mic.stop();
       this.mic = null;
     }
-    this.sending.audio = this.mic;
-    this.applySending('audio');
+    this.updateAudio();
     this.emit();
   }
 
@@ -253,7 +403,7 @@ export class LiveSession {
     this.updateVideo();
   }
 
-  // teacher: shares a screen or window in place of the camera
+  // shares a screen or window in place of the camera (the teacher, or a learner presenting)
   async setScreenShare(on){
     this.mediaError = null;
     if(on && !this.screen){
@@ -268,6 +418,7 @@ export class LiveSession {
         if(!err || err.name!=='NotAllowedError') this.mediaError = { code:mediaProblem(err, 'screen') };
       }
     } else if(!on && this.screen){
+      this.stopPicture();
       this.screen.onended = null;
       this.screen.stop();
       this.screen = null;
@@ -275,8 +426,48 @@ export class LiveSession {
     this.updateVideo();
   }
 
+  // Phones can't share their screen, so there one shares a picture instead (a screenshot or a
+  // photo of one's work): it is drawn on a canvas whose video goes out in place of the screen.
+  async sharePicture(file){
+    this.mediaError = null;
+    if(this.screen) this.setScreenShare(false);
+    try{
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      try{
+        img.src = url;
+        await img.decode();
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+      const scale = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(2, Math.round(img.naturalWidth * scale / 2) * 2);
+      canvas.height = Math.max(2, Math.round(img.naturalHeight * scale / 2) * 2);
+      const draw = ()=>canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      draw();
+      const [track] = canvas.captureStream(5).getVideoTracks();
+      // a still canvas sends no new frames, so it is drawn again now and then for new viewers
+      this.pictureTimer = setInterval(draw, 500);
+      this.screen = this.keepTrack(track, this.screen);
+      if(!this.screen) this.stopPicture();
+    } catch {
+      this.stopPicture();
+      this.mediaError = { code:'live_picture_failed' };
+    }
+    this.updateVideo();
+  }
+
+  stopPicture(){
+    if(this.pictureTimer){ clearInterval(this.pictureTimer); this.pictureTimer = null; }
+  }
+
   updateVideo(){
-    this.sending.video = this.screen || this.cam;
+    if(this.cam) this.cameraAsked = false;
+    this.syncSnapshots();
+    // while a learner presents, the class sees them; my own preview stays my camera
+    const own = this.screen || this.cam;
+    this.sending.video = (this.role==='teacher' && this.presenterTrack('video')) || own;
     this.applySending('video');
     this.refreshPreview();
     this.emit();
@@ -291,7 +482,7 @@ export class LiveSession {
 
 // The message key for why a microphone, camera or screen share ('mic' | 'camera' | 'screen')
 // couldn't start. Browsers only allow them on https:// pages (and http://localhost).
-function mediaProblem(err, kind){
+export function mediaProblem(err, kind){
   if(!window.isSecureContext || !navigator.mediaDevices) return 'live_media_insecure';
   const name = err && err.name;
   if(kind==='screen') return 'live_screen_failed';
