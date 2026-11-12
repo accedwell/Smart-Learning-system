@@ -15,13 +15,15 @@ const transport = config.smtp.host
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-// The demo accounts' @school.demo addresses have no inbox. While the demo school is on, their
-// emails (like sign-in codes) go to the school's own sending mailbox instead, marked with the
-// account they were for, so the demo can be shown with real emails.
-const DEMO_DOMAIN = '@school.demo';
+// The sample school's accounts (@school.co.za, formerly @school.demo) are not real inboxes. While
+// the sample school is on, their emails (like sign-in codes) go to the school's own sending
+// mailbox instead, marked with the account they were for, so the system can be shown with real
+// emails and nothing goes to a stranger.
+const DEMO_DOMAINS = ['@school.co.za', '@school.demo'];
 
 async function send({ to, subject, text, html }) {
-  if (config.seedDemoData && config.smtp.user && String(to).toLowerCase().endsWith(DEMO_DOMAIN)) {
+  const address = String(to).toLowerCase();
+  if (config.seedDemoData && config.smtp.user && DEMO_DOMAINS.some((d) => address.endsWith(d))) {
     subject = `[Demo: ${to}] ${subject}`;
     to = config.smtp.user;
   }

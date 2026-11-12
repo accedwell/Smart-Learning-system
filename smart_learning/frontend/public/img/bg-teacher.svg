@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+  <!-- teacher dashboard background: a deep-green chalkboard with faint chalk sketches, a wooden ledge with an apple -->
+  <defs>
+    <linearGradient id="board" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f4a3a"/>
+      <stop offset="0.55" stop-color="#2a5b47"/>
+      <stop offset="1" stop-color="#173a2d"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.35" r="0.65">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b9824d"/>
+      <stop offset="1" stop-color="#7a4f2a"/>
+    </linearGradient>
+    <filter id="chalk" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.2"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#board)"/>
+  <rect width="1600" height="1000" fill="url(#glow)"/>
+
+  <!-- smudges where the board was wiped -->
+  <g fill="#ffffff" opacity="0.045">
+    <ellipse cx="420" cy="300" rx="300" ry="90" transform="rotate(-8 420 300)"/>
+    <ellipse cx="1180" cy="520" rx="340" ry="80" transform="rotate(6 1180 520)"/>
+    <ellipse cx="760" cy="760" rx="260" ry="60"/>
+  </g>
+
+  <!-- chalk sketches -->
+  <g fill="none" stroke="#f4f1e6" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.32" filter="url(#chalk)">
+    <!-- triangle with a right angle and sides -->
+    <path d="M150 560 L420 560 L150 360 Z"/>
+    <path d="M150 530 L180 530 L180 560"/>
+    <!-- circle with radius -->
+    <circle cx="1310" cy="230" r="95"/>
+    <path d="M1310 230 L1395 190"/>
+    <circle cx="1310" cy="230" r="4" fill="#f4f1e6"/>
+    <!-- a little globe -->
+    <circle cx="1240" cy="730" r="70"/>
+    <ellipse cx="1240" cy="730" rx="30" ry="70"/>
+    <path d="M1170 730 H1310 M1180 695 H1300 M1180 765 H1300"/>
+    <!-- graph: axes and a curve -->
+    <path d="M640 180 V400 H900"/>
+    <path d="M650 390 C710 380 740 230 790 230 C840 230 860 330 895 300"/>
+    <!-- underlines and arrows -->
+    <path d="M520 600 q40 -10 80 0"/>
+    <path d="M980 360 l60 0 m-14 -10 l14 10 l-14 10"/>
+    <!-- star doodle -->
+    <path d="M1490 470 l10 22 l24 2 l-18 15 l6 23 l-22 -13 l-22 13 l6 -23 l-18 -15 l24 -2 Z"/>
+  </g>
+  <g fill="#f4f1e6" opacity="0.3" font-family="'Comic Sans MS','Segoe Print',cursive" filter="url(#chalk)">
+    <text x="140" y="190" font-size="54">a² + b² = c²</text>
+    <text x="250" y="610" font-size="30">c</text>
+    <text x="1000" y="250" font-size="44">E = mc²</text>
+    <text x="470" y="700" font-size="48">A B C</text>
+    <text x="1000" y="430" font-size="38">x = 2y + 7</text>
+    <text x="1350" y="200" font-size="28">r</text>
+    <text x="660" y="470" font-size="34">π ≈ 3.14</text>
+    <text x="120" y="820" font-size="40">H₂O</text>
+  </g>
+
+  <!-- wooden ledge with chalk, duster and an apple -->
+  <rect x="0" y="905" width="1600" height="26" fill="url(#wood)"/>
+  <rect x="0" y="931" width="1600" height="69" fill="#13302a"/>
+  <rect x="0" y="905" width="1600" height="4" fill="#d9a46d" opacity="0.6"/>
+  <rect x="380" y="893" width="64" height="12" rx="5" fill="#f4f1e6" opacity="0.9"/>
+  <rect x="460" y="896" width="40" height="9" rx="4" fill="#f7d36b" opacity="0.85"/>
+  <g>
+    <rect x="1080" y="874" width="130" height="31" rx="6" fill="#3d3a36"/>
+    <rect x="1080" y="874" width="130" height="12" rx="6" fill="#8a6b4a"/>
+  </g>
+  <g>
+    <path d="M1390 905 c-40 0 -58 -30 -54 -58 c4 -30 30 -40 54 -28 c24 -12 50 -2 54 28 c4 28 -14 58 -54 58 Z" fill="#c8402f"/>
+    <path d="M1372 838 c6 -10 14 -12 18 -10" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" opacity="0.5"/>
+    <path d="M1390 820 c0 -12 4 -20 10 -26" fill="none" stroke="#5a3a20" stroke-width="5" stroke-linecap="round"/>
+    <path d="M1398 806 c14 -14 34 -12 40 -6 c-12 12 -30 14 -40 6 Z" fill="#4f8f3d"/>
+  </g>
+</svg>

@@ -83,9 +83,11 @@ function clearFailures(userId, conn) {
 
 // ---- two-step sign-in ----
 
-const needsCode = (user) => TWO_FACTOR_ROLES.has(user.role) && Boolean(user.email);
+// Off unless LOGIN_CODES=true in backend/.env: then the admin, principal and HODs also type a
+// code emailed to them after their password.
+const needsCode = (user) => process.env.LOGIN_CODES === 'true' && TWO_FACTOR_ROLES.has(user.role) && Boolean(user.email);
 
-// "pi***@school.demo": enough for the person to recognise their address
+// "pi***@school.co.za": enough for the person to recognise their address
 function maskEmail(email) {
   const [name, domain] = String(email).split('@');
   return name.slice(0, 2) + '***@' + domain;
