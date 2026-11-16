@@ -103,7 +103,7 @@ router.get('/users', async (req, res) => {
   }
   const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
   if (q) {
-    where.push('(name LIKE ? OR email LIKE ? OR learner_number LIKE ?)');
+    where.push('(name ILIKE ? OR email ILIKE ? OR learner_number ILIKE ?)');
     const like = '%' + q.replace(/[\\%_]/g, (c) => '\\' + c) + '%';
     params.push(like, like, like);
   }
@@ -193,7 +193,7 @@ router.patch('/users/:id', async (req, res) => {
   if (Object.keys(updates).length) await db.query('UPDATE users SET ? WHERE id = ?', [updates, user.id]);
   // a learner moved to another grade leaves the classes of their old grade
   if (user.role === 'learner' && updates.grade && updates.grade !== user.grade) {
-    await db.query('DELETE cl FROM class_learners cl JOIN classes k ON k.id = cl.class_id WHERE cl.learner_id = ? AND k.grade <> ?',
+    await db.query('DELETE FROM class_learners cl USING classes k WHERE k.id = cl.class_id AND cl.learner_id = ? AND k.grade <> ?',
       [user.id, updates.grade]);
   }
   if (user.role === 'learner' && updates.class_name) await syncRegisterClass(user.id);
@@ -260,10 +260,10 @@ router.get('/security', async (req, res) => {
     event ? [event] : [],
   );
   const locked = await db.query(
-    "SELECT id, name, email, learner_number, role, locked_until FROM users WHERE locked_until > UTC_TIMESTAMP() ORDER BY locked_until DESC");
+    "SELECT id, name, email, learner_number, role, locked_until FROM users WHERE locked_until > now() ORDER BY locked_until DESC");
   const counts = {};
   for (const row of await db.query(
-    'SELECT event, COUNT(*) AS n FROM security_events WHERE created_at > UTC_TIMESTAMP() - INTERVAL 1 DAY GROUP BY event')) {
+    "SELECT event, COUNT(*) AS n FROM security_events WHERE created_at > now() - INTERVAL '1 day' GROUP BY event")) {
     counts[row.event] = row.n;
   }
   res.json({
@@ -321,7 +321,7 @@ router.post('/users/:id/email-login', emailLimiter, async (req, res) => {
 router.post('/parents/:id/children', async (req, res) => {
   const parent = await requireUser(http.id(req.params.id), 'parent');
   const learner = await requireUser(http.id(http.body(req).learnerId, 'learnerId'), 'learner');
-  await db.query('INSERT IGNORE INTO parent_children (parent_id, learner_id) VALUES (?, ?)', [parent.id, learner.id]);
+  await db.query('INSERT INTO parent_children (parent_id, learner_id) VALUES (?, ?) ON CONFLICT DO NOTHING', [parent.id, learner.id]);
   const [out] = await withLinks([parent]);
   res.json({ user: out });
 });
@@ -371,7 +371,7 @@ async function uniqueClass(write) {
   try {
     return await write();
   } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY') throw http.conflict('admin_class_error_taken', 'That class already exists for this grade and subject');
+    if (db.isDuplicate(err)) throw http.conflict('admin_class_error_taken', 'That class already exists for this grade and subject');
     throw err;
   }
 }
@@ -421,7 +421,7 @@ router.put('/classes/:id/learners/:learnerId', async (req, res) => {
   if (taken.length && !taken.includes(c.subject_key)) {
     throw http.badRequest('admin_class_error_subject', 'This learner does not take this subject', { field: 'learnerId' });
   }
-  await db.query('INSERT IGNORE INTO class_learners (class_id, learner_id) VALUES (?, ?)', [c.id, learner.id]);
+  await db.query('INSERT INTO class_learners (class_id, learner_id) VALUES (?, ?) ON CONFLICT DO NOTHING', [c.id, learner.id]);
   res.json({ class: await classById(c.id) });
 });
 
@@ -434,12 +434,12 @@ router.delete('/classes/:id/learners/:learnerId', async (req, res) => {
 router.get('/overview', async (req, res) => {
   const counts = Object.fromEntries(catalog.ROLES.map((r) => [r, 0]));
   for (const row of await db.query('SELECT role, COUNT(*) AS n FROM users GROUP BY role')) counts[row.role] = row.n;
-  const subjects = await db.query('SELECT subject_key AS `key`, attendance, performance FROM subject_stats ORDER BY subject_key');
+  const subjects = await db.query('SELECT subject_key AS "key", attendance, performance FROM subject_stats ORDER BY subject_key');
   const quizzes = await db.one(
     `SELECT (SELECT COUNT(*) FROM quizzes) AS quizzes,
-            (SELECT COUNT(*) FROM quiz_attempts WHERE submitted_at IS NOT NULL) AS quizAttempts,
+            (SELECT COUNT(*) FROM quiz_attempts WHERE submitted_at IS NOT NULL) AS "quizAttempts",
             (SELECT COUNT(*) FROM papers) AS papers,
-            (SELECT COUNT(*) FROM users WHERE must_change_password = 1) AS awaitingFirstLogin`,
+            (SELECT COUNT(*) FROM users WHERE must_change_password = 1) AS "awaitingFirstLogin"`,
   );
   res.json({ counts, totalUsers: Object.values(counts).reduce((a, b) => a + b, 0), subjects, ...quizzes });
 });

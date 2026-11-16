@@ -26,7 +26,7 @@ async function attendance(learnerId) {
        JOIN class_learners cl ON cl.class_id = oc.class_id AND cl.learner_id = ?
        JOIN classes k ON k.id = oc.class_id
        LEFT JOIN online_attendance a ON a.online_class_id = oc.id AND a.learner_id = ?
-      WHERE oc.ended_at IS NOT NULL OR oc.starts_at + INTERVAL oc.duration_min MINUTE < UTC_TIMESTAMP()
+      WHERE oc.ended_at IS NOT NULL OR oc.starts_at + make_interval(mins => oc.duration_min) < now()
       ORDER BY oc.starts_at DESC`,
     [learnerId, learnerId],
   );

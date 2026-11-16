@@ -113,13 +113,13 @@ const OWN_LESSONS = { subject_1: 'lesson_1', subject_2: 'lesson_2', subject_3: '
 
 async function ensureLessonCatalog() {
   for (const [i, key] of LESSON_KEYS.entries()) {
-    await db.query('INSERT IGNORE INTO lessons (lesson_key, sort_order) VALUES (?, ?)', [key, i + 1]);
+    await db.query('INSERT INTO lessons (lesson_key, sort_order) VALUES (?, ?) ON CONFLICT DO NOTHING', [key, i + 1]);
   }
   for (const [i, subject] of catalog.SUBJECT_OPTIONS.entries()) {
     const key = OWN_LESSONS[subject] || 'lesson_term_work:' + subject;
     await db.query(
       `INSERT INTO lessons (lesson_key, sort_order, subject_key) VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order), subject_key = VALUES(subject_key)`,
+       ON CONFLICT (lesson_key) DO UPDATE SET sort_order = EXCLUDED.sort_order, subject_key = EXCLUDED.subject_key`,
       [key, i + 1, subject],
     );
   }
@@ -182,9 +182,8 @@ async function seedDemoData() {
       await ensureLessons(learnerId, conn);
       for (const [i, progress] of l.lessons.entries()) {
         await db.query(
-          `UPDATE learner_lessons ll JOIN lessons ls ON ls.id = ll.lesson_id
-              SET ll.progress = ?, ll.done = ?, ll.assessment_viewed = ?
-            WHERE ll.learner_id = ? AND ls.lesson_key = ?`,
+          `UPDATE learner_lessons ll SET progress = ?, done = ?, assessment_viewed = ?
+             FROM lessons ls WHERE ls.id = ll.lesson_id AND ll.learner_id = ? AND ls.lesson_key = ?`,
           [progress, progress === 100, progress === 100, learnerId, LESSON_KEYS[i]],
           conn,
         );
@@ -243,7 +242,7 @@ async function seedDemoData() {
       for (const table of ['quiz_attempts', 'quiz_submissions']) {
         await db.query(
           `INSERT INTO ${table} (quiz_id, learner_id, answers, score, total, started_at, submitted_at)
-           VALUES (?, ?, '[]', ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))`,
+           VALUES (?, ?, '[]', ?, ?, now(), now())`,
           [quiz.id, ids[r.learner], r.score, quiz.total],
           conn,
         );

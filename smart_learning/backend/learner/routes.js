@@ -168,8 +168,8 @@ router.post('/quizzes/:id/start', async (req, res) => {
   const deadline = quiz.time_limit_min ? new Date(now.getTime() + quiz.time_limit_min * 60000) : null;
   await db.query(
     `INSERT INTO quiz_attempts (quiz_id, learner_id, total, started_at, deadline) VALUES (?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE answers = NULL, score = NULL, timed_out = 0, total = VALUES(total),
-       started_at = VALUES(started_at), deadline = VALUES(deadline), submitted_at = NULL`,
+     ON CONFLICT (quiz_id, learner_id) DO UPDATE SET answers = NULL, score = NULL, timed_out = 0, total = EXCLUDED.total,
+       started_at = EXCLUDED.started_at, deadline = EXCLUDED.deadline, submitted_at = NULL`,
     [quiz.id, req.user.id, quiz.questions.length, now, deadline],
   );
   const attempt = await db.one('SELECT * FROM quiz_attempts WHERE quiz_id = ? AND learner_id = ?', [quiz.id, req.user.id]);
@@ -272,7 +272,7 @@ router.put('/teachers/:id/rating', async (req, res) => {
   if (!teacher || !(await teachesLearner(teacher.id, req.user.id))) throw http.notFound('teacher_not_found', 'No such teacher of your classes');
   const rating = http.int(http.body(req).rating, 'rating', { min: 1, max: 5 });
   await db.query(
-    'INSERT INTO teacher_ratings (teacher_id, learner_id, rating) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE rating = VALUES(rating)',
+    'INSERT INTO teacher_ratings (teacher_id, learner_id, rating) VALUES (?, ?, ?) ON CONFLICT (teacher_id, learner_id) DO UPDATE SET rating = EXCLUDED.rating',
     [teacher.id, req.user.id, rating],
   );
   res.json({ teacherId: teacher.id, rating });
@@ -292,7 +292,7 @@ router.get('/online-classes', async (req, res) => {
        JOIN class_learners cl ON cl.class_id = oc.class_id AND cl.learner_id = ?
        LEFT JOIN users u ON u.id = oc.teacher_id
        LEFT JOIN online_attendance a ON a.online_class_id = oc.id AND a.learner_id = ?
-      WHERE oc.starts_at >= UTC_TIMESTAMP() - INTERVAL 7 DAY
+      WHERE oc.starts_at >= now() - INTERVAL '7 days'
       ORDER BY oc.starts_at, oc.id`,
     [req.user.id, req.user.id],
   );

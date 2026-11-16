@@ -41,7 +41,7 @@ async function logEvent(req, event, { user = null, login = null, actor = null } 
 }
 
 function pruneEvents() {
-  return db.query('DELETE FROM security_events WHERE created_at < UTC_TIMESTAMP() - INTERVAL ? DAY', [KEEP_EVENTS_DAYS]);
+  return db.query('DELETE FROM security_events WHERE created_at < now() - make_interval(days => ?)', [KEEP_EVENTS_DAYS]);
 }
 
 // ---- lockout ----
@@ -60,7 +60,7 @@ async function failedAttempt(req, user, event, login) {
   await db.query('UPDATE users SET failed_logins = failed_logins + 1 WHERE id = ?', [user.id]);
   const { failed_logins: failed } = await db.one('SELECT failed_logins FROM users WHERE id = ?', [user.id]);
   if (failed < MAX_FAILED_LOGINS) return;
-  await db.query('UPDATE users SET failed_logins = 0, locked_until = UTC_TIMESTAMP() + INTERVAL ? MINUTE WHERE id = ?', [LOCK_MINUTES, user.id]);
+  await db.query('UPDATE users SET failed_logins = 0, locked_until = now() + make_interval(mins => ?) WHERE id = ?', [LOCK_MINUTES, user.id]);
   await db.query('DELETE FROM login_codes WHERE user_id = ?', [user.id]);
   await logEvent(req, 'account_locked', { user });
   tellOwnerLocked(user);
@@ -107,8 +107,8 @@ async function startCodeSignIn(req, user) {
   const challenge = crypto.randomBytes(32).toString('hex');
   const { seed, minutes } = await db.tx(async (conn) => {
     const current = await db.one(
-      `SELECT seed, CEIL(TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), expires_at) / 60) AS minutes FROM login_codes
-        WHERE user_id = ? AND expires_at > UTC_TIMESTAMP() + INTERVAL 1 MINUTE AND attempts < ? FOR UPDATE`,
+      `SELECT seed, CEIL(EXTRACT(EPOCH FROM expires_at - now()) / 60) AS minutes FROM login_codes
+        WHERE user_id = ? AND expires_at > now() + INTERVAL '1 minute' AND attempts < ? FOR UPDATE`,
       [user.id, MAX_CODE_ATTEMPTS], conn);
     if (current) {
       await db.query('UPDATE login_codes SET challenge_hash = ? WHERE user_id = ?', [sha256(challenge), user.id], conn);
@@ -117,7 +117,7 @@ async function startCodeSignIn(req, user) {
     const fresh = crypto.randomBytes(16).toString('hex');
     await db.query('DELETE FROM login_codes WHERE user_id = ?', [user.id], conn);
     await db.query(
-      'INSERT INTO login_codes (user_id, challenge_hash, seed, expires_at) VALUES (?, ?, ?, UTC_TIMESTAMP() + INTERVAL ? MINUTE)',
+      'INSERT INTO login_codes (user_id, challenge_hash, seed, expires_at) VALUES (?, ?, ?, now() + make_interval(mins => ?))',
       [user.id, sha256(challenge), fresh, CODE_MINUTES], conn,
     );
     return { seed: fresh, minutes: CODE_MINUTES };
@@ -135,7 +135,7 @@ async function startCodeSignIn(req, user) {
 // the account a challenge + code belong to; throws when the code is wrong, expired or used up
 async function finishCodeSignIn(req, challenge, code) {
   const row = typeof challenge === 'string' && challenge
-    ? await db.one('SELECT * FROM login_codes WHERE challenge_hash = ? AND expires_at > UTC_TIMESTAMP()', [sha256(challenge)])
+    ? await db.one('SELECT * FROM login_codes WHERE challenge_hash = ? AND expires_at > now()', [sha256(challenge)])
     : null;
   if (!row) throw new HttpError(400, 'two_factor_expired', 'This code has expired. Log in again to get a new one');
   const user = await db.one('SELECT * FROM users WHERE id = ?', [row.user_id]);
@@ -183,7 +183,7 @@ async function signedIn(req, user) {
     const label = deviceName(req.get('user-agent')).slice(0, 80);
     const known = await db.one('SELECT 1 FROM known_devices WHERE user_id = ? AND device_hash = ?', [user.id, hash]);
     if (known) {
-      await db.query('UPDATE known_devices SET last_seen = UTC_TIMESTAMP() WHERE user_id = ? AND device_hash = ?', [user.id, hash]);
+      await db.query('UPDATE known_devices SET last_seen = now() WHERE user_id = ? AND device_hash = ?', [user.id, hash]);
       return;
     }
     const { n } = await db.one('SELECT COUNT(*) AS n FROM known_devices WHERE user_id = ?', [user.id]);

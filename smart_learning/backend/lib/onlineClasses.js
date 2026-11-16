@@ -77,17 +77,18 @@ async function forClassroom(user, id) {
 }
 
 // A learner entered the classroom: present, or late after the first minutes. A mark the
-// teacher made is kept, except "absent" given before the learner had come in at all. (MySQL
-// applies the SET list left to right, so the status check still sees the old joined_at.)
+// teacher made is kept, except "absent" given before the learner had come in at all. (The SET
+// list reads the row as it was, so the status check sees the old joined_at.)
 async function learnerEntered(oc, learnerId) {
   const status = Date.now() > new Date(oc.starts_at).getTime() + LATE_AFTER_MS ? 'late' : 'present';
   await db.query(
     `INSERT INTO online_attendance (online_class_id, learner_id, status, joined_at, last_joined_at, marked_by)
-     VALUES (?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(), 'join')
-     ON DUPLICATE KEY UPDATE
-       status = IF(joined_at IS NULL AND status = 'absent', VALUES(status), status),
-       joined_at = COALESCE(joined_at, VALUES(joined_at)),
-       last_joined_at = UTC_TIMESTAMP()`,
+     VALUES (?, ?, ?, now(), now(), 'join')
+     ON CONFLICT (online_class_id, learner_id) DO UPDATE SET
+       status = CASE WHEN online_attendance.joined_at IS NULL AND online_attendance.status = 'absent'
+                     THEN EXCLUDED.status ELSE online_attendance.status END,
+       joined_at = COALESCE(online_attendance.joined_at, EXCLUDED.joined_at),
+       last_joined_at = now()`,
     [oc.id, learnerId, status],
   );
 }
@@ -96,7 +97,7 @@ async function learnerEntered(oc, learnerId) {
 async function learnerLeft(ocId, learnerId) {
   await db.query(
     `UPDATE online_attendance
-        SET seconds_attended = seconds_attended + GREATEST(0, TIMESTAMPDIFF(SECOND, last_joined_at, UTC_TIMESTAMP())),
+        SET seconds_attended = seconds_attended + GREATEST(0, FLOOR(EXTRACT(EPOCH FROM now() - last_joined_at))::int),
             last_joined_at = NULL
       WHERE online_class_id = ? AND learner_id = ? AND last_joined_at IS NOT NULL`,
     [ocId, learnerId],

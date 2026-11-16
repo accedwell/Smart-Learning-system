@@ -50,7 +50,7 @@ router.get('/class', async (req, res) => {
        LEFT JOIN checkin_attempts c ON c.id = (
          SELECT id FROM checkin_attempts WHERE learner_id = u.id ORDER BY created_at DESC, id DESC LIMIT 1)
        LEFT JOIN (
-         SELECT s.learner_id, AVG(s.score / s.total) AS avg_pct, COUNT(*) AS attempts
+         SELECT s.learner_id, AVG(s.score::numeric / s.total) AS avg_pct, COUNT(*) AS attempts
            FROM quiz_submissions s JOIN quizzes z ON z.id = s.quiz_id
           WHERE z.teacher_id = ? AND NOT EXISTS (
             SELECT 1 FROM quiz_submissions e WHERE e.quiz_id = s.quiz_id AND e.learner_id = s.learner_id AND e.id < s.id)
@@ -376,7 +376,7 @@ router.get('/online-classes', async (req, res) => {
   if (rows.length) {
     const ids = rows.map((r) => r.id);
     for (const r of await db.query(
-      `SELECT online_class_id AS id, SUM(status = 'present') AS present, SUM(status = 'late') AS late
+      `SELECT online_class_id AS id, COUNT(*) FILTER (WHERE status = 'present') AS present, COUNT(*) FILTER (WHERE status = 'late') AS late
          FROM online_attendance WHERE online_class_id IN (?) GROUP BY online_class_id`, [ids])) {
       counts.set(r.id, { present: Number(r.present), late: Number(r.late) });
     }
@@ -432,7 +432,7 @@ router.put('/online-classes/:id/register/:learnerId', async (req, res) => {
   } else {
     await db.query(
       `INSERT INTO online_attendance (online_class_id, learner_id, status, marked_by) VALUES (?, ?, ?, 'teacher')
-       ON DUPLICATE KEY UPDATE status = VALUES(status), marked_by = 'teacher'`,
+       ON CONFLICT (online_class_id, learner_id) DO UPDATE SET status = EXCLUDED.status, marked_by = 'teacher'`,
       [oc.id, learnerId, http.oneOf(status, onlineClasses.ATTENDANCE, 'status')],
     );
   }
@@ -442,7 +442,7 @@ router.put('/online-classes/:id/register/:learnerId', async (req, res) => {
 // ends the class now: the classroom closes for everyone in it
 router.post('/online-classes/:id/end', async (req, res) => {
   const oc = await ownOnlineClass(req);
-  if (onlineClasses.phase(oc) !== 'ended') await db.query('UPDATE online_classes SET ended_at = UTC_TIMESTAMP() WHERE id = ?', [oc.id]);
+  if (onlineClasses.phase(oc) !== 'ended') await db.query('UPDATE online_classes SET ended_at = now() WHERE id = ?', [oc.id]);
   liveRooms.end(oc.id);
   res.json({ onlineClass: teacherOnlineView(await onlineClasses.find(oc.id), new Map()) });
 });

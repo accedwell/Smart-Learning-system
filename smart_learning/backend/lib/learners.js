@@ -9,19 +9,20 @@ async function ensureLessons(learnerId, conn) {
   const subjects = await db.query('SELECT subject_key FROM learner_subjects WHERE learner_id = ?', [learnerId], conn);
   if (subjects.length === 0) {
     await db.query(
-      "INSERT IGNORE INTO learner_lessons (learner_id, lesson_id) SELECT ?, id FROM lessons WHERE lesson_key IN ('lesson_1', 'lesson_2', 'lesson_3')",
+      "INSERT INTO learner_lessons (learner_id, lesson_id) SELECT ?, id FROM lessons WHERE lesson_key IN ('lesson_1', 'lesson_2', 'lesson_3') ON CONFLICT DO NOTHING",
       [learnerId], conn,
     );
     return;
   }
   await db.query(
-    `DELETE ll FROM learner_lessons ll JOIN lessons l ON l.id = ll.lesson_id
-      WHERE ll.learner_id = ? AND (l.subject_key IS NULL OR l.subject_key NOT IN (SELECT subject_key FROM learner_subjects WHERE learner_id = ?))`,
+    `DELETE FROM learner_lessons ll USING lessons l
+      WHERE l.id = ll.lesson_id AND ll.learner_id = ? AND (l.subject_key IS NULL OR l.subject_key NOT IN (SELECT subject_key FROM learner_subjects WHERE learner_id = ?))`,
     [learnerId, learnerId], conn,
   );
   await db.query(
-    `INSERT IGNORE INTO learner_lessons (learner_id, lesson_id)
-     SELECT ?, l.id FROM lessons l JOIN learner_subjects ls ON ls.subject_key = l.subject_key AND ls.learner_id = ?`,
+    `INSERT INTO learner_lessons (learner_id, lesson_id)
+     SELECT ?, l.id FROM lessons l JOIN learner_subjects ls ON ls.subject_key = l.subject_key AND ls.learner_id = ?
+     ON CONFLICT DO NOTHING`,
     [learnerId, learnerId], conn,
   );
 }

@@ -155,7 +155,7 @@ router.post('/forgot-password', credentialLimiter, async (req, res) => {
 router.post('/reset-password', credentialLimiter, async (req, res) => {
   const b = http.body(req);
   const token = typeof b.token === 'string' ? b.token : '';
-  const reset = token && await db.one('SELECT * FROM password_resets WHERE token_hash = ? AND expires_at > UTC_TIMESTAMP()', [sha256(token)]);
+  const reset = token && await db.one('SELECT * FROM password_resets WHERE token_hash = ? AND expires_at > now()', [sha256(token)]);
   if (!reset) throw http.badRequest('reset_link_invalid', 'This reset link is invalid or has expired');
   const next = auth.checkNewPassword(b.newPassword);
   await db.tx(async (conn) => {

@@ -1,10 +1,13 @@
-// Question-paper and study-guide uploads: images, PDFs or Word (.docx) files up to 5 MB, stored
-// under UPLOAD_DIR with a random name (the original name is kept in the database for downloads).
+// Question-paper and study-guide uploads: images, PDFs or Word (.docx) files up to 5 MB. The
+// file is kept in the database (paper_files), so it survives a restart or redeploy of the server
+// (a hosting service wipes its disk then). Papers uploaded before that were saved under
+// UPLOAD_DIR, and are still read from there.
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const multer = require('multer');
 const config = require('./config');
+const db = require('./db');
 const http = require('./http');
 const { DOCX } = require('./documentText');
 
@@ -26,13 +29,9 @@ const SIGNATURES = {
 
 const badType = () => http.badRequest('paper_bad_type', 'Upload a photo (PNG, JPEG, GIF or WebP), a PDF or a Word (.docx) file');
 
-fs.mkdirSync(config.uploadDir, { recursive: true });
-
+// the upload stays in memory (req.file.buffer) until it is saved with the paper
 const paperUpload = multer({
-  storage: multer.diskStorage({
-    destination: config.uploadDir,
-    filename: (req, file, cb) => cb(null, crypto.randomBytes(16).toString('hex') + EXTENSIONS[file.mimetype]),
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: config.maxUploadBytes, files: 1 },
   fileFilter: (req, file, cb) => {
     if (EXTENSIONS[file.mimetype]) cb(null, true);
@@ -40,21 +39,29 @@ const paperUpload = multer({
   },
 }).single('file');
 
-// after the upload is saved: refuses a file whose contents are not the type it claims
-async function checkFileType(file) {
-  const handle = await fs.promises.open(file.path);
-  try {
-    const { buffer } = await handle.read(Buffer.alloc(12), 0, 12, 0);
-    if (!SIGNATURES[file.mimetype](buffer)) throw badType();
-  } finally {
-    await handle.close();
-  }
+// refuses a file whose contents are not the type it claims
+function checkFileType(file) {
+  if (!SIGNATURES[file.mimetype](file.buffer)) throw badType();
 }
 
-const filePath = (storedName) => path.join(config.uploadDir, path.basename(storedName));
+// a random name for the paper's file, with the extension of its type
+const storedName = (file) => crypto.randomBytes(16).toString('hex') + EXTENSIONS[file.mimetype];
 
-function removeFile(storedName) {
-  fs.rm(filePath(storedName), { force: true }, () => {});
+function saveFile(paperId, file, conn) {
+  return db.query('INSERT INTO paper_files (paper_id, data) VALUES (?, ?) RETURNING paper_id', [paperId, file.buffer], conn);
 }
 
-module.exports = { paperUpload, checkFileType, filePath, removeFile };
+const oldFilePath = (paper) => path.join(config.uploadDir, path.basename(paper.stored_name));
+
+// the paper's file as a Buffer
+async function fileData(paper) {
+  const row = await db.one('SELECT data FROM paper_files WHERE paper_id = ?', [paper.id]);
+  return row ? row.data : fs.promises.readFile(oldFilePath(paper));
+}
+
+// after the paper is deleted (its paper_files row goes with it): an older file on disk too
+function removeOldFile(paper) {
+  fs.rm(oldFilePath(paper), { force: true }, () => {});
+}
+
+module.exports = { paperUpload, checkFileType, storedName, saveFile, fileData, removeOldFile };

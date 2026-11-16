@@ -57,7 +57,7 @@ router.post('/reports', async (req, res) => {
     attendance: tc.attendance, performance: tc.performance, avgRating: tc.ratings.average,
   }));
   const report = await db.tx(async (conn) => {
-    const result = await db.query('INSERT INTO dept_reports (hod_id, dept, `rows`) VALUES (?, ?, ?)',
+    const result = await db.query('INSERT INTO dept_reports (hod_id, dept, "rows") VALUES (?, ?, ?)',
       [req.user.id, req.user.dept, JSON.stringify(rows)], conn);
     const principals = await db.query("SELECT id FROM users WHERE role = 'principal'", [], conn);
     await notify(principals.map((p) => p.id), { message: `${req.user.name} sent a department report.` }, conn);

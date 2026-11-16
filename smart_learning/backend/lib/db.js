@@ -1,97 +1,106 @@
-// MySQL access. `init()` creates the database and tables on first start (so they show up
-// in MySQL Workbench), then every query goes through one shared connection pool.
+// PostgreSQL access. `init()` creates the database and tables on first start (so they show up
+// in pgAdmin), then every query goes through one shared connection pool.
+//
+// The routes write SQL with `?` placeholders. query() turns them into PostgreSQL's $1, $2 …,
+// and a value can stand for more than one:
+//   an array        `IN (?)` with [1, 2]           -> IN ($1, $2)
+//   rows            `VALUES ?` with [[1, 2], [3, 4]] -> VALUES ($1, $2), ($3, $4)
+//   an object       `INSERT INTO t SET ?`          -> INSERT INTO t ("a", "b") VALUES ($1, $2)
+//                   `UPDATE t SET ? WHERE …`        -> UPDATE t SET "a" = $1, "b" = $2 WHERE …
+// true and false are stored as 1 and 0 (the flag columns are SMALLINT).
 const fs = require('node:fs');
 const path = require('node:path');
-const mysql = require('mysql2/promise');
+const { Client, Pool, types } = require('pg');
 const config = require('./config');
+
+// COUNT() and SUM() give int8 and AVG() and ROUND() numeric, which the driver hands over as text
+types.setTypeParser(types.builtins.INT8, (v) => Number(v));
+types.setTypeParser(types.builtins.NUMERIC, (v) => Number(v));
 
 let pool = null;
 
-// the tables, from db/schema.sql; its CREATE DATABASE/USE lines are skipped because the
-// database name comes from DB_NAME
+// the tables, from db/schema.sql
 function schemaStatements() {
   const sql = fs.readFileSync(path.join(__dirname, '..', 'db', 'schema.sql'), 'utf8')
     .split(/\r?\n/) // a Windows checkout has CRLF line endings
     .map((line) => line.replace(/(^|\s)--\s.*$/, '')) // drop "-- comments", which may contain a ';'
     .join('\n');
-  return sql.split(';').map((s) => s.trim()).filter((s) => s && !/^(CREATE DATABASE|USE)\b/i.test(s));
+  return sql.split(';').map((s) => s.trim()).filter(Boolean);
 }
 
 async function init() {
-  const { database, ...server } = config.db;
-  const admin = await mysql.createConnection(server);
+  const { database } = config.db;
+  if (!/^[A-Za-z0-9_]+$/.test(database)) throw new Error('DB_NAME may only contain letters, digits and _');
+  // the database itself, created from the server's built-in "postgres" one
+  const admin = new Client({ ...config.db, database: 'postgres' });
+  await admin.connect();
   try {
-    await admin.query(`CREATE DATABASE IF NOT EXISTS \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`);
+    const { rowCount } = await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [database]);
+    if (!rowCount) await admin.query(`CREATE DATABASE "${database}" ENCODING 'UTF8'`);
   } finally {
     await admin.end();
   }
-  // everything is stored and read as UTC, including the CURRENT_TIMESTAMP column defaults
-  pool = mysql.createPool({ ...config.db, connectionLimit: 10, timezone: 'Z', supportBigNumbers: true });
-  pool.pool.on('connection', (conn) => conn.query("SET time_zone = '+00:00'"));
+  // everything is stored and read as UTC
+  pool = new Pool({ ...config.db, max: 10, options: '-c TimeZone=UTC' });
   for (const statement of schemaStatements()) await pool.query(statement);
-  await migrate();
 }
 
-// Changes to tables an older version already created (CREATE TABLE IF NOT EXISTS leaves
-// those as they were). Each runs only while it is still needed.
-const MIGRATIONS = [
-  // learners log in with the learner number the school gave them, not their ID number
-  { table: 'users', column: 'id_number', exists: true, sql: 'RENAME COLUMN id_number TO learner_number' },
-  { table: 'online_classes', column: 'meeting_url', exists: true, sql: 'DROP COLUMN meeting_url' },
-  { table: 'online_attendance', column: 'last_joined_at', exists: false, sql: 'ADD COLUMN last_joined_at DATETIME NULL AFTER joined_at' },
-  { table: 'online_attendance', column: 'seconds_attended', exists: false, sql: 'ADD COLUMN seconds_attended INT NOT NULL DEFAULT 0 AFTER last_joined_at' },
-  { table: 'papers', column: 'extracted_text', exists: false, sql: 'ADD COLUMN extracted_text MEDIUMTEXT NULL AFTER size_bytes' },
-  { table: 'lessons', column: 'subject_key', exists: false, sql: 'ADD COLUMN subject_key VARCHAR(60) NULL AFTER sort_order' },
-  { table: 'users', column: 'class_name', exists: false, sql: 'ADD COLUMN class_name VARCHAR(10) NULL AFTER grade' },
-  { table: 'users', column: 'failed_logins', exists: false, sql: 'ADD COLUMN failed_logins INT NOT NULL DEFAULT 0 AFTER token_version' },
-  { table: 'users', column: 'locked_until', exists: false, sql: 'ADD COLUMN locked_until DATETIME NULL AFTER failed_logins' },
-];
+const isRow = (v) => Array.isArray(v);
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) && !(v instanceof Date) && !Buffer.isBuffer(v);
 
-// Other changes to existing tables: `needed` is a query that returns a row while the change
-// still has to be made, and `sql` the statements that make it.
-const CHANGES = [
-  // learners are added with their learner number and need no email address of their own
-  {
-    needed: "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'email' AND IS_NULLABLE = 'NO'",
-    sql: ['ALTER TABLE users MODIFY email VARCHAR(254) NULL'],
-  },
-  // one account per learner number (empty values become NULL first, which the index allows many of)
-  {
-    needed: "SELECT 1 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'learner_number' AND NON_UNIQUE = 0)",
-    sql: ["UPDATE users SET learner_number = NULL WHERE learner_number = ''", 'ALTER TABLE users ADD UNIQUE INDEX uq_users_learner_number (learner_number)'],
-  },
-  // sign-in codes: one per account, emailed again unchanged (its rows only live 10 minutes)
-  {
-    needed: "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_codes' AND NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_codes' AND COLUMN_NAME = 'seed')",
-    sql: ['DROP TABLE login_codes', `CREATE TABLE IF NOT EXISTS login_codes (
-        user_id INT PRIMARY KEY,          -- one code at a time per account
-        challenge_hash CHAR(64) NOT NULL UNIQUE,
-        seed CHAR(32) NOT NULL,           -- the code is worked out from this and JWT_SECRET, so it can be emailed again unchanged
-        attempts INT NOT NULL DEFAULT 0,
-        expires_at DATETIME NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB`],
-  },
-];
+function column(name) {
+  if (!/^[a-z_][a-z0-9_]*$/i.test(name)) throw new Error(`Not a column name: ${name}`);
+  return `"${name}"`;
+}
 
-async function migrate() {
-  for (const m of MIGRATIONS) {
-    const [rows] = await pool.query(
-      'SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
-      [m.table, m.column],
-    );
-    if ((rows.length > 0) === m.exists) await pool.query(`ALTER TABLE \`${m.table}\` ${m.sql}`);
+// `sql` with ? placeholders and `params` -> PostgreSQL's { text, values } (see the top)
+function toPostgres(sql, params = []) {
+  const values = [];
+  const add = (v) => {
+    values.push(typeof v === 'boolean' ? Number(v) : v === undefined ? null : v);
+    return '$' + values.length;
+  };
+  let text = '';
+  let quote = null;
+  let next = 0;
+  for (const ch of sql) {
+    if (quote) {
+      text += ch;
+      if (ch === quote) quote = null;
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+      text += ch;
+    } else if (ch !== '?') {
+      text += ch;
+    } else {
+      const v = params[next++];
+      if (isObject(v)) {
+        const keys = Object.keys(v);
+        if (/INSERT\s+INTO\s+\S+\s+SET\s*$/i.test(text)) {
+          text = text.replace(/SET\s*$/i, '') + `(${keys.map(column).join(', ')}) VALUES (${keys.map((k) => add(v[k])).join(', ')})`;
+        } else {
+          text += keys.map((k) => `${column(k)} = ${add(v[k])}`).join(', ');
+        }
+      } else if (Array.isArray(v)) {
+        if (!v.length) text += 'NULL'; // IN (NULL) matches nothing
+        else if (v.every(isRow)) text += v.map((row) => `(${row.map(add).join(', ')})`).join(', ');
+        else text += v.map(add).join(', ');
+      } else {
+        text += add(v);
+      }
+    }
   }
-  for (const change of CHANGES) {
-    const [rows] = await pool.query(change.needed);
-    if (rows.length) for (const sql of change.sql) await pool.query(sql);
-  }
+  // an INSERT hands back its new rows, for insertId
+  if (/^\s*INSERT\b/i.test(text) && !/\bRETURNING\b/i.test(text)) text += ' RETURNING *';
+  return { text, values };
 }
 
 // rows for a SELECT, or the result header ({ insertId, affectedRows }) for a write
 async function query(sql, params = [], conn = pool) {
-  const [result] = await conn.query(sql, params);
-  return result;
+  const { text, values } = toPostgres(sql, params);
+  const result = await conn.query(text, values);
+  if (result.command === 'SELECT') return result.rows;
+  return { insertId: result.rows && result.rows[0] ? result.rows[0].id : undefined, affectedRows: result.rowCount };
 }
 
 async function one(sql, params = [], conn = pool) {
@@ -101,22 +110,25 @@ async function one(sql, params = [], conn = pool) {
 
 // runs fn(conn) inside a transaction; pass conn to query()/one() inside it
 async function tx(fn) {
-  const conn = await pool.getConnection();
+  const conn = await pool.connect();
   try {
-    await conn.beginTransaction();
+    await conn.query('BEGIN');
     const result = await fn(conn);
-    await conn.commit();
+    await conn.query('COMMIT');
     return result;
   } catch (err) {
-    await conn.rollback();
+    await conn.query('ROLLBACK').catch(() => {});
     throw err;
   } finally {
     conn.release();
   }
 }
 
+// whether an error is a clash with a UNIQUE key (e.g. that class already exists)
+const isDuplicate = (err) => Boolean(err) && err.code === '23505';
+
 async function close() {
   if (pool) await pool.end();
 }
 
-module.exports = { init, query, one, tx, close };
+module.exports = { init, query, one, tx, isDuplicate, close };

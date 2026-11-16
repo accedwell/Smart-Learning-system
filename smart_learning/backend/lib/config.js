@@ -1,5 +1,5 @@
 // Settings come from environment variables, loaded from backend/.env when present
-// (see .env.example). Everything has a development default except the MySQL password.
+// (see .env.example). Everything has a development default except the PostgreSQL password.
 const path = require('node:path');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
@@ -37,8 +37,8 @@ module.exports = {
 
   db: {
     host: env.DB_HOST || 'localhost',
-    port: Number(env.DB_PORT) || 3306,
-    user: env.DB_USER || 'root',
+    port: Number(env.DB_PORT) || 5432,
+    user: env.DB_USER || 'postgres',
     password: env.DB_PASSWORD || '',
     database: env.DB_NAME || 'smart_learning',
   },

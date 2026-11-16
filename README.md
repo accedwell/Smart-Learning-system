@@ -6,7 +6,7 @@ A school learning platform where every learner is taught, tracked and supported 
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-22+-339933?logo=nodedotjs&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)
-![MySQL](https://img.shields.io/badge/MySQL-8-4479A1?logo=mysql&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-4169E1?logo=postgresql&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-chatbot-009688?logo=fastapi&logoColor=white)
 
@@ -43,7 +43,7 @@ A school learning platform where every learner is taught, tracked and supported 
 | Part | Technology |
 |---|---|
 | Frontend | React 19, Vite 8, Immer |
-| Backend | Node.js 22+, Express 5, MySQL 8 (mysql2), JWT sign-in, bcrypt |
+| Backend | Node.js 22+, Express 5, PostgreSQL 14+ (pg), JWT sign-in, bcrypt |
 | Online classes | WebRTC (browser to browser), with the backend relaying the connection set-up and chat |
 | Reading documents | Tesseract.js (OCR), pdf.js, Mammoth (Word files) |
 | Chatbot | Python, FastAPI, Uvicorn |
@@ -68,7 +68,7 @@ Smart-Learning-system/
 ### What you need
 
 - Node.js 22.12 or newer
-- MySQL 8
+- PostgreSQL 14 or newer
 - Python 3.11 or newer (only for the chatbot)
 
 ### 1. Backend
@@ -81,7 +81,7 @@ cp .env.example .env
 
 Open `.env` and fill in at least:
 
-- `DB_HOST`, `DB_PORT`, `DB_USER` and `DB_PASSWORD`: your MySQL server
+- `DB_HOST`, `DB_PORT`, `DB_USER` and `DB_PASSWORD`: your PostgreSQL server (the backend creates the `smart_learning` database and its tables on first start)
 - `JWT_SECRET`: a long random value
 - `CHATBOT_SECRET`: another long random value
 
@@ -203,7 +203,7 @@ The administrator then adds everyone else from their dashboard.
 1. **Stronger passwords:** require letters and numbers, and block common passwords such as `Password123`.
 2. **HTTPS** once the system runs on a server.
 3. **Dependency checks:** run `npm audit` and `pip-audit` regularly.
-4. **A MySQL user with limited rights:** it can read and write data but can't drop tables.
+4. **A PostgreSQL user with limited rights:** it can read and write data but can't drop tables.
 5. **Regular database backups.**
 
 ### Keeping your installation safe

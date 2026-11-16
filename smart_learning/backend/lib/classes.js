@@ -25,14 +25,15 @@ async function syncRegisterClass(learnerId, conn) {
   const others = registerClasses(learner.grade).filter((name) => name !== learner.class_name);
   if (others.length) {
     await db.query(
-      `DELETE cl FROM class_learners cl JOIN classes k ON k.id = cl.class_id
-        WHERE cl.learner_id = ? AND k.grade = ? AND k.name IN (?)`,
+      `DELETE FROM class_learners cl USING classes k
+        WHERE k.id = cl.class_id AND cl.learner_id = ? AND k.grade = ? AND k.name IN (?)`,
       [learnerId, learner.grade, others], conn);
   }
   await db.query(
-    `INSERT IGNORE INTO class_learners (class_id, learner_id)
+    `INSERT INTO class_learners (class_id, learner_id)
      SELECT k.id, ? FROM classes k JOIN learner_subjects s ON s.learner_id = ? AND s.subject_key = k.subject_key
-      WHERE k.grade = ? AND k.name = ?`,
+      WHERE k.grade = ? AND k.name = ?
+     ON CONFLICT DO NOTHING`,
     [learnerId, learnerId, learner.grade, learner.class_name], conn);
 }
 

@@ -40,7 +40,7 @@ app.use((err, req, res, next) => {
     e = err.code === 'LIMIT_FILE_SIZE'
       ? new HttpError(413, 'paper_too_big', `The file is larger than ${config.maxUploadBytes / 1024 / 1024} MB`)
       : new HttpError(400, 'invalid_upload', err.message);
-  } else if (err.code === 'ER_DUP_ENTRY') {
+  } else if (db.isDuplicate(err)) {
     e = new HttpError(409, 'duplicate', 'That already exists');
   } else if (err.type === 'entity.parse.failed') {
     e = new HttpError(400, 'invalid_json', 'The request body is not valid JSON');
@@ -58,7 +58,7 @@ async function start() {
   try {
     await db.init();
   } catch (err) {
-    console.error(`[db] Could not connect to MySQL at ${config.db.user}@${config.db.host}:${config.db.port}: ${err.message}`);
+    console.error(`[db] Could not connect to PostgreSQL at ${config.db.user}@${config.db.host}:${config.db.port}: ${err.message}`);
     console.error('[db] Check DB_HOST, DB_PORT, DB_USER and DB_PASSWORD in backend/.env');
     process.exit(1);
   }
