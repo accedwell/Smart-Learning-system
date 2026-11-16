@@ -1,11 +1,13 @@
 // Opens or downloads an uploaded paper. The file needs the sign-in token, which a plain link
 // can't send, so it is fetched first and handed to the browser as a local blob URL.
 // Resolves to an error ({ code }) or null.
+import { serverUrl } from './api.js'
+
 export async function openFile(url, token, { download=false, fileName='file' } = {}){
   // a new tab has to be opened while the click still counts, or the browser blocks it
   const win = download ? null : window.open('', '_blank');
   try{
-    const res = await fetch(url, { headers:{ Authorization:'Bearer '+token } });
+    const res = await fetch(serverUrl(url), { headers:{ Authorization:'Bearer '+token } });
     if(!res.ok) throw new Error(String(res.status));
     const blobUrl = URL.createObjectURL(await res.blob());
     if(download){

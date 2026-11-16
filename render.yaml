@@ -1,0 +1,44 @@
+# The Smart Learning backend on Render (render.com > New > Blueprint, then pick this repository).
+# The website is on Vercel (smart_learning/frontend/vercel.json) and the database on Neon.
+services:
+  - type: web
+    name: smart-learning-api
+    runtime: node
+    plan: free
+    rootDir: smart_learning/backend
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      # Render's proxy sits in front of the server: the visitor's address is one hop back
+      - key: TRUST_PROXY
+        value: "1"
+      # the Neon connection string (postgresql://...?sslmode=require)
+      - key: DATABASE_URL
+        sync: false
+      # the website's address on Vercel, e.g. https://smart-learning.vercel.app
+      - key: CORS_ORIGIN
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CHATBOT_SECRET
+        generateValue: true
+      # optional: AI quiz drafting and study tips, and email (sign-in codes, password resets)
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false

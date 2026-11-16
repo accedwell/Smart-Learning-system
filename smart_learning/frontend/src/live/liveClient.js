@@ -1,4 +1,4 @@
-import { apiPost } from '../services/api.js'
+import { apiPost, serverUrl } from '../services/api.js'
 
 // The live classroom's connection to the backend (/api/live). The event stream is read with
 // fetch rather than EventSource, because EventSource can't send the sign-in token. It
@@ -21,7 +21,7 @@ export function openStream(ocId, token, handlers){
     while(!finished){
       handlers.onStatus(attempt===0 ? 'connecting' : 'reconnecting');
       try{
-        const res = await fetch(`/api/live/${ocId}/stream`, { headers:{ Authorization:'Bearer '+token }, signal:abort.signal });
+        const res = await fetch(serverUrl(`/api/live/${ocId}/stream`), { headers:{ Authorization:'Bearer '+token }, signal:abort.signal });
         if(!res.ok){
           const body = await res.json().catch(()=>null);
           finished = true;

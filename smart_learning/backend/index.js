@@ -11,7 +11,7 @@ const { HttpError } = require('./lib/http');
 const mailer = require('./lib/mailer');
 
 const app = express();
-app.set('trust proxy', 'loopback');
+app.set('trust proxy', config.trustProxy);
 app.disable('x-powered-by');
 // CSP, HSTS, no framing, nosniff and no Referer on every response
 app.use(helmet({ referrerPolicy: { policy: 'no-referrer' } }));
@@ -58,13 +58,13 @@ async function start() {
   try {
     await db.init();
   } catch (err) {
-    console.error(`[db] Could not connect to PostgreSQL at ${config.db.user}@${config.db.host}:${config.db.port}: ${err.message}`);
-    console.error('[db] Check DB_HOST, DB_PORT, DB_USER and DB_PASSWORD in backend/.env');
+    console.error(`[db] Could not connect to PostgreSQL at ${db.where()}: ${err.message}`);
+    console.error('[db] Check DATABASE_URL, or DB_HOST, DB_PORT, DB_USER and DB_PASSWORD, in backend/.env');
     process.exit(1);
   }
   await ensureLessonCatalog();
   if (config.seedDemoData && (await seedDemoData())) {
-    console.log(`[db] Demo school added to "${config.db.database}" (every demo account's password is ${DEMO_PASSWORD})`);
+    console.log(`[db] Demo school added to ${db.where()} (every demo account's password is ${DEMO_PASSWORD})`);
   }
   if (!(await db.one("SELECT 1 FROM users WHERE role = 'admin' LIMIT 1"))) {
     console.warn('[setup] There is no administrator yet. Create one with: npm run create-admin -- --name "Jane Doe" --email jane@school.org');
@@ -72,7 +72,7 @@ async function start() {
   await pruneEvents(); // the security log keeps half a year
   await mailer.verify();
   const server = app.listen(config.port, () => {
-    console.log(`Smart Learning API on http://localhost:${config.port}/api (database "${config.db.database}")`);
+    console.log(`Smart Learning API on http://localhost:${config.port}/api (database ${db.where()})`);
   });
   const stop = () => server.close(() => db.close().finally(() => process.exit(0)));
   process.on('SIGINT', stop);

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/AppStore.jsx'
 import { useI18n } from '../i18n/I18nContext.jsx'
 import { LanguageSelect } from '../components/ui.jsx'
-import { errorText } from '../services/api.js'
+import { errorText, serverUrl } from '../services/api.js'
 import { readEvents } from '../live/liveClient.js'
 
 // The most recent turns sent with each question, so the assistant can follow the conversation
@@ -59,7 +59,7 @@ export default function ChatWidget(){
     setSending(true);
     const botId = addMsg('bot', t('chat_thinking'));
     try{
-      const res = await fetch('/api/ai/chat', {
+      const res = await fetch(serverUrl('/api/ai/chat'), {
         method:'POST',
         headers:{ 'Content-Type':'application/json', Accept:'text/event-stream', Authorization:'Bearer '+token },
         body: JSON.stringify({ messages:turns, lang: chatLang==='__system' ? lang : chatLang }),

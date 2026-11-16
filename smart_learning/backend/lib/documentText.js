@@ -122,9 +122,8 @@ async function inTurn(fn) {
   }
 }
 
-// the text of the file at `filePath` of type `mimeType`, tidied: no stray spaces, at most one blank line
-async function documentText(filePath, mimeType) {
-  const buffer = await fs.readFile(filePath);
+// the text of a file (a Buffer) of type `mimeType`, tidied: no stray spaces, at most one blank line
+async function documentText(buffer, mimeType) {
   const text = await inTurn(async () => {
     if (mimeType === 'application/pdf') return pdfText(buffer);
     if (mimeType === DOCX) return docxText(buffer);

@@ -4,6 +4,13 @@ import { UI } from '../i18n/strings.js'
 // Resolves to { data } or { error: { code, message, vars } }; error codes are i18n keys
 // where one exists, so screens can show t(error.code, error.vars).
 // `token` is the sign-in token from POST /auth/login (state.auth.token).
+
+// The backend's address: VITE_API_URL when the website and the backend are on different sites
+// (e.g. https://smart-learning-api.onrender.com), otherwise this site's own /api.
+export const SERVER = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+// "/api/papers/3/file" (as the backend writes its links) -> where to fetch it
+export const serverUrl = (path)=>SERVER+path;
+
 // A random id this browser keeps, sent with every request, so the backend can tell a sign-in
 // from a new device (and email a login alert). It identifies the browser, never the person.
 const DEVICE_KEY = 'smart-learning-device';
@@ -24,7 +31,7 @@ export async function apiRequest(method, path, { body, token } = {}){
     const headers = { 'X-Device-Id':getDeviceId() };
     if(body!==undefined) headers['Content-Type'] = 'application/json';
     if(token) headers.Authorization = 'Bearer '+token;
-    const res = await fetch('/api'+path, {
+    const res = await fetch(serverUrl('/api'+path), {
       method,
       headers,
       body: body===undefined ? undefined : JSON.stringify(body),
@@ -52,7 +59,7 @@ export function apiPatch(path, body, token){
 // multipart/form-data upload (the browser sets the boundary); same answer shape as apiRequest
 export async function apiUpload(path, formData, token){
   try{
-    const res = await fetch('/api'+path, {
+    const res = await fetch(serverUrl('/api'+path), {
       method:'POST',
       headers: token ? { Authorization:'Bearer '+token } : {},
       body: formData,

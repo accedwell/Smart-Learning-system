@@ -1,7 +1,6 @@
 // /api/teacher: the teacher's own classes with each learner's status, quizzes and their
 // results, question papers (with AI quiz drafting) and feedback from the principal. A teacher
 // only ever sees their own classes, the learners in them, and their own quizzes and papers.
-const fs = require('node:fs/promises');
 const express = require('express');
 const db = require('../lib/db');
 const auth = require('../lib/auth');
@@ -20,7 +19,7 @@ const GENERATED_QUESTIONS = 15;
 const quizFromPaperLimiter = rateLimit({ windowMs: 60 * 1000, max: 6, key: (req) => 'paper-quiz:' + req.user.id });
 const liveRooms = require('../lib/liveRooms');
 const { parseQuiz, teacherView } = require('../lib/quizzes');
-const { paperUpload, checkFileType, filePath, removeFile } = require('../lib/uploads');
+const { paperUpload, checkFileType, storedName, saveFile, fileData, removeOldFile } = require('../lib/uploads');
 const { classView, teacherClassesFor, sendToClasses, classIdsOf, teachesLearner } = require('../lib/classes');
 const http = require('../lib/http');
 
@@ -246,43 +245,39 @@ router.get('/papers', async (req, res) => {
 // one grade and subject, which the paper takes), file
 router.post('/papers', paperUpload, async (req, res) => {
   if (!req.file) throw http.badRequest('paper_no_file', 'Attach the question paper file');
-  try {
-    await checkFileType(req.file);
-    const b = http.body(req);
-    const classes = await teacherClassesFor(req.user.id, b.classIds);
-    const fields = {
-      teacher_id: req.user.id,
-      title: http.text(b.title, 'title', { max: 150 }),
-      grade: classes[0].grade,
-      subject_key: classes[0].subject_key,
-      file_name: (req.file.originalname || 'paper').slice(0, 255),
-      stored_name: req.file.filename,
-      mime_type: req.file.mimetype,
-      size_bytes: req.file.size,
-    };
-    const id = await db.tx(async (conn) => {
-      const result = await db.query('INSERT INTO papers SET ?', [fields], conn);
-      await sendToClasses('paper', result.insertId, classes, conn);
-      return result.insertId;
-    });
-    res.status(201).json({ paper: (await paperViews([await db.one('SELECT * FROM papers WHERE id = ?', [id])]))[0] });
-  } catch (err) {
-    removeFile(req.file.filename);
-    throw err;
-  }
+  checkFileType(req.file);
+  const b = http.body(req);
+  const classes = await teacherClassesFor(req.user.id, b.classIds);
+  const fields = {
+    teacher_id: req.user.id,
+    title: http.text(b.title, 'title', { max: 150 }),
+    grade: classes[0].grade,
+    subject_key: classes[0].subject_key,
+    file_name: (req.file.originalname || 'paper').slice(0, 255),
+    stored_name: storedName(req.file),
+    mime_type: req.file.mimetype,
+    size_bytes: req.file.size,
+  };
+  const id = await db.tx(async (conn) => {
+    const result = await db.query('INSERT INTO papers SET ?', [fields], conn);
+    await saveFile(result.insertId, req.file, conn);
+    await sendToClasses('paper', result.insertId, classes, conn);
+    return result.insertId;
+  });
+  res.status(201).json({ paper: (await paperViews([await db.one('SELECT * FROM papers WHERE id = ?', [id])]))[0] });
 });
 
 router.delete('/papers/:id', async (req, res) => {
   const paper = await ownPaper(req);
   await db.query('DELETE FROM papers WHERE id = ?', [paper.id]);
-  removeFile(paper.stored_name);
+  removeOldFile(paper);
   res.status(204).end();
 });
 
 // the paper's text, read once (OCR for photos and scans) and kept on the paper
 async function paperText(paper) {
   if (paper.extracted_text != null) return paper.extracted_text;
-  const text = (await documentText(filePath(paper.stored_name), paper.mime_type)).slice(0, 200000);
+  const text = (await documentText(await fileData(paper), paper.mime_type)).slice(0, 200000);
   await db.query('UPDATE papers SET extracted_text = ? WHERE id = ?', [text, paper.id]);
   return text;
 }
@@ -302,7 +297,7 @@ router.post('/papers/:id/generate-quiz', quizFromPaperLimiter, async (req, res) 
       const isFile = paper.mime_type === 'application/pdf' || paper.mime_type.startsWith('image/');
       questions = await ai.quizFromPaper({
         ...(isFile
-          ? { fileBase64: (await fs.readFile(filePath(paper.stored_name))).toString('base64'), mimeType: paper.mime_type }
+          ? { fileBase64: (await fileData(paper)).toString('base64'), mimeType: paper.mime_type }
           : { text: (await paperText(paper)).slice(0, 60000) }),
         max: GENERATED_QUESTIONS,
         prompt: `This is a ${t('grade_' + paper.grade)} ${t(paper.subject_key)} question paper or study guide titled ` +

@@ -28,10 +28,11 @@ function schemaStatements() {
   return sql.split(';').map((s) => s.trim()).filter(Boolean);
 }
 
-async function init() {
+// the database itself, created from the server's built-in "postgres" one (not for a
+// DATABASE_URL: a hosted database comes already made)
+async function createDatabase() {
   const { database } = config.db;
   if (!/^[A-Za-z0-9_]+$/.test(database)) throw new Error('DB_NAME may only contain letters, digits and _');
-  // the database itself, created from the server's built-in "postgres" one
   const admin = new Client({ ...config.db, database: 'postgres' });
   await admin.connect();
   try {
@@ -40,6 +41,10 @@ async function init() {
   } finally {
     await admin.end();
   }
+}
+
+async function init() {
+  if (!config.db.connectionString) await createDatabase();
   // everything is stored and read as UTC
   pool = new Pool({ ...config.db, max: 10, options: '-c TimeZone=UTC' });
   for (const statement of schemaStatements()) await pool.query(statement);
@@ -124,6 +129,17 @@ async function tx(fn) {
   }
 }
 
+// "user@host:port/database" for messages (never the password)
+function where() {
+  if (!config.db.connectionString) return `${config.db.user}@${config.db.host}:${config.db.port}/${config.db.database}`;
+  try {
+    const url = new URL(config.db.connectionString);
+    return `${url.username}@${url.host}${url.pathname}`;
+  } catch {
+    return 'DATABASE_URL';
+  }
+}
+
 // whether an error is a clash with a UNIQUE key (e.g. that class already exists)
 const isDuplicate = (err) => Boolean(err) && err.code === '23505';
 
@@ -131,4 +147,4 @@ async function close() {
   if (pool) await pool.end();
 }
 
-module.exports = { init, query, one, tx, isDuplicate, close };
+module.exports = { init, query, one, tx, isDuplicate, where, close };

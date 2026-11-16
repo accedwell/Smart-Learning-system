@@ -3,7 +3,7 @@ import { useStore } from '../src/store/AppStore.jsx'
 import { scoreClass } from '../src/store/metrics.js'
 import { useI18n } from '../src/i18n/I18nContext.jsx'
 import { SectionHead, Icon } from '../src/components/ui.jsx'
-import { apiGet, apiPost, errorText } from '../src/services/api.js'
+import { apiGet, apiPost, errorText, serverUrl } from '../src/services/api.js'
 import { formatDate, timeAgo } from '../src/services/dates.js'
 
 const STATUS_PILL = { on_track:'good', watch:'warn', at_risk:'bad' };
@@ -74,7 +74,7 @@ export default function ParentDashboard(){
 
   // the report as a PDF, made by the server: shown in a new tab, or saved as a file
   async function reportPdf(){
-    const res = await fetch(`/api/parent/children/${child.id}/report.pdf`, { headers:{ Authorization:'Bearer '+token } });
+    const res = await fetch(serverUrl(`/api/parent/children/${child.id}/report.pdf`), { headers:{ Authorization:'Bearer '+token } });
     if(!res.ok) throw new Error('report');
     return URL.createObjectURL(await res.blob());
   }

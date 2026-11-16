@@ -7,7 +7,7 @@ const config = require('../lib/config');
 const { aiLimiter } = require('../lib/rateLimit');
 const { catalog } = require('../lib/catalog');
 const { childIdsOf } = require('../lib/users');
-const { filePath } = require('../lib/uploads');
+const { fileData } = require('../lib/uploads');
 const { sentToLearners } = require('../lib/classes');
 const http = require('../lib/http');
 
@@ -81,7 +81,7 @@ router.get('/papers/:id/file', auth.requireAuth(), async (req, res) => {
   res.set('X-Content-Type-Options', 'nosniff');
   res.type(paper.mime_type);
   res.set('Content-Disposition', `${req.query.download ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(paper.file_name)}`);
-  res.sendFile(filePath(paper.stored_name));
+  res.send(await fileData(paper));
 });
 
 // ---- AI support chat ----

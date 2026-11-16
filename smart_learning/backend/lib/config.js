@@ -25,9 +25,15 @@ if (isProd && seedDemoData) throw new Error('SEED_DEMO_DATA must not be true in 
 
 const list = (value) => (value || '').split(',').map((s) => s.trim()).filter(Boolean);
 
+// Which proxies in front of the server to believe about the visitor's address (used for the
+// sign-in limits): only this computer by default; behind a host's proxy (e.g. Render) the
+// number of proxies, usually 1.
+const trustProxy = /^\d+$/.test(env.TRUST_PROXY || '') ? Number(env.TRUST_PROXY) : env.TRUST_PROXY || 'loopback';
+
 module.exports = {
   ROOT,
   isProd,
+  trustProxy,
   port: Number(env.PORT) || 4000,
   corsOrigins: list(env.CORS_ORIGIN || 'http://localhost:5173'),
   appUrl: env.APP_URL || 'http://localhost:5173',
@@ -35,7 +41,9 @@ module.exports = {
   jwtSecret,
   jwtExpiresIn: env.JWT_EXPIRES_IN || '8h',
 
-  db: {
+  // DATABASE_URL (a hosted database such as Neon gives one: postgresql://user:password@host/db?sslmode=require)
+  // takes the place of the DB_ settings; that database must exist already
+  db: env.DATABASE_URL ? { connectionString: env.DATABASE_URL } : {
     host: env.DB_HOST || 'localhost',
     port: Number(env.DB_PORT) || 5432,
     user: env.DB_USER || 'postgres',
