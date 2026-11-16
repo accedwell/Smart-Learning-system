@@ -11,8 +11,8 @@ import { HeaderButtons } from './Common';
 
 const ROLES = ['learner', 'teacher', 'parent', 'hod', 'principal', 'admin'];
 const ROLE_KEY = { learner: 'tab_learner', teacher: 'tab_teacher', parent: 'tab_parent', hod: 'tab_hod', principal: 'tab_principal', admin: 'tab_admin' };
-// each grade's register classes: 10A, 10B, 10C (as on the website)
-const registerClasses = (grade) => (grade ? ['A', 'B', 'C'].map((letter) => grade + letter) : []);
+// each grade's register classes: 10A, 10B, 10C, 10D (as on the website)
+const registerClasses = (grade) => (grade ? ['A', 'B', 'C', 'D'].map((letter) => grade + letter) : []);
 
 export function AdminOverview() {
   const { t, c, switchTab } = useKit();

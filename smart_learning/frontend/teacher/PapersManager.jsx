@@ -8,7 +8,7 @@ import ClassPicker from './ClassPicker.jsx'
 import QuizFromPaper from './QuizFromPaper.jsx'
 import { makeEmptyPaperDraft } from './drafts.js'
 
-const MAX_BYTES = 5*1024*1024;
+const MAX_BYTES = 4*1024*1024;
 
 // The teacher uploads question papers and study guides (PDF, Word .docx or a photo) for their
 // classes; learners in those classes can open them. As soon as a file is uploaded the system

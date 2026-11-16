@@ -80,7 +80,10 @@ module.exports = {
   },
 
   uploadDir: path.resolve(ROOT, env.UPLOAD_DIR || 'uploads'),
-  maxUploadBytes: 5 * 1024 * 1024,
+  // under the 4.5 MB a Vercel function accepts
+  maxUploadBytes: 4 * 1024 * 1024,
+  // open database connections per server (a Vercel instance needs only a few)
+  dbPoolMax: Number(env.DB_POOL_MAX) || 10,
 
   ai: {
     enabled: env.AI_ENABLED !== 'false',

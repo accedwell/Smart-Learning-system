@@ -1,4 +1,4 @@
-// Question-paper and study-guide uploads: images, PDFs or Word (.docx) files up to 5 MB. The
+// Question-paper and study-guide uploads: images, PDFs or Word (.docx) files up to 4 MB. The
 // file is kept in the database (paper_files), so it survives a restart or redeploy of the server
 // (a hosting service wipes its disk then). Papers uploaded before that were saved under
 // UPLOAD_DIR, and are still read from there.

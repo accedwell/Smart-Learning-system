@@ -1,0 +1,3 @@
+# the Smart Learning API: nothing here for search engines
+User-agent: *
+Disallow: /

@@ -1,0 +1,6 @@
+# never uploaded to Vercel: local settings (with passwords), local uploads and installed packages
+.env
+.env.*
+!.env.example
+uploads
+node_modules

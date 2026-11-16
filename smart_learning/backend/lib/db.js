@@ -46,7 +46,7 @@ async function createDatabase() {
 async function init() {
   if (!config.db.connectionString) await createDatabase();
   // everything is stored and read as UTC
-  pool = new Pool({ ...config.db, max: 10, options: '-c TimeZone=UTC' });
+  pool = new Pool({ ...config.db, max: config.dbPoolMax, options: '-c TimeZone=UTC' });
   for (const statement of schemaStatements()) await pool.query(statement);
 }
 

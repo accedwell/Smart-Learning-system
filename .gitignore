@@ -32,3 +32,6 @@ desktop.ini
 
 # Claude Code's personal settings for this repo
 .claude/settings.local.json
+
+# Vercel project links (made by the Vercel CLI)
+.vercel

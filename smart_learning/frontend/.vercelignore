@@ -1,0 +1,6 @@
+# never uploaded to Vercel: local settings, installed packages and local builds
+.env
+.env.*
+node_modules
+dist
+dist-mobile
